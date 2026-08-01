@@ -7,6 +7,13 @@ const ENTRANCE := Vector2i(0, 5)
 const TREASURE := Vector2i(14, 5)
 const DOOR := Vector2i(7, 5)
 const MOVE_SPEED := 150.0
+const PREPARATION_DURATION := 15.0
+
+enum GameState {
+    PREPARATION,
+    INVASION,
+    FINISHED
+}
 
 var astar := AStarGrid2D.new()
 var walls: Array[Vector2i] = []
@@ -14,19 +21,30 @@ var door_closed := false
 var adventurer_position := Vector2.ZERO
 var path: Array[Vector2] = []
 var path_index := 0
-var run_finished := false
+var game_state := GameState.PREPARATION
+var preparation_time_left := PREPARATION_DURATION
 var status_label: Label
+var phase_label: Label
+var countdown_label: Label
 var door_button: Button
+var start_button: Button
 
 func _ready() -> void:
     _build_level()
     _configure_pathfinding()
     _build_interface()
-    _restart_invasion()
+    _start_new_run()
     queue_redraw()
 
 func _process(delta: float) -> void:
-    if run_finished or path_index >= path.size():
+    if game_state == GameState.PREPARATION:
+        preparation_time_left = maxf(preparation_time_left - delta, 0.0)
+        _refresh_phase_ui()
+        if preparation_time_left <= 0.0:
+            _start_invasion()
+        return
+
+    if game_state != GameState.INVASION or path_index >= path.size():
         return
 
     var target := path[path_index]
@@ -36,8 +54,9 @@ func _process(delta: float) -> void:
         adventurer_position = target
         path_index += 1
         if path_index >= path.size():
-            run_finished = true
+            game_state = GameState.FINISHED
             status_label.text = "Le trésor a été pillé. Il faut ajouter des défenses !"
+            _refresh_phase_ui()
 
     queue_redraw()
 
@@ -80,6 +99,16 @@ func _build_interface() -> void:
     title.add_theme_font_size_override("font_size", 26)
     add_child(title)
 
+    phase_label = Label.new()
+    phase_label.position = Vector2(48, 60)
+    phase_label.add_theme_font_size_override("font_size", 18)
+    add_child(phase_label)
+
+    countdown_label = Label.new()
+    countdown_label.position = Vector2(260, 60)
+    countdown_label.add_theme_font_size_override("font_size", 18)
+    add_child(countdown_label)
+
     status_label = Label.new()
     status_label.position = Vector2(48, 590)
     status_label.size = Vector2(580, 32)
@@ -91,25 +120,49 @@ func _build_interface() -> void:
     door_button.pressed.connect(_toggle_door)
     add_child(door_button)
 
-    var restart_button := Button.new()
-    restart_button.text = "Relancer l'invasion"
-    restart_button.position = Vector2(710, 24)
-    restart_button.size = Vector2(200, 42)
-    restart_button.pressed.connect(_restart_invasion)
-    add_child(restart_button)
+    start_button = Button.new()
+    start_button.position = Vector2(710, 24)
+    start_button.size = Vector2(200, 42)
+    start_button.pressed.connect(_on_primary_button_pressed)
+    add_child(start_button)
 
     _refresh_door_ui()
 
-func _restart_invasion() -> void:
+func _start_new_run() -> void:
+    game_state = GameState.PREPARATION
+    preparation_time_left = PREPARATION_DURATION
     adventurer_position = _world_from_cell(ENTRANCE)
-    run_finished = false
+    path.clear()
+    path_index = 0
+    status_label.text = "Préparez le donjon avant l'arrivée de l'aventurier."
+    _refresh_phase_ui()
+    queue_redraw()
+
+func _start_invasion() -> void:
+    if game_state != GameState.PREPARATION:
+        return
+
+    game_state = GameState.INVASION
     _recalculate_path()
+    _refresh_phase_ui()
+
+func _on_primary_button_pressed() -> void:
+    if game_state == GameState.PREPARATION:
+        _start_invasion()
+    else:
+        _start_new_run()
 
 func _toggle_door() -> void:
+    if game_state == GameState.FINISHED:
+        return
+
     door_closed = not door_closed
     astar.set_point_solid(DOOR, door_closed)
     _refresh_door_ui()
-    _recalculate_path()
+
+    if game_state == GameState.INVASION:
+        _recalculate_path()
+
     queue_redraw()
 
 func _recalculate_path() -> void:
@@ -128,11 +181,27 @@ func _recalculate_path() -> void:
         path.remove_at(0)
 
     if path.is_empty():
-        run_finished = true
+        game_state = GameState.FINISHED
         status_label.text = "Chemin bloqué : le donjon est défendu."
     else:
-        run_finished = false
         status_label.text = "L'aventurier cherche un chemin vers le trésor."
+
+    _refresh_phase_ui()
+
+func _refresh_phase_ui() -> void:
+    match game_state:
+        GameState.PREPARATION:
+            phase_label.text = "Phase : PRÉPARATION"
+            countdown_label.text = "Départ dans %d s" % ceili(preparation_time_left)
+            start_button.text = "Lancer l'invasion"
+        GameState.INVASION:
+            phase_label.text = "Phase : INVASION"
+            countdown_label.text = ""
+            start_button.text = "Relancer la partie"
+        GameState.FINISHED:
+            phase_label.text = "Phase : TERMINÉE"
+            countdown_label.text = ""
+            start_button.text = "Nouvelle partie"
 
 func _refresh_door_ui() -> void:
     door_button.text = "Ouvrir la porte" if door_closed else "Fermer la porte"
@@ -140,7 +209,6 @@ func _refresh_door_ui() -> void:
 func _draw_grid() -> void:
     for y in range(GRID_SIZE.y):
         for x in range(GRID_SIZE.x):
-            var cell := Vector2i(x, y)
             var rect := Rect2(GRID_ORIGIN + Vector2(x, y) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE))
             var fill := Color("252a3a") if (x + y) % 2 == 0 else Color("212635")
             draw_rect(rect, fill)
