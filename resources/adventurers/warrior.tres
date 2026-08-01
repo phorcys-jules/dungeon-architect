@@ -6,8 +6,11 @@
 script = ExtResource("1")
 id = "warrior"
 display_name = "Guerrier"
-description = "Aventurier équilibré et résistant."
+description = "Aventurier équilibré et résistant, protégé par une armure légère."
 max_health = 140
 speed_multiplier = 0.95
 reward = 40
+flat_armor = 4
+trap_damage_multiplier = 1.0
+defender_damage_multiplier = 0.9
 color = Color(0.35, 0.55, 1, 1)
