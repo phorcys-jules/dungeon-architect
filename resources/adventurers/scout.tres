@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AdventurerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/adventurer_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "scout"
+display_name = "Éclaireur"
+description = "Rapide mais fragile."
+max_health = 90
+speed_multiplier = 1.18
+reward = 25
+color = Color(0.35, 0.75, 1, 1)
