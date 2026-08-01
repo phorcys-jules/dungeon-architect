@@ -3,6 +3,7 @@ extends Node2D
 const HealthComponentScript := preload("res://scripts/components/health_component.gd")
 const SpikeTrapScript := preload("res://scripts/traps/spike_trap.gd")
 const DefenderScript := preload("res://scripts/monsters/defender.gd")
+const RunStatsScript := preload("res://scripts/core/run_stats.gd")
 const GRID_SIZE := Vector2i(15, 10)
 const CELL_SIZE := 48
 const GRID_ORIGIN := Vector2(48, 96)
@@ -28,6 +29,7 @@ var path_index := 0
 var game_state := GameState.PREPARATION
 var preparation_time_left := PREPARATION_DURATION
 var adventurer_health: HealthComponent
+var run_stats: RunStats = RunStatsScript.new()
 var status_label: Label
 var phase_label: Label
 var countdown_label: Label
@@ -37,6 +39,9 @@ var door_button: Button
 var start_button: Button
 var trap_button: Button
 var defender_button: Button
+var result_panel: Panel
+var result_title: Label
+var result_summary: Label
 
 func _ready() -> void:
     _build_level()
@@ -62,7 +67,11 @@ func _process(delta: float) -> void:
         queue_redraw()
         return
 
-    if game_state != GameState.INVASION or path_index >= path.size() or adventurer_health.is_dead:
+    if game_state != GameState.INVASION or adventurer_health.is_dead:
+        return
+
+    run_stats.tick(delta)
+    if path_index >= path.size():
         return
 
     var target := path[path_index]
@@ -72,9 +81,7 @@ func _process(delta: float) -> void:
         _trigger_trap_at(_cell_from_world(adventurer_position))
         path_index += 1
         if path_index >= path.size() and not adventurer_health.is_dead:
-            game_state = GameState.FINISHED
-            status_label.text = "Le trésor a été pillé. Il faut améliorer les défenses."
-            _refresh_phase_ui()
+            _finish_run(false, "Le trésor a été pillé.")
     queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -176,6 +183,25 @@ func _build_interface() -> void:
     start_button.size = Vector2(200, 42)
     start_button.pressed.connect(_on_primary_button_pressed)
     add_child(start_button)
+
+    result_panel = Panel.new()
+    result_panel.position = Vector2(290, 205)
+    result_panel.size = Vector2(440, 250)
+    result_panel.visible = false
+    add_child(result_panel)
+
+    result_title = Label.new()
+    result_title.position = Vector2(30, 24)
+    result_title.size = Vector2(380, 45)
+    result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    result_title.add_theme_font_size_override("font_size", 30)
+    result_panel.add_child(result_title)
+
+    result_summary = Label.new()
+    result_summary.position = Vector2(55, 85)
+    result_summary.size = Vector2(330, 130)
+    result_summary.add_theme_font_size_override("font_size", 18)
+    result_panel.add_child(result_summary)
     _refresh_door_ui()
 
 func _start_new_run() -> void:
@@ -183,12 +209,12 @@ func _start_new_run() -> void:
     preparation_time_left = PREPARATION_DURATION
     adventurer_position = _world_from_cell(ENTRANCE)
     adventurer_health.reset()
+    run_stats.reset()
     path.clear()
     path_index = 0
-    for trap: SpikeTrap in traps.values():
-        trap.queue_free()
-    for defender: Defender in defenders.values():
-        defender.queue_free()
+    result_panel.visible = false
+    for trap: SpikeTrap in traps.values(): trap.queue_free()
+    for defender: Defender in defenders.values(): defender.queue_free()
     traps.clear()
     defenders.clear()
     build_mode = BuildMode.SPIKE_TRAP
@@ -223,7 +249,9 @@ func _place_spike_trap(cell: Vector2i) -> void:
         return
     var trap: SpikeTrap = SpikeTrapScript.new()
     trap.setup(cell)
-    trap.triggered.connect(func(damage: int): status_label.text = "Piège déclenché : %d dégâts." % damage)
+    trap.triggered.connect(func(damage: int):
+        run_stats.record_trap(damage)
+        status_label.text = "Piège déclenché : %d dégâts." % damage)
     add_child(trap)
     traps[cell] = trap
     status_label.text = "Piège placé."
@@ -236,7 +264,9 @@ func _place_defender(cell: Vector2i) -> void:
         return
     var defender: Defender = DefenderScript.new()
     defender.setup(cell, _world_from_cell(cell))
-    defender.attacked.connect(func(damage: int): status_label.text = "Le défenseur inflige %d dégâts." % damage)
+    defender.attacked.connect(func(damage: int):
+        run_stats.record_defender_attack(damage)
+        status_label.text = "Le défenseur inflige %d dégâts." % damage)
     add_child(defender)
     defenders[cell] = defender
     status_label.text = "Défenseur placé."
@@ -267,26 +297,32 @@ func _on_adventurer_health_changed(current_health: int, max_health: int) -> void
     queue_redraw()
 
 func _on_adventurer_died() -> void:
+    _finish_run(true, "L'aventurier a été éliminé.")
+
+func _finish_run(victory: bool, message: String) -> void:
+    if game_state == GameState.FINISHED:
+        return
     game_state = GameState.FINISHED
     path.clear()
-    status_label.text = "L'aventurier a été éliminé. Le donjon est défendu !"
+    run_stats.finish("VICTOIRE" if victory else "DÉFAITE")
+    status_label.text = message
+    result_title.text = run_stats.result
+    result_title.modulate = Color("63d471") if victory else Color("ed6a5a")
+    result_summary.text = run_stats.summary()
+    result_panel.visible = true
     _refresh_phase_ui()
     queue_redraw()
 
 func _recalculate_path() -> void:
     var start_cell := _cell_from_world(adventurer_position)
-    if not _is_inside_grid(start_cell):
-        start_cell = ENTRANCE
+    if not _is_inside_grid(start_cell): start_cell = ENTRANCE
     var cell_path := astar.get_id_path(start_cell, TREASURE)
     path.clear()
     path_index = 0
-    for cell in cell_path:
-        path.append(_world_from_cell(cell))
-    if path.size() > 1:
-        path.remove_at(0)
+    for cell in cell_path: path.append(_world_from_cell(cell))
+    if path.size() > 1: path.remove_at(0)
     if path.is_empty():
-        game_state = GameState.FINISHED
-        status_label.text = "Chemin bloqué : le donjon est défendu."
+        _finish_run(true, "Chemin bloqué : le donjon est défendu.")
     else:
         status_label.text = "L'aventurier cherche un chemin vers le trésor."
     _refresh_phase_ui()
@@ -300,11 +336,11 @@ func _refresh_phase_ui() -> void:
         GameState.INVASION:
             phase_label.text = "Phase : INVASION"
             countdown_label.text = ""
-            start_button.text = "Relancer la partie"
+            start_button.text = "Recommencer"
         GameState.FINISHED:
             phase_label.text = "Phase : TERMINÉE"
             countdown_label.text = ""
-            start_button.text = "Nouvelle partie"
+            start_button.text = "Rejouer"
     trap_button.disabled = game_state != GameState.PREPARATION
     defender_button.disabled = game_state != GameState.PREPARATION
 
@@ -319,8 +355,7 @@ func _draw_grid() -> void:
     for y in range(GRID_SIZE.y):
         for x in range(GRID_SIZE.x):
             var rect := Rect2(GRID_ORIGIN + Vector2(x, y) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE))
-            var fill := Color("252a3a") if (x + y) % 2 == 0 else Color("212635")
-            draw_rect(rect, fill)
+            draw_rect(rect, Color("252a3a") if (x + y) % 2 == 0 else Color("212635"))
             draw_rect(rect, Color("3b4358"), false, 1.0)
 
 func _draw_level_objects() -> void:
@@ -353,8 +388,7 @@ func _draw_defenders() -> void:
         draw_circle(center + Vector2(5, -4), 2.0, Color.WHITE)
 
 func _draw_adventurer() -> void:
-    if adventurer_health.is_dead:
-        return
+    if adventurer_health.is_dead: return
     draw_circle(adventurer_position, 14.0, Color("62a7ff"))
     draw_circle(adventurer_position + Vector2(-5, -4), 2.0, Color.WHITE)
     draw_circle(adventurer_position + Vector2(5, -4), 2.0, Color.WHITE)

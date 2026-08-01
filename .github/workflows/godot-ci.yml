@@ -52,6 +52,9 @@ jobs:
       - name: Run defender test
         run: ./godot --headless --path . --script tests/defender_test.gd
 
+      - name: Run result statistics test
+        run: ./godot --headless --path . --script tests/run_stats_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \

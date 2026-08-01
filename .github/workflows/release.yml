@@ -43,6 +43,8 @@ jobs:
           ./godot --headless --path . --script tests/smoke_test.gd
           ./godot --headless --path . --script tests/health_component_test.gd
           ./godot --headless --path . --script tests/spike_trap_test.gd
+          ./godot --headless --path . --script tests/defender_test.gd
+          ./godot --headless --path . --script tests/run_stats_test.gd
 
       - name: Install export templates
         run: |
