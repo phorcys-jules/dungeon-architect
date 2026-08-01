@@ -6,8 +6,11 @@
 script = ExtResource("1")
 id = "champion"
 display_name = "Champion"
-description = "Très lent, mais possède une réserve de vie élevée."
+description = "Très lent, mais lourdement blindé et difficile à abattre."
 max_health = 220
 speed_multiplier = 0.78
 reward = 65
+flat_armor = 8
+trap_damage_multiplier = 0.9
+defender_damage_multiplier = 0.75
 color = Color(0.75, 0.45, 1, 1)
