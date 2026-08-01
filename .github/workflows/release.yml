@@ -1,20 +1,19 @@
-name: Godot CI
+name: Publish Windows release
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate-test-build:
-    name: Validate, test and build
+  build-release:
+    name: Build and publish Windows release
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     env:
       GODOT_VERSION: 4.7.1
@@ -24,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y unzip zip
 
       - name: Download Godot editor
@@ -35,19 +34,15 @@ jobs:
           unzip godot.zip -d godot-bin
           mv "godot-bin/Godot_v${GODOT_RELEASE}_linux.x86_64" godot
           chmod +x godot
-          ./godot --version
 
-      - name: Import project and validate resources
+      - name: Import and validate project
         run: ./godot --headless --path . --import
 
-      - name: Run smoke test
-        run: ./godot --headless --path . --script tests/smoke_test.gd
-
-      - name: Run health component test
-        run: ./godot --headless --path . --script tests/health_component_test.gd
-
-      - name: Run spike trap test
-        run: ./godot --headless --path . --script tests/spike_trap_test.gd
+      - name: Run automated tests
+        run: |
+          ./godot --headless --path . --script tests/smoke_test.gd
+          ./godot --headless --path . --script tests/health_component_test.gd
+          ./godot --headless --path . --script tests/spike_trap_test.gd
 
       - name: Install export templates
         run: |
@@ -65,16 +60,14 @@ jobs:
           test -s build/windows/dungeon-architect.exe
           test -s build/windows/dungeon-architect.pck
 
-      - name: Package Windows build
+      - name: Package release
         run: |
           cd build/windows
-          zip -9 ../dungeon-architect-windows.zip dungeon-architect.exe dungeon-architect.pck
-          test -s ../dungeon-architect-windows.zip
+          zip -9 ../dungeon-architect-windows-${GITHUB_REF_NAME}.zip dungeon-architect.exe dungeon-architect.pck
 
-      - name: Upload Windows build
-        uses: actions/upload-artifact@v4
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
         with:
-          name: dungeon-architect-windows
-          path: build/dungeon-architect-windows.zip
-          if-no-files-found: error
-          retention-days: 14
+          files: build/dungeon-architect-windows-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
