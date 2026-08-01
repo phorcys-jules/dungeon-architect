@@ -5,6 +5,8 @@ const SpikeTrapScript := preload("res://scripts/traps/spike_trap.gd")
 const DefenderScript := preload("res://scripts/monsters/defender.gd")
 const RunStatsScript := preload("res://scripts/core/run_stats.gd")
 const EconomyScript := preload("res://scripts/core/economy.gd")
+const WaveManagerScript := preload("res://scripts/core/wave_manager.gd")
+
 const GRID_SIZE := Vector2i(15, 10)
 const CELL_SIZE := 48
 const GRID_ORIGIN := Vector2(48, 96)
@@ -13,14 +15,12 @@ const TREASURE := Vector2i(14, 5)
 const DOOR := Vector2i(7, 5)
 const MOVE_SPEED := 150.0
 const PREPARATION_DURATION := 15.0
-const ADVENTURER_MAX_HEALTH := 100
 const STARTING_GOLD := 100
 const SPIKE_TRAP_COST := 25
 const DEFENDER_COST := 40
 const DOOR_COST := 10
-const KILL_REWARD := 30
 
-enum GameState { PREPARATION, INVASION, FINISHED }
+enum GameState { PREPARATION, INVASION, WAVE_RESULT, CAMPAIGN_FINISHED }
 enum BuildMode { SPIKE_TRAP, DEFENDER }
 
 var astar := AStarGrid2D.new()
@@ -38,9 +38,12 @@ var preparation_time_left := PREPARATION_DURATION
 var adventurer_health: HealthComponent
 var run_stats: RunStats = RunStatsScript.new()
 var economy: Economy = EconomyScript.new()
+var waves: WaveManager = WaveManagerScript.new()
+
 var status_label: Label
 var phase_label: Label
 var countdown_label: Label
+var wave_label: Label
 var health_label: Label
 var build_label: Label
 var gold_label: Label
@@ -59,41 +62,53 @@ func _ready() -> void:
     _build_interface()
     economy.starting_gold = STARTING_GOLD
     economy.gold_changed.connect(_on_gold_changed)
-    _start_new_run()
+    _start_new_campaign()
     queue_redraw()
 
 func _process(delta: float) -> void:
-    for trap: SpikeTrap in traps.values(): trap.tick(delta)
+    for trap: SpikeTrap in traps.values():
+        trap.tick(delta)
     for defender: Defender in defenders.values():
         defender.tick(delta)
         if game_state == GameState.INVASION and not adventurer_health.is_dead:
             defender.try_attack(adventurer_position, adventurer_health, CELL_SIZE)
+
     if game_state == GameState.PREPARATION:
         preparation_time_left = maxf(preparation_time_left - delta, 0.0)
         _refresh_phase_ui()
-        if preparation_time_left <= 0.0: _start_invasion()
+        if preparation_time_left <= 0.0:
+            _start_invasion()
         queue_redraw()
         return
-    if game_state != GameState.INVASION or adventurer_health.is_dead: return
+
+    if game_state != GameState.INVASION or adventurer_health.is_dead:
+        return
+
     run_stats.tick(delta)
-    if path_index >= path.size(): return
+    if path_index >= path.size():
+        return
+
     var target := path[path_index]
-    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * delta)
+    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * waves.get_speed_multiplier() * delta)
     if adventurer_position.distance_to(target) < 1.0:
         adventurer_position = target
         _trigger_trap_at(_cell_from_world(adventurer_position))
         path_index += 1
         if path_index >= path.size() and not adventurer_health.is_dead:
-            _finish_run(false, "Le trésor a été pillé.")
+            _finish_campaign(false, "Le trésor a été pillé pendant la vague %d." % waves.current_wave)
     queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
-    if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed): return
+    if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
+        return
     var cell := _cell_from_world(event.position)
-    if cell == DOOR: _toggle_door()
+    if cell == DOOR:
+        _toggle_door()
     elif game_state == GameState.PREPARATION:
-        if build_mode == BuildMode.SPIKE_TRAP: _place_spike_trap(cell)
-        else: _place_defender(cell)
+        if build_mode == BuildMode.SPIKE_TRAP:
+            _place_spike_trap(cell)
+        else:
+            _place_defender(cell)
 
 func _draw() -> void:
     _draw_grid()
@@ -115,194 +130,368 @@ func _configure_pathfinding() -> void:
     astar.offset = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
     astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
     astar.update()
-    for wall in walls: astar.set_point_solid(wall, true)
+    for wall in walls:
+        astar.set_point_solid(wall, true)
 
 func _build_health_component() -> void:
     adventurer_health = HealthComponentScript.new()
-    adventurer_health.max_health = ADVENTURER_MAX_HEALTH
     adventurer_health.health_changed.connect(_on_adventurer_health_changed)
     adventurer_health.died.connect(_on_adventurer_died)
     add_child(adventurer_health)
 
 func _build_interface() -> void:
     var title := Label.new()
-    title.text = "DUNGEON ARCHITECT — Prototype"
+    title.text = "DUNGEON ARCHITECT — Alpha"
     title.position = Vector2(48, 24)
     title.add_theme_font_size_override("font_size", 26)
     add_child(title)
-    phase_label = Label.new(); phase_label.position = Vector2(48, 60); phase_label.add_theme_font_size_override("font_size", 18); add_child(phase_label)
-    countdown_label = Label.new(); countdown_label.position = Vector2(260, 60); countdown_label.add_theme_font_size_override("font_size", 18); add_child(countdown_label)
-    gold_label = Label.new(); gold_label.position = Vector2(470, 60); gold_label.add_theme_font_size_override("font_size", 18); add_child(gold_label)
-    status_label = Label.new(); status_label.position = Vector2(48, 590); status_label.size = Vector2(650, 32); add_child(status_label)
-    health_label = Label.new(); health_label.position = Vector2(48, 620); health_label.size = Vector2(260, 30); add_child(health_label)
-    build_label = Label.new(); build_label.position = Vector2(320, 620); build_label.size = Vector2(500, 30); add_child(build_label)
-    trap_button = Button.new(); trap_button.position = Vector2(470, 574); trap_button.size = Vector2(165, 42); trap_button.pressed.connect(func(): _set_build_mode(BuildMode.SPIKE_TRAP)); add_child(trap_button)
-    defender_button = Button.new(); defender_button.position = Vector2(640, 574); defender_button.size = Vector2(135, 42); defender_button.pressed.connect(func(): _set_build_mode(BuildMode.DEFENDER)); add_child(defender_button)
-    door_button = Button.new(); door_button.position = Vector2(780, 574); door_button.size = Vector2(150, 42); door_button.pressed.connect(_toggle_door); add_child(door_button)
-    start_button = Button.new(); start_button.position = Vector2(710, 24); start_button.size = Vector2(200, 42); start_button.pressed.connect(_on_primary_button_pressed); add_child(start_button)
-    result_panel = Panel.new(); result_panel.position = Vector2(290, 205); result_panel.size = Vector2(440, 250); result_panel.visible = false; add_child(result_panel)
-    result_title = Label.new(); result_title.position = Vector2(30, 24); result_title.size = Vector2(380, 45); result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; result_title.add_theme_font_size_override("font_size", 30); result_panel.add_child(result_title)
-    result_summary = Label.new(); result_summary.position = Vector2(55, 85); result_summary.size = Vector2(330, 130); result_summary.add_theme_font_size_override("font_size", 18); result_panel.add_child(result_summary)
 
-func _start_new_run() -> void:
+    phase_label = Label.new()
+    phase_label.position = Vector2(48, 60)
+    phase_label.add_theme_font_size_override("font_size", 18)
+    add_child(phase_label)
+
+    countdown_label = Label.new()
+    countdown_label.position = Vector2(260, 60)
+    countdown_label.add_theme_font_size_override("font_size", 18)
+    add_child(countdown_label)
+
+    wave_label = Label.new()
+    wave_label.position = Vector2(445, 60)
+    wave_label.add_theme_font_size_override("font_size", 18)
+    add_child(wave_label)
+
+    gold_label = Label.new()
+    gold_label.position = Vector2(610, 60)
+    gold_label.add_theme_font_size_override("font_size", 18)
+    add_child(gold_label)
+
+    status_label = Label.new()
+    status_label.position = Vector2(48, 590)
+    status_label.size = Vector2(650, 32)
+    add_child(status_label)
+
+    health_label = Label.new()
+    health_label.position = Vector2(48, 620)
+    health_label.size = Vector2(260, 30)
+    add_child(health_label)
+
+    build_label = Label.new()
+    build_label.position = Vector2(320, 620)
+    build_label.size = Vector2(600, 30)
+    add_child(build_label)
+
+    trap_button = Button.new()
+    trap_button.position = Vector2(470, 574)
+    trap_button.size = Vector2(165, 42)
+    trap_button.pressed.connect(func(): _set_build_mode(BuildMode.SPIKE_TRAP))
+    add_child(trap_button)
+
+    defender_button = Button.new()
+    defender_button.position = Vector2(640, 574)
+    defender_button.size = Vector2(135, 42)
+    defender_button.pressed.connect(func(): _set_build_mode(BuildMode.DEFENDER))
+    add_child(defender_button)
+
+    door_button = Button.new()
+    door_button.position = Vector2(780, 574)
+    door_button.size = Vector2(150, 42)
+    door_button.pressed.connect(_toggle_door)
+    add_child(door_button)
+
+    start_button = Button.new()
+    start_button.position = Vector2(710, 24)
+    start_button.size = Vector2(200, 42)
+    start_button.pressed.connect(_on_primary_button_pressed)
+    add_child(start_button)
+
+    result_panel = Panel.new()
+    result_panel.position = Vector2(290, 205)
+    result_panel.size = Vector2(440, 250)
+    result_panel.visible = false
+    add_child(result_panel)
+
+    result_title = Label.new()
+    result_title.position = Vector2(30, 24)
+    result_title.size = Vector2(380, 45)
+    result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    result_title.add_theme_font_size_override("font_size", 30)
+    result_panel.add_child(result_title)
+
+    result_summary = Label.new()
+    result_summary.position = Vector2(55, 85)
+    result_summary.size = Vector2(330, 130)
+    result_summary.add_theme_font_size_override("font_size", 18)
+    result_panel.add_child(result_summary)
+
+func _start_new_campaign() -> void:
+    waves.reset()
+    economy.reset()
+    for trap: SpikeTrap in traps.values():
+        trap.queue_free()
+    for defender: Defender in defenders.values():
+        defender.queue_free()
+    traps.clear()
+    defenders.clear()
+    door_closed = false
+    door_purchased = false
+    astar.set_point_solid(DOOR, false)
+    _prepare_current_wave()
+
+func _prepare_current_wave() -> void:
     game_state = GameState.PREPARATION
     preparation_time_left = PREPARATION_DURATION
     adventurer_position = _world_from_cell(ENTRANCE)
+    adventurer_health.max_health = waves.get_adventurer_health()
     adventurer_health.reset()
     run_stats.reset()
-    economy.reset()
-    path.clear(); path_index = 0; result_panel.visible = false
-    for trap: SpikeTrap in traps.values(): trap.queue_free()
-    for defender: Defender in defenders.values(): defender.queue_free()
-    traps.clear(); defenders.clear(); build_mode = BuildMode.SPIKE_TRAP
-    door_closed = false; door_purchased = false; astar.set_point_solid(DOOR, false)
-    status_label.text = "Choisissez une défense puis cliquez sur une case libre."
-    _refresh_phase_ui(); _refresh_build_ui(); _refresh_door_ui(); queue_redraw()
+    path.clear()
+    path_index = 0
+    result_panel.visible = false
+    build_mode = BuildMode.SPIKE_TRAP
+    for trap: SpikeTrap in traps.values():
+        trap.reset()
+    for defender: Defender in defenders.values():
+        defender.reset()
+    status_label.text = "Préparez les défenses pour %s." % waves.get_label()
+    _refresh_all_ui()
+    queue_redraw()
 
 func _start_invasion() -> void:
-    if game_state != GameState.PREPARATION: return
+    if game_state != GameState.PREPARATION:
+        return
     game_state = GameState.INVASION
-    _recalculate_path(); _refresh_phase_ui()
+    _recalculate_path()
+    _refresh_all_ui()
 
 func _on_primary_button_pressed() -> void:
-    if game_state == GameState.PREPARATION: _start_invasion()
-    else: _start_new_run()
+    match game_state:
+        GameState.PREPARATION:
+            _start_invasion()
+        GameState.WAVE_RESULT:
+            _prepare_current_wave()
+        GameState.CAMPAIGN_FINISHED:
+            _start_new_campaign()
+        GameState.INVASION:
+            _finish_campaign(false, "La campagne a été abandonnée.")
 
 func _set_build_mode(mode: BuildMode) -> void:
-    if game_state != GameState.PREPARATION: return
+    if game_state != GameState.PREPARATION:
+        return
     build_mode = mode
     status_label.text = "Mode de construction modifié."
     _refresh_build_ui()
 
 func _place_spike_trap(cell: Vector2i) -> void:
-    if not _is_valid_build_cell(cell): status_label.text = "Placement impossible sur cette case."; return
-    if not economy.spend(SPIKE_TRAP_COST): status_label.text = "Or insuffisant pour ce piège."; return
+    if not _is_valid_build_cell(cell):
+        status_label.text = "Placement impossible sur cette case."
+        return
+    if not economy.spend(SPIKE_TRAP_COST):
+        status_label.text = "Or insuffisant pour ce piège."
+        return
     var trap: SpikeTrap = SpikeTrapScript.new()
     trap.setup(cell)
     trap.triggered.connect(func(damage: int): run_stats.record_trap(damage); status_label.text = "Piège déclenché : %d dégâts." % damage)
-    add_child(trap); traps[cell] = trap
+    add_child(trap)
+    traps[cell] = trap
     status_label.text = "Piège placé pour %d or." % SPIKE_TRAP_COST
-    _refresh_build_ui(); queue_redraw()
+    _refresh_build_ui()
+    queue_redraw()
 
 func _place_defender(cell: Vector2i) -> void:
-    if not _is_valid_build_cell(cell): status_label.text = "Placement impossible sur cette case."; return
-    if not economy.spend(DEFENDER_COST): status_label.text = "Or insuffisant pour ce défenseur."; return
+    if not _is_valid_build_cell(cell):
+        status_label.text = "Placement impossible sur cette case."
+        return
+    if not economy.spend(DEFENDER_COST):
+        status_label.text = "Or insuffisant pour ce défenseur."
+        return
     var defender: Defender = DefenderScript.new()
     defender.setup(cell, _world_from_cell(cell))
     defender.attacked.connect(func(damage: int): run_stats.record_defender_attack(damage); status_label.text = "Le défenseur inflige %d dégâts." % damage)
-    add_child(defender); defenders[cell] = defender
+    add_child(defender)
+    defenders[cell] = defender
     status_label.text = "Défenseur placé pour %d or." % DEFENDER_COST
-    _refresh_build_ui(); queue_redraw()
+    _refresh_build_ui()
+    queue_redraw()
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
     return _is_inside_grid(cell) and cell != ENTRANCE and cell != TREASURE and cell != DOOR and not walls.has(cell) and not traps.has(cell) and not defenders.has(cell)
 
 func _trigger_trap_at(cell: Vector2i) -> void:
-    if traps.has(cell): (traps[cell] as SpikeTrap).try_trigger(adventurer_health)
+    if traps.has(cell):
+        (traps[cell] as SpikeTrap).try_trigger(adventurer_health)
 
 func _toggle_door() -> void:
-    if game_state == GameState.FINISHED: return
+    if game_state != GameState.PREPARATION:
+        return
     if not door_closed and not door_purchased:
-        if not economy.spend(DOOR_COST): status_label.text = "Or insuffisant pour verrouiller la porte."; return
+        if not economy.spend(DOOR_COST):
+            status_label.text = "Or insuffisant pour verrouiller la porte."
+            return
         door_purchased = true
     door_closed = not door_closed
     astar.set_point_solid(DOOR, door_closed)
-    status_label.text = "Porte verrouillée pour %d or." % DOOR_COST if door_closed and door_purchased else "Porte ouverte."
-    _refresh_door_ui(); _refresh_build_ui()
-    if game_state == GameState.INVASION: _recalculate_path()
+    status_label.text = "Porte verrouillée." if door_closed else "Porte ouverte."
+    _refresh_all_ui()
     queue_redraw()
 
 func _on_gold_changed(current_gold: int) -> void:
-    if gold_label: gold_label.text = "Or : %d" % current_gold
+    if gold_label:
+        gold_label.text = "Or : %d" % current_gold
     _refresh_build_ui()
 
 func _on_adventurer_health_changed(current_health: int, max_health: int) -> void:
-    if health_label: health_label.text = "Aventurier : %d / %d PV" % [current_health, max_health]
+    if health_label:
+        health_label.text = "Aventurier : %d / %d PV" % [current_health, max_health]
     queue_redraw()
 
 func _on_adventurer_died() -> void:
-    economy.add_gold(KILL_REWARD)
-    _finish_run(true, "L'aventurier a été éliminé. Récompense : +%d or." % KILL_REWARD)
+    if game_state != GameState.INVASION:
+        return
+    var reward := waves.get_wave_reward()
+    economy.add_gold(reward)
+    if waves.has_next_wave():
+        var completed_wave := waves.current_wave
+        waves.advance()
+        game_state = GameState.WAVE_RESULT
+        result_title.text = "VAGUE %d RÉUSSIE" % completed_wave
+        result_title.modulate = Color("63d471")
+        result_summary.text = run_stats.summary() + "\nRécompense : +%d or\nProchaine : %s" % [reward, waves.get_label()]
+        result_panel.visible = true
+        status_label.text = "Les défenses et l'or sont conservés."
+        _refresh_all_ui()
+    else:
+        _finish_campaign(true, "Les cinq vagues ont été repoussées.")
 
-func _finish_run(victory: bool, message: String) -> void:
-    if game_state == GameState.FINISHED: return
-    game_state = GameState.FINISHED; path.clear(); run_stats.finish("VICTOIRE" if victory else "DÉFAITE")
+func _finish_campaign(victory: bool, message: String) -> void:
+    if game_state == GameState.CAMPAIGN_FINISHED:
+        return
+    game_state = GameState.CAMPAIGN_FINISHED
+    path.clear()
+    run_stats.finish("VICTOIRE" if victory else "DÉFAITE")
     status_label.text = message
-    result_title.text = run_stats.result
+    result_title.text = "CAMPAGNE GAGNÉE" if victory else "CAMPAGNE PERDUE"
     result_title.modulate = Color("63d471") if victory else Color("ed6a5a")
-    result_summary.text = run_stats.summary() + "\nOr restant : %d" % economy.current_gold
+    result_summary.text = run_stats.summary() + "\nVague atteinte : %d / %d\nOr restant : %d" % [waves.current_wave, WaveManager.MAX_WAVES, economy.current_gold]
     result_panel.visible = true
-    _refresh_phase_ui(); queue_redraw()
+    _refresh_all_ui()
+    queue_redraw()
 
 func _recalculate_path() -> void:
     var start_cell := _cell_from_world(adventurer_position)
-    if not _is_inside_grid(start_cell): start_cell = ENTRANCE
+    if not _is_inside_grid(start_cell):
+        start_cell = ENTRANCE
     var cell_path := astar.get_id_path(start_cell, TREASURE)
-    path.clear(); path_index = 0
-    for cell in cell_path: path.append(_world_from_cell(cell))
-    if path.size() > 1: path.remove_at(0)
-    if path.is_empty(): _finish_run(true, "Chemin bloqué : le donjon est défendu.")
-    else: status_label.text = "L'aventurier cherche un chemin vers le trésor."
+    path.clear()
+    path_index = 0
+    for cell in cell_path:
+        path.append(_world_from_cell(cell))
+    if path.size() > 1:
+        path.remove_at(0)
+    if path.is_empty():
+        _on_adventurer_died()
+    else:
+        status_label.text = "%s : l'aventurier avance vers le trésor." % waves.get_label()
+
+func _refresh_all_ui() -> void:
     _refresh_phase_ui()
+    _refresh_build_ui()
+    _refresh_door_ui()
+    if wave_label:
+        wave_label.text = waves.get_label()
 
 func _refresh_phase_ui() -> void:
+    if not phase_label or not countdown_label or not start_button:
+        return
     match game_state:
         GameState.PREPARATION:
-            phase_label.text = "Phase : PRÉPARATION"; countdown_label.text = "Départ dans %d s" % ceili(preparation_time_left); start_button.text = "Lancer l'invasion"
+            phase_label.text = "Phase : PRÉPARATION"
+            countdown_label.text = "Départ dans %d s" % ceili(preparation_time_left)
+            start_button.text = "Lancer la vague"
         GameState.INVASION:
-            phase_label.text = "Phase : INVASION"; countdown_label.text = ""; start_button.text = "Recommencer"
-        GameState.FINISHED:
-            phase_label.text = "Phase : TERMINÉE"; countdown_label.text = ""; start_button.text = "Rejouer"
+            phase_label.text = "Phase : INVASION"
+            countdown_label.text = ""
+            start_button.text = "Abandonner"
+        GameState.WAVE_RESULT:
+            phase_label.text = "Phase : RÉCOMPENSE"
+            countdown_label.text = ""
+            start_button.text = "Préparer la suite"
+        GameState.CAMPAIGN_FINISHED:
+            phase_label.text = "Phase : TERMINÉE"
+            countdown_label.text = ""
+            start_button.text = "Nouvelle campagne"
     trap_button.disabled = game_state != GameState.PREPARATION or not economy.can_afford(SPIKE_TRAP_COST)
     defender_button.disabled = game_state != GameState.PREPARATION or not economy.can_afford(DEFENDER_COST)
+    door_button.disabled = game_state != GameState.PREPARATION
 
 func _refresh_build_ui() -> void:
-    if not build_label or not trap_button or not defender_button: return
+    if not build_label or not trap_button or not defender_button:
+        return
     var cost := SPIKE_TRAP_COST if build_mode == BuildMode.SPIKE_TRAP else DEFENDER_COST
     var mode_name := "Piège" if build_mode == BuildMode.SPIKE_TRAP else "Défenseur"
     build_label.text = "Mode : %s (%d or) | Pièges : %d | Défenseurs : %d" % [mode_name, cost, traps.size(), defenders.size()]
     trap_button.text = "Piège (%d or)" % SPIKE_TRAP_COST
     defender_button.text = "Défenseur (%d or)" % DEFENDER_COST
-    _refresh_phase_ui()
 
 func _refresh_door_ui() -> void:
-    if door_button: door_button.text = "Ouvrir porte" if door_closed else "Fermer (%d or)" % (0 if door_purchased else DOOR_COST)
+    if door_button:
+        door_button.text = "Ouvrir porte" if door_closed else "Fermer (%d or)" % (0 if door_purchased else DOOR_COST)
 
 func _draw_grid() -> void:
     for y in range(GRID_SIZE.y):
         for x in range(GRID_SIZE.x):
             var rect := Rect2(GRID_ORIGIN + Vector2(x, y) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE))
-            draw_rect(rect, Color("252a3a") if (x + y) % 2 == 0 else Color("212635")); draw_rect(rect, Color("3b4358"), false, 1.0)
+            draw_rect(rect, Color("252a3a") if (x + y) % 2 == 0 else Color("212635"))
+            draw_rect(rect, Color("3b4358"), false, 1.0)
 
 func _draw_level_objects() -> void:
     for wall in walls:
         var rect := Rect2(_cell_top_left(wall) + Vector2(3, 3), Vector2(CELL_SIZE - 6, CELL_SIZE - 6))
-        draw_rect(rect, Color("59627a")); draw_rect(rect, Color("78839e"), false, 2.0)
+        draw_rect(rect, Color("59627a"))
+        draw_rect(rect, Color("78839e"), false, 2.0)
     draw_circle(_world_from_cell(ENTRANCE), 15.0, Color("4fd1a5"))
     var treasure_center := _world_from_cell(TREASURE)
-    draw_circle(treasure_center, 17.0, Color("f5c451")); draw_circle(treasure_center, 8.0, Color("fff0a6"))
+    draw_circle(treasure_center, 17.0, Color("f5c451"))
+    draw_circle(treasure_center, 8.0, Color("fff0a6"))
     var door_rect := Rect2(_cell_top_left(DOOR) + Vector2(8, 2), Vector2(CELL_SIZE - 16, CELL_SIZE - 4))
-    draw_rect(door_rect, Color("b64d55") if door_closed else Color("5fbf82")); draw_rect(door_rect, Color.WHITE, false, 2.0)
+    draw_rect(door_rect, Color("b64d55") if door_closed else Color("5fbf82"))
+    draw_rect(door_rect, Color.WHITE, false, 2.0)
 
 func _draw_traps() -> void:
     for cell: Vector2i in traps:
-        var trap: SpikeTrap = traps[cell]; var center := _world_from_cell(cell); var color := Color("ed6a5a") if trap.is_ready else Color("77515a")
-        for offset in [-12.0, 0.0, 12.0]: draw_colored_polygon(PackedVector2Array([center + Vector2(offset - 5, 10), center + Vector2(offset, -12), center + Vector2(offset + 5, 10)]), color)
+        var trap: SpikeTrap = traps[cell]
+        var center := _world_from_cell(cell)
+        var color := Color("ed6a5a") if trap.is_ready else Color("77515a")
+        for offset in [-12.0, 0.0, 12.0]:
+            draw_colored_polygon(PackedVector2Array([center + Vector2(offset - 5, 10), center + Vector2(offset, -12), center + Vector2(offset + 5, 10)]), color)
 
 func _draw_defenders() -> void:
     for cell: Vector2i in defenders:
-        var defender: Defender = defenders[cell]; var center := _world_from_cell(cell)
-        draw_circle(center, 15.0, Color("9b5de5") if defender.is_ready else Color("5e4778")); draw_circle(center + Vector2(-5, -4), 2.0, Color.WHITE); draw_circle(center + Vector2(5, -4), 2.0, Color.WHITE)
+        var defender: Defender = defenders[cell]
+        var center := _world_from_cell(cell)
+        draw_circle(center, 15.0, Color("9b5de5") if defender.is_ready else Color("5e4778"))
+        draw_circle(center + Vector2(-5, -4), 2.0, Color.WHITE)
+        draw_circle(center + Vector2(5, -4), 2.0, Color.WHITE)
 
 func _draw_adventurer() -> void:
-    if adventurer_health.is_dead: return
-    draw_circle(adventurer_position, 14.0, Color("62a7ff")); draw_circle(adventurer_position + Vector2(-5, -4), 2.0, Color.WHITE); draw_circle(adventurer_position + Vector2(5, -4), 2.0, Color.WHITE)
+    if adventurer_health.is_dead:
+        return
+    draw_circle(adventurer_position, 14.0, Color("62a7ff"))
+    draw_circle(adventurer_position + Vector2(-5, -4), 2.0, Color.WHITE)
+    draw_circle(adventurer_position + Vector2(5, -4), 2.0, Color.WHITE)
     var bar_position := adventurer_position + Vector2(-18, -25)
-    draw_rect(Rect2(bar_position, Vector2(36, 5)), Color("2a2d36")); draw_rect(Rect2(bar_position, Vector2(36.0 * adventurer_health.get_health_ratio(), 5)), Color("63d471"))
+    draw_rect(Rect2(bar_position, Vector2(36, 5)), Color("2a2d36"))
+    draw_rect(Rect2(bar_position, Vector2(36.0 * adventurer_health.get_health_ratio(), 5)), Color("63d471"))
 
-func _world_from_cell(cell: Vector2i) -> Vector2: return GRID_ORIGIN + Vector2(cell) * CELL_SIZE + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-func _cell_top_left(cell: Vector2i) -> Vector2: return GRID_ORIGIN + Vector2(cell) * CELL_SIZE
+func _world_from_cell(cell: Vector2i) -> Vector2:
+    return GRID_ORIGIN + Vector2(cell) * CELL_SIZE + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+
+func _cell_top_left(cell: Vector2i) -> Vector2:
+    return GRID_ORIGIN + Vector2(cell) * CELL_SIZE
+
 func _cell_from_world(world_position: Vector2) -> Vector2i:
     var local := world_position - GRID_ORIGIN
     return Vector2i(floori(local.x / CELL_SIZE), floori(local.y / CELL_SIZE))
-func _is_inside_grid(cell: Vector2i) -> bool: return cell.x >= 0 and cell.y >= 0 and cell.x < GRID_SIZE.x and cell.y < GRID_SIZE.y
+
+func _is_inside_grid(cell: Vector2i) -> bool:
+    return cell.x >= 0 and cell.y >= 0 and cell.x < GRID_SIZE.x and cell.y < GRID_SIZE.y
