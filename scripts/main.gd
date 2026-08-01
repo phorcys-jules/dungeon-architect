@@ -2,6 +2,7 @@ extends Node2D
 
 const HealthComponentScript := preload("res://scripts/components/health_component.gd")
 const SpikeTrapScript := preload("res://scripts/traps/spike_trap.gd")
+const DefenderScript := preload("res://scripts/monsters/defender.gd")
 const GRID_SIZE := Vector2i(15, 10)
 const CELL_SIZE := 48
 const GRID_ORIGIN := Vector2(48, 96)
@@ -13,10 +14,13 @@ const PREPARATION_DURATION := 15.0
 const ADVENTURER_MAX_HEALTH := 100
 
 enum GameState { PREPARATION, INVASION, FINISHED }
+enum BuildMode { SPIKE_TRAP, DEFENDER }
 
 var astar := AStarGrid2D.new()
 var walls: Array[Vector2i] = []
 var traps: Dictionary = {}
+var defenders: Dictionary = {}
+var build_mode := BuildMode.SPIKE_TRAP
 var door_closed := false
 var adventurer_position := Vector2.ZERO
 var path: Array[Vector2] = []
@@ -28,9 +32,11 @@ var status_label: Label
 var phase_label: Label
 var countdown_label: Label
 var health_label: Label
-var trap_label: Label
+var build_label: Label
 var door_button: Button
 var start_button: Button
+var trap_button: Button
+var defender_button: Button
 
 func _ready() -> void:
     _build_level()
@@ -43,6 +49,10 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     for trap: SpikeTrap in traps.values():
         trap.tick(delta)
+    for defender: Defender in defenders.values():
+        defender.tick(delta)
+        if game_state == GameState.INVASION and not adventurer_health.is_dead:
+            defender.try_attack(adventurer_position, adventurer_health, CELL_SIZE)
 
     if game_state == GameState.PREPARATION:
         preparation_time_left = maxf(preparation_time_left - delta, 0.0)
@@ -74,12 +84,16 @@ func _unhandled_input(event: InputEvent) -> void:
     if cell == DOOR:
         _toggle_door()
     elif game_state == GameState.PREPARATION:
-        _place_spike_trap(cell)
+        if build_mode == BuildMode.SPIKE_TRAP:
+            _place_spike_trap(cell)
+        else:
+            _place_defender(cell)
 
 func _draw() -> void:
     _draw_grid()
     _draw_level_objects()
     _draw_traps()
+    _draw_defenders()
     _draw_adventurer()
 
 func _build_level() -> void:
@@ -132,14 +146,28 @@ func _build_interface() -> void:
     health_label.size = Vector2(260, 30)
     add_child(health_label)
 
-    trap_label = Label.new()
-    trap_label.position = Vector2(320, 620)
-    trap_label.size = Vector2(350, 30)
-    add_child(trap_label)
+    build_label = Label.new()
+    build_label.position = Vector2(320, 620)
+    build_label.size = Vector2(390, 30)
+    add_child(build_label)
+
+    trap_button = Button.new()
+    trap_button.text = "Piège à pointes"
+    trap_button.position = Vector2(500, 574)
+    trap_button.size = Vector2(150, 42)
+    trap_button.pressed.connect(func(): _set_build_mode(BuildMode.SPIKE_TRAP))
+    add_child(trap_button)
+
+    defender_button = Button.new()
+    defender_button.text = "Défenseur"
+    defender_button.position = Vector2(655, 574)
+    defender_button.size = Vector2(120, 42)
+    defender_button.pressed.connect(func(): _set_build_mode(BuildMode.DEFENDER))
+    add_child(defender_button)
 
     door_button = Button.new()
-    door_button.position = Vector2(710, 574)
-    door_button.size = Vector2(200, 42)
+    door_button.position = Vector2(780, 574)
+    door_button.size = Vector2(150, 42)
     door_button.pressed.connect(_toggle_door)
     add_child(door_button)
 
@@ -159,10 +187,14 @@ func _start_new_run() -> void:
     path_index = 0
     for trap: SpikeTrap in traps.values():
         trap.queue_free()
+    for defender: Defender in defenders.values():
+        defender.queue_free()
     traps.clear()
-    status_label.text = "Cliquez sur une case libre pour placer un piège à pointes."
+    defenders.clear()
+    build_mode = BuildMode.SPIKE_TRAP
+    status_label.text = "Choisissez une défense puis cliquez sur une case libre."
     _refresh_phase_ui()
-    _refresh_trap_ui()
+    _refresh_build_ui()
     queue_redraw()
 
 func _start_invasion() -> void:
@@ -178,8 +210,15 @@ func _on_primary_button_pressed() -> void:
     else:
         _start_new_run()
 
+func _set_build_mode(mode: BuildMode) -> void:
+    if game_state != GameState.PREPARATION:
+        return
+    build_mode = mode
+    status_label.text = "Mode de construction modifié."
+    _refresh_build_ui()
+
 func _place_spike_trap(cell: Vector2i) -> void:
-    if not _is_valid_trap_cell(cell):
+    if not _is_valid_build_cell(cell):
         status_label.text = "Placement impossible sur cette case."
         return
     var trap: SpikeTrap = SpikeTrapScript.new()
@@ -187,12 +226,25 @@ func _place_spike_trap(cell: Vector2i) -> void:
     trap.triggered.connect(func(damage: int): status_label.text = "Piège déclenché : %d dégâts." % damage)
     add_child(trap)
     traps[cell] = trap
-    status_label.text = "Piège placé. Vous pouvez en placer plusieurs avant l'invasion."
-    _refresh_trap_ui()
+    status_label.text = "Piège placé."
+    _refresh_build_ui()
     queue_redraw()
 
-func _is_valid_trap_cell(cell: Vector2i) -> bool:
-    return _is_inside_grid(cell) and cell != ENTRANCE and cell != TREASURE and cell != DOOR and not walls.has(cell) and not traps.has(cell)
+func _place_defender(cell: Vector2i) -> void:
+    if not _is_valid_build_cell(cell):
+        status_label.text = "Placement impossible sur cette case."
+        return
+    var defender: Defender = DefenderScript.new()
+    defender.setup(cell, _world_from_cell(cell))
+    defender.attacked.connect(func(damage: int): status_label.text = "Le défenseur inflige %d dégâts." % damage)
+    add_child(defender)
+    defenders[cell] = defender
+    status_label.text = "Défenseur placé."
+    _refresh_build_ui()
+    queue_redraw()
+
+func _is_valid_build_cell(cell: Vector2i) -> bool:
+    return _is_inside_grid(cell) and cell != ENTRANCE and cell != TREASURE and cell != DOOR and not walls.has(cell) and not traps.has(cell) and not defenders.has(cell)
 
 func _trigger_trap_at(cell: Vector2i) -> void:
     if traps.has(cell):
@@ -253,12 +305,15 @@ func _refresh_phase_ui() -> void:
             phase_label.text = "Phase : TERMINÉE"
             countdown_label.text = ""
             start_button.text = "Nouvelle partie"
+    trap_button.disabled = game_state != GameState.PREPARATION
+    defender_button.disabled = game_state != GameState.PREPARATION
 
-func _refresh_trap_ui() -> void:
-    trap_label.text = "Pièges placés : %d" % traps.size()
+func _refresh_build_ui() -> void:
+    var mode_name := "Piège" if build_mode == BuildMode.SPIKE_TRAP else "Défenseur"
+    build_label.text = "Mode : %s | Pièges : %d | Défenseurs : %d" % [mode_name, traps.size(), defenders.size()]
 
 func _refresh_door_ui() -> void:
-    door_button.text = "Ouvrir la porte" if door_closed else "Fermer la porte"
+    door_button.text = "Ouvrir porte" if door_closed else "Fermer porte"
 
 func _draw_grid() -> void:
     for y in range(GRID_SIZE.y):
@@ -273,8 +328,7 @@ func _draw_level_objects() -> void:
         var rect := Rect2(_cell_top_left(wall) + Vector2(3, 3), Vector2(CELL_SIZE - 6, CELL_SIZE - 6))
         draw_rect(rect, Color("59627a"))
         draw_rect(rect, Color("78839e"), false, 2.0)
-    var entrance_center := _world_from_cell(ENTRANCE)
-    draw_circle(entrance_center, 15.0, Color("4fd1a5"))
+    draw_circle(_world_from_cell(ENTRANCE), 15.0, Color("4fd1a5"))
     var treasure_center := _world_from_cell(TREASURE)
     draw_circle(treasure_center, 17.0, Color("f5c451"))
     draw_circle(treasure_center, 8.0, Color("fff0a6"))
@@ -288,8 +342,15 @@ func _draw_traps() -> void:
         var center := _world_from_cell(cell)
         var color := Color("ed6a5a") if trap.is_ready else Color("77515a")
         for offset in [-12.0, 0.0, 12.0]:
-            var points := PackedVector2Array([center + Vector2(offset - 5, 10), center + Vector2(offset, -12), center + Vector2(offset + 5, 10)])
-            draw_colored_polygon(points, color)
+            draw_colored_polygon(PackedVector2Array([center + Vector2(offset - 5, 10), center + Vector2(offset, -12), center + Vector2(offset + 5, 10)]), color)
+
+func _draw_defenders() -> void:
+    for cell: Vector2i in defenders:
+        var defender: Defender = defenders[cell]
+        var center := _world_from_cell(cell)
+        draw_circle(center, 15.0, Color("9b5de5") if defender.is_ready else Color("5e4778"))
+        draw_circle(center + Vector2(-5, -4), 2.0, Color.WHITE)
+        draw_circle(center + Vector2(5, -4), 2.0, Color.WHITE)
 
 func _draw_adventurer() -> void:
     if adventurer_health.is_dead:
