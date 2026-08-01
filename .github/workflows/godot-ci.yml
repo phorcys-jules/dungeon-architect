@@ -19,7 +19,6 @@ jobs:
     env:
       GODOT_VERSION: 4.7.1
       GODOT_RELEASE: 4.7.1-stable
-      GODOT_TEMPLATES_DIR: ${{ github.workspace }}/.godot-templates
 
     steps:
       - name: Checkout repository
@@ -30,9 +29,7 @@ jobs:
 
       - name: Download Godot editor
         run: |
-          curl --fail --location --retry 3 \
-            --output godot.zip \
-            "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          curl --fail --location --retry 3 --output godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
           unzip godot.zip -d godot-bin
           mv "godot-bin/Godot_v${GODOT_RELEASE}_linux.x86_64" godot
           chmod +x godot
@@ -47,11 +44,12 @@ jobs:
       - name: Run health component test
         run: ./godot --headless --path . --script tests/health_component_test.gd
 
+      - name: Run spike trap test
+        run: ./godot --headless --path . --script tests/spike_trap_test.gd
+
       - name: Install export templates
         run: |
-          curl --fail --location --retry 3 \
-            --output templates.tpz \
-            "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
+          curl --fail --location --retry 3 --output templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           unzip templates.tpz -d templates-unpacked
           cp -R templates-unpacked/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
