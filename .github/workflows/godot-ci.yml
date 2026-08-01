@@ -44,6 +44,9 @@ jobs:
       - name: Run smoke test
         run: ./godot --headless --path . --script tests/smoke_test.gd
 
+      - name: Run health component test
+        run: ./godot --headless --path . --script tests/health_component_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
