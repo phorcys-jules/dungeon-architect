@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="WaveData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/wave_data.gd" id="1"]
+[ext_resource type="Resource" path="res://resources/adventurers/scout.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+wave_number = 1
+adventurer = ExtResource("2")
+preparation_duration = 15.0
+bonus_reward = 5
