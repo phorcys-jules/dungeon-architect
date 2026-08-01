@@ -4,6 +4,8 @@ Prototype Godot 4 d'un jeu de défense de donjon inspiré d'un **Pac-Man invers�
 
 Le joueur incarne le maître du donjon. Des aventuriers entrent dans le labyrinthe et tentent d'atteindre le trésor. L'objectif futur sera de placer des portes, pièges et monstres afin de créer des réactions en chaîne.
 
+La direction produit, les piliers de gameplay et le périmètre du MVP sont décrits dans [`docs/VISION.md`](docs/VISION.md).
+
 ## Prototype actuel
 
 - grille de donjon de 15 × 10 cases ;
@@ -120,6 +122,8 @@ Une pull request ne doit pas être fusionnée si le workflow **Godot CI** échou
 ```text
 res://
 ├── .github/workflows/godot-ci.yml
+├── docs/
+│   └── VISION.md
 ├── export_presets.cfg
 ├── project.godot
 ├── scenes/
@@ -130,7 +134,13 @@ res://
     └── smoke_test.gd
 ```
 
-## Développement
+## Principes de développement
+
+- Une responsabilité principale par scène ou script.
+- Les systèmes communs doivent devenir des composants réutilisables.
+- Les données de contenu doivent être séparées du comportement lorsque cela apporte de la valeur.
+- `main.gd` coordonne la partie mais ne doit pas contenir toute la logique du jeu.
+- Toute fonctionnalité importante doit pouvoir être vérifiée en mode headless.
 
 Flux de travail recommandé :
 
