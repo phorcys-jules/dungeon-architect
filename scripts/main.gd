@@ -1,5 +1,6 @@
 extends Node2D
 
+const HealthComponentScript := preload("res://scripts/components/health_component.gd")
 const GRID_SIZE := Vector2i(15, 10)
 const CELL_SIZE := 48
 const GRID_ORIGIN := Vector2(48, 96)
@@ -8,6 +9,7 @@ const TREASURE := Vector2i(14, 5)
 const DOOR := Vector2i(7, 5)
 const MOVE_SPEED := 150.0
 const PREPARATION_DURATION := 15.0
+const ADVENTURER_MAX_HEALTH := 100
 
 enum GameState {
     PREPARATION,
@@ -23,15 +25,19 @@ var path: Array[Vector2] = []
 var path_index := 0
 var game_state := GameState.PREPARATION
 var preparation_time_left := PREPARATION_DURATION
+var adventurer_health: HealthComponent
 var status_label: Label
 var phase_label: Label
 var countdown_label: Label
+var health_label: Label
 var door_button: Button
 var start_button: Button
+var damage_button: Button
 
 func _ready() -> void:
     _build_level()
     _configure_pathfinding()
+    _build_health_component()
     _build_interface()
     _start_new_run()
     queue_redraw()
@@ -44,7 +50,7 @@ func _process(delta: float) -> void:
             _start_invasion()
         return
 
-    if game_state != GameState.INVASION or path_index >= path.size():
+    if game_state != GameState.INVASION or path_index >= path.size() or adventurer_health.is_dead:
         return
 
     var target := path[path_index]
@@ -92,6 +98,13 @@ func _configure_pathfinding() -> void:
     for wall in walls:
         astar.set_point_solid(wall, true)
 
+func _build_health_component() -> void:
+    adventurer_health = HealthComponentScript.new()
+    adventurer_health.max_health = ADVENTURER_MAX_HEALTH
+    adventurer_health.health_changed.connect(_on_adventurer_health_changed)
+    adventurer_health.died.connect(_on_adventurer_died)
+    add_child(adventurer_health)
+
 func _build_interface() -> void:
     var title := Label.new()
     title.text = "DUNGEON ARCHITECT — Prototype"
@@ -114,11 +127,23 @@ func _build_interface() -> void:
     status_label.size = Vector2(580, 32)
     add_child(status_label)
 
+    health_label = Label.new()
+    health_label.position = Vector2(48, 620)
+    health_label.size = Vector2(260, 30)
+    add_child(health_label)
+
     door_button = Button.new()
     door_button.position = Vector2(710, 574)
     door_button.size = Vector2(200, 42)
     door_button.pressed.connect(_toggle_door)
     add_child(door_button)
+
+    damage_button = Button.new()
+    damage_button.text = "Test : -25 PV"
+    damage_button.position = Vector2(500, 574)
+    damage_button.size = Vector2(180, 42)
+    damage_button.pressed.connect(_damage_adventurer_for_test)
+    add_child(damage_button)
 
     start_button = Button.new()
     start_button.position = Vector2(710, 24)
@@ -132,6 +157,7 @@ func _start_new_run() -> void:
     game_state = GameState.PREPARATION
     preparation_time_left = PREPARATION_DURATION
     adventurer_position = _world_from_cell(ENTRANCE)
+    adventurer_health.reset()
     path.clear()
     path_index = 0
     status_label.text = "Préparez le donjon avant l'arrivée de l'aventurier."
@@ -163,6 +189,23 @@ func _toggle_door() -> void:
     if game_state == GameState.INVASION:
         _recalculate_path()
 
+    queue_redraw()
+
+func _damage_adventurer_for_test() -> void:
+    if game_state == GameState.FINISHED:
+        return
+    adventurer_health.take_damage(25)
+
+func _on_adventurer_health_changed(current_health: int, max_health: int) -> void:
+    if health_label:
+        health_label.text = "Aventurier : %d / %d PV" % [current_health, max_health]
+    queue_redraw()
+
+func _on_adventurer_died() -> void:
+    game_state = GameState.FINISHED
+    path.clear()
+    status_label.text = "L'aventurier a été éliminé. Le donjon est défendu !"
+    _refresh_phase_ui()
     queue_redraw()
 
 func _recalculate_path() -> void:
@@ -203,6 +246,8 @@ func _refresh_phase_ui() -> void:
             countdown_label.text = ""
             start_button.text = "Nouvelle partie"
 
+    damage_button.disabled = game_state == GameState.FINISHED
+
 func _refresh_door_ui() -> void:
     door_button.text = "Ouvrir la porte" if door_closed else "Fermer la porte"
 
@@ -234,9 +279,16 @@ func _draw_level_objects() -> void:
     draw_rect(door_rect, Color.WHITE, false, 2.0)
 
 func _draw_adventurer() -> void:
+    if adventurer_health.is_dead:
+        return
+
     draw_circle(adventurer_position, 14.0, Color("62a7ff"))
     draw_circle(adventurer_position + Vector2(-5, -4), 2.0, Color.WHITE)
     draw_circle(adventurer_position + Vector2(5, -4), 2.0, Color.WHITE)
+
+    var bar_position := adventurer_position + Vector2(-18, -25)
+    draw_rect(Rect2(bar_position, Vector2(36, 5)), Color("2a2d36"))
+    draw_rect(Rect2(bar_position, Vector2(36.0 * adventurer_health.get_health_ratio(), 5)), Color("63d471"))
 
 func _world_from_cell(cell: Vector2i) -> Vector2:
     return GRID_ORIGIN + Vector2(cell) * CELL_SIZE + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
