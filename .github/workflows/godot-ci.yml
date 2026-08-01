@@ -49,6 +49,9 @@ jobs:
       - name: Run spike trap test
         run: ./godot --headless --path . --script tests/spike_trap_test.gd
 
+      - name: Run defender test
+        run: ./godot --headless --path . --script tests/defender_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
