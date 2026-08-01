@@ -25,11 +25,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y unzip
+        run: sudo apt-get update && sudo apt-get install -y unzip zip
 
       - name: Download Godot editor
         run: |
-          curl --fail --location --retry 3 --output godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          curl --fail --location --retry 3 \
+            --output godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
           unzip godot.zip -d godot-bin
           mv "godot-bin/Godot_v${GODOT_RELEASE}_linux.x86_64" godot
           chmod +x godot
@@ -49,24 +51,30 @@ jobs:
 
       - name: Install export templates
         run: |
-          curl --fail --location --retry 3 --output templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
+          curl --fail --location --retry 3 \
+            --output templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           unzip templates.tpz -d templates-unpacked
           cp -R templates-unpacked/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
 
       - name: Export Windows build
         run: |
-          mkdir -p build
-          ./godot --headless --path . --export-release "Windows Desktop" build/dungeon-architect.exe
-          test -s build/dungeon-architect.exe
-          test -s build/dungeon-architect.pck
+          mkdir -p build/windows
+          ./godot --headless --path . --export-release "Windows Desktop" build/windows/dungeon-architect.exe
+          test -s build/windows/dungeon-architect.exe
+          test -s build/windows/dungeon-architect.pck
+
+      - name: Package Windows build
+        run: |
+          cd build/windows
+          zip -9 ../dungeon-architect-windows.zip dungeon-architect.exe dungeon-architect.pck
+          test -s ../dungeon-architect-windows.zip
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: dungeon-architect-windows
-          path: |
-            build/dungeon-architect.exe
-            build/dungeon-architect.pck
+          path: build/dungeon-architect-windows.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
