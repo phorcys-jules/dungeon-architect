@@ -55,6 +55,9 @@ jobs:
       - name: Run result statistics test
         run: ./godot --headless --path . --script tests/run_stats_test.gd
 
+      - name: Run economy test
+        run: ./godot --headless --path . --script tests/economy_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
