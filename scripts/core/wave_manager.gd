@@ -46,8 +46,25 @@ func get_preparation_duration() -> float:
 func get_adventurer_name() -> String:
     return get_adventurer_data().display_name
 
+func get_adventurer_description() -> String:
+    return get_adventurer_data().description
+
 func get_adventurer_color() -> Color:
     return get_adventurer_data().color
+
+func get_profile_summary() -> String:
+    return "%s — %d PV — vitesse %.2fx — récompense %d or" % [
+        get_adventurer_name(),
+        get_adventurer_health(),
+        get_speed_multiplier(),
+        get_wave_reward(),
+    ]
+
+func get_briefing() -> String:
+    var description := get_adventurer_description().strip_edges()
+    if description.is_empty():
+        return get_profile_summary()
+    return "%s\n%s" % [get_profile_summary(), description]
 
 func get_label() -> String:
     return "Vague %d / %d — %s" % [current_wave, MAX_WAVES, get_adventurer_name()]
