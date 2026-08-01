@@ -64,6 +64,9 @@ jobs:
       - name: Run content resources test
         run: ./godot --headless --path . --script tests/content_resources_test.gd
 
+      - name: Run damage resolver test
+        run: ./godot --headless --path . --script tests/damage_resolver_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
