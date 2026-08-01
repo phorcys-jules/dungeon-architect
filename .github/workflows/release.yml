@@ -1,0 +1,73 @@
+name: Publish Windows release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build and publish Windows release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      GODOT_VERSION: 4.7.1
+      GODOT_RELEASE: 4.7.1-stable
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y unzip zip
+
+      - name: Download Godot editor
+        run: |
+          curl --fail --location --retry 3 \
+            --output godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          unzip godot.zip -d godot-bin
+          mv "godot-bin/Godot_v${GODOT_RELEASE}_linux.x86_64" godot
+          chmod +x godot
+
+      - name: Import and validate project
+        run: ./godot --headless --path . --import
+
+      - name: Run automated tests
+        run: |
+          ./godot --headless --path . --script tests/smoke_test.gd
+          ./godot --headless --path . --script tests/health_component_test.gd
+          ./godot --headless --path . --script tests/spike_trap_test.gd
+
+      - name: Install export templates
+        run: |
+          curl --fail --location --retry 3 \
+            --output templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip templates.tpz -d templates-unpacked
+          cp -R templates-unpacked/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+
+      - name: Export Windows build
+        run: |
+          mkdir -p build/windows
+          ./godot --headless --path . --export-release "Windows Desktop" build/windows/dungeon-architect.exe
+          test -s build/windows/dungeon-architect.exe
+          test -s build/windows/dungeon-architect.pck
+
+      - name: Package release
+        run: |
+          cd build/windows
+          zip -9 ../dungeon-architect-windows-${GITHUB_REF_NAME}.zip dungeon-architect.exe dungeon-architect.pck
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/dungeon-architect-windows-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
