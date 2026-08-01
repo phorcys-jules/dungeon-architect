@@ -19,7 +19,7 @@ Le joueur incarne le maître du donjon. Des aventuriers entrent dans le labyrint
 
 ### Obligatoire
 
-- **Godot Engine 4.7.1 Standard** — version recommandée pour le projet.
+- **Godot Engine 4.7.1 Standard** — version utilisée par le projet et la CI.
   - Télécharger l'édition standard, pas l'édition `.NET`.
   - Le projet utilise GDScript : le SDK .NET n'est donc pas nécessaire.
   - Éviter les versions `dev`, `beta` et `rc`.
@@ -79,17 +79,35 @@ Avec GitHub Desktop, utiliser **File → Clone repository**, puis sélectionner 
 4. Cliquer sur **Importer et modifier**.
 5. Lancer le projet avec `F6` ou `F5`.
 
-## Vérification en ligne de commande
+## Vérifications locales
 
-Depuis la racine du dépôt, Godot peut vérifier que le projet et les scripts se chargent :
+Depuis la racine du dépôt, importer et valider les ressources :
 
 ```powershell
-C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe --headless --path . --editor --quit
+C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe --headless --path . --import
+```
+
+Exécuter ensuite le test de démarrage :
+
+```powershell
+C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe --headless --path . --script tests/smoke_test.gd
 ```
 
 Le nom exact de l'exécutable peut varier selon l'archive téléchargée.
 
-Cette commande servira aussi de base à la future intégration continue GitHub Actions.
+## Intégration continue
+
+Le workflow `.github/workflows/godot-ci.yml` est exécuté automatiquement à chaque push sur `main` et sur chaque pull request vers `main`.
+
+Il effectue trois contrôles :
+
+1. importe le projet en mode headless et vérifie les scripts et ressources ;
+2. charge et instancie la scène principale avec `tests/smoke_test.gd` ;
+3. exporte un build Windows avec le preset `Windows Desktop`.
+
+Le build Windows généré est disponible pendant 7 jours dans les **Artifacts** de l'exécution GitHub Actions.
+
+Une pull request ne doit pas être fusionnée si le workflow **Godot CI** échoue.
 
 ## Contrôles
 
@@ -101,11 +119,15 @@ Cette commande servira aussi de base à la future intégration continue GitHub A
 
 ```text
 res://
+├── .github/workflows/godot-ci.yml
+├── export_presets.cfg
 ├── project.godot
 ├── scenes/
 │   └── main.tscn
-└── scripts/
-    └── main.gd
+├── scripts/
+│   └── main.gd
+└── tests/
+    └── smoke_test.gd
 ```
 
 ## Développement
