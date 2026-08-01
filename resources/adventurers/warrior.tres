@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AdventurerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/adventurer_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "warrior"
+display_name = "Guerrier"
+description = "Aventurier équilibré et résistant."
+max_health = 140
+speed_multiplier = 0.95
+reward = 40
+color = Color(0.35, 0.55, 1, 1)

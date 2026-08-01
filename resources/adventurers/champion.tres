@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AdventurerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/adventurer_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "champion"
+display_name = "Champion"
+description = "Très lent, mais possède une réserve de vie élevée."
+max_health = 220
+speed_multiplier = 0.78
+reward = 65
+color = Color(0.75, 0.45, 1, 1)
