@@ -125,14 +125,22 @@ func _add_loops(open_cells: Dictionary, rng: RandomNumberGenerator) -> void:
             if neighbours >= 2:
                 candidates.append(cell)
 
-    candidates.shuffle()
+    _shuffle_with_rng(candidates, rng)
     var loops_to_add := mini(minimum_loops + rng.randi_range(0, 3), candidates.size())
     for index in range(loops_to_add):
         open_cells[candidates[index]] = true
 
+func _shuffle_with_rng(values: Array[Vector2i], rng: RandomNumberGenerator) -> void:
+    for index in range(values.size() - 1, 0, -1):
+        var swap_index := rng.randi_range(0, index)
+        var temporary := values[index]
+        values[index] = values[swap_index]
+        values[swap_index] = temporary
+
 func _has_path(start: Vector2i, target: Vector2i, blocked: Dictionary) -> bool:
     var frontier: Array[Vector2i] = [start]
-    var visited: Dictionary = {start: true}
+    var visited: Dictionary = {}
+    visited[start] = true
     while not frontier.is_empty():
         var current := frontier.pop_front()
         if current == target:
