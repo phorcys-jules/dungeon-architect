@@ -91,6 +91,9 @@ jobs:
       - name: Run permanent reward test
         run: timeout 45s ./godot --headless --path . --script tests/run_reward_service_test.gd
 
+      - name: Run end flow test
+        run: timeout 45s ./godot --headless --path . --script tests/run_end_controller_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
