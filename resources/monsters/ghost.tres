@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MonsterArchetypeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/monster_archetype_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+archetype_id = "ghost"
+display_name = "Fantôme"
+base_speed = 118.0
+base_damage = 12
+tags = Array[StringName]([&"ghost", &"ethereal"])
+abilities = Array[StringName]([&"phase"])
+effect_values = {"phase_cooldown": 5.0}
