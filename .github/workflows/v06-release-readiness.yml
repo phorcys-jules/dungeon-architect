@@ -39,3 +39,5 @@ jobs:
         run: ./godot --headless --path . --script tests/monster_team_runtime_test.gd
       - name: Test selectable labyrinth modules
         run: ./godot --headless --path . --script tests/labyrinth_module_loadout_test.gd
+      - name: Test adventurer intelligence reports
+        run: ./godot --headless --path . --script tests/adventurer_intelligence_test.gd

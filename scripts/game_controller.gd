@@ -2,6 +2,7 @@ extends "res://scripts/dungeon_invasion_controller.gd"
 class_name GameController
 
 const RunEndControllerScript := preload("res://scripts/core/run_end_controller.gd")
+const AdventurerIntelligenceScript := preload("res://scripts/meta/adventurer_intelligence.gd")
 
 var run_end: RunEndController = RunEndControllerScript.new()
 var village_button: Button
@@ -23,6 +24,8 @@ var village_den := DenProgression.new()
 var monster_roster := MonsterRoster.new()
 var monster_progression := MonsterProgression.new()
 var labyrinth_modules := LabyrinthModuleLoadout.new()
+var adventurer_intelligence: RefCounted = AdventurerIntelligenceScript.new()
+var intelligence_label: Label
 var choice_engine := RogueliteChoiceEngine.new()
 var choice_buttons: Array[Button] = []
 var current_choice_offer: Array[Dictionary] = []
@@ -41,6 +44,13 @@ func _ready() -> void:
 
 func _build_interface() -> void:
     super._build_interface()
+    intelligence_label = Label.new()
+    intelligence_label.position = Vector2(772, 438)
+    intelligence_label.size = Vector2(152, 112)
+    intelligence_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    intelligence_label.add_theme_font_size_override("font_size", 10)
+    intelligence_label.add_theme_color_override("font_color", Color("b8d8ff"))
+    add_child(intelligence_label)
     objectives_label = Label.new()
     objectives_label.position = Vector2(772, 110)
     objectives_label.size = Vector2(152, 130)
@@ -123,6 +133,7 @@ func _prepare_current_wave() -> void:
     result_summary.size.y = 318
     var announcement := v06_integration.start_wave(waves.current_wave, active_biome.active_biome_id)
     super._prepare_current_wave()
+    _refresh_adventurer_intelligence()
     var village_health := 1.0 + float(village_modifiers.get("adventurer_health_multiplier", 0.0))
     adventurer_health.max_health = maxi(1, roundi(float(waves.get_adventurer_health()) * v06_integration.adventurer_health_multiplier() * village_health))
     adventurer_health.reset()
@@ -181,6 +192,7 @@ func _finish_campaign(victory: bool, message: String) -> void:
     persisted_state["monster_roster"] = monster_roster.to_dict()
     persisted_state["monster_progression"] = monster_progression.to_dict()
     persisted_state["labyrinth_modules"] = labyrinth_modules.to_dict()
+    persisted_state["adventurer_intelligence"] = adventurer_intelligence.to_dict()
     v06_integration.store.save_state(persisted_state)
     result_summary.text += "\nÉquipe de monstres : +%d XP" % experience_gain
     _set_run_end_actions_visible(true)
@@ -217,6 +229,7 @@ func _load_village_progression() -> void:
         monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
     monster_progression.from_dict(state.get("monster_progression", {}))
     labyrinth_modules.from_dict(state.get("labyrinth_modules", {}), village_progression.state.buildings)
+    adventurer_intelligence.from_dict(state.get("adventurer_intelligence", {}))
     var labyrinth_modifiers := labyrinth_modules.generator_modifiers()
     labyrinth_generator.wall_density = clampf(0.34 + float(labyrinth_modifiers.density), 0.18, 0.48)
     labyrinth_generator.minimum_loops = 4 + int(labyrinth_modifiers.loops)
@@ -228,6 +241,21 @@ func _load_village_progression() -> void:
     var market_modifiers := black_market.combined_modifiers()
     for key in market_modifiers:
         village_modifiers[key] = float(village_modifiers.get(key, 0.0)) + float(market_modifiers[key])
+
+func _refresh_adventurer_intelligence() -> void:
+    var adventurer := waves.get_adventurer_data()
+    var laboratory_level := int(village_progression.state.buildings.get("laboratory", 0))
+    var report: Dictionary = adventurer_intelligence.report(adventurer, laboratory_level)
+    adventurer_intelligence.record_encounter(adventurer.id)
+    var persisted_state := v06_integration.store.load_state()
+    persisted_state["adventurer_intelligence"] = adventurer_intelligence.to_dict()
+    v06_integration.store.save_state(persisted_state)
+    var lines: Array[String] = ["RENSEIGNEMENTS — %s" % String(report.name)]
+    for fact in report.visible:
+        lines.append("• %s" % String(fact))
+    lines.append("? %d donnée(s) inconnue(s)" % int(report.hidden_count))
+    intelligence_label.text = "\n".join(lines)
+    intelligence_label.tooltip_text = "Le laboratoire révèle une information fiable supplémentaire par niveau."
 
 func _max_defenders() -> int:
     return village_den.get_capacity()
