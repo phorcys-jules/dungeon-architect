@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GODOT_RELEASE: 4.7.1-stable
+      GODOT_TEMPLATE_DIR: 4.7.1.stable
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y unzip zip
@@ -23,10 +24,10 @@ jobs:
           chmod +x godot
       - name: Download export templates
         run: |
-          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_RELEASE}"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATE_DIR}"
           curl --fail --location --retry 3 --output templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
           unzip -q templates.tpz -d templates
-          cp -R templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_RELEASE}/"
+          cp -R templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATE_DIR}/"
       - run: timeout 60s ./godot --headless --path . --import
       - run: timeout 45s ./godot --headless --path . --script tests/v05_release_readiness_test.gd
       - name: Export Windows
