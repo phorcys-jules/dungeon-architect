@@ -727,8 +727,9 @@ func _draw_splash_effect(target: Vector2, progress: float, color: Color) -> void
     var alpha := 1.0 - progress
     draw_circle(target, 5.0 + progress * 19.0, Color(color, alpha * 0.25))
     draw_arc(target, 7.0 + progress * 17.0, 0.0, TAU, 18, Color(color, alpha), 2.0)
-    for direction in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
-        var drop := target + direction.rotated(progress * 0.8) * (8.0 + progress * 15.0)
+    var splash_directions: Array[Vector2] = [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
+    for direction: Vector2 in splash_directions:
+        var drop: Vector2 = target + direction.rotated(progress * 0.8) * (8.0 + progress * 15.0)
         draw_circle(drop, 3.0 * alpha, Color(color, alpha))
 
 func _draw_impact(target: Vector2, progress: float, color: Color) -> void:

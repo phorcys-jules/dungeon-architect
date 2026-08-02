@@ -30,7 +30,7 @@ func _init() -> void:
     if screen.ambient_animator == null or screen.ambient_animator.TORCH_POSITIONS.size() != 12:
         quit(1)
         return
-    var animation_time := screen.ambient_animator.elapsed
+    var animation_time: float = screen.ambient_animator.elapsed
     screen.ambient_animator._process(0.1)
     if screen.ambient_animator.elapsed <= animation_time:
         quit(1)

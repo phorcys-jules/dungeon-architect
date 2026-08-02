@@ -104,7 +104,7 @@ func _init() -> void:
     assert(game.spider_webs.has(crossroads_cell))
     game.village_den.level = 2
     assert(game._max_defenders() == 6)
-    var previous_synergies := game.v06_integration.synergies.active.duplicate(true)
+    var previous_synergies: Array = game.v06_integration.synergies.active.duplicate(true)
     game.v06_integration.events.active_events = [{
         "id": "runtime_test",
         "name": "Modificateurs actifs",
@@ -129,7 +129,7 @@ func _init() -> void:
     assert(game.effect_rows.any(func(row: Button): return row.text == "Modificateurs actifs" and not row.tooltip_text.is_empty()))
     game.v06_integration.events.active_events.clear()
     game.v06_integration.synergies.active = previous_synergies
-    var previous_modifiers := game.village_modifiers.duplicate(true)
+    var previous_modifiers: Dictionary = game.village_modifiers.duplicate(true)
     game.village_modifiers = {
         "trap_damage_multiplier": 0.2,
         "effect_duration_multiplier": 0.4,
