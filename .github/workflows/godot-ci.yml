@@ -82,6 +82,9 @@ jobs:
       - name: Run room deck test
         run: timeout 45s ./godot --headless --path . --script tests/room_deck_test.gd
 
+      - name: Run village save persistence test
+        run: timeout 45s ./godot --headless --path . --script tests/village_save_store_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
