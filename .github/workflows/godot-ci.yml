@@ -97,6 +97,12 @@ jobs:
       - name: Run roguelite synergy build test
         run: timeout 45s ./godot --headless --path . --script tests/roguelite_synergy_build_test.gd
 
+      - name: Run end flow test
+        run: timeout 45s ./godot --headless --path . --script tests/run_end_controller_test.gd
+
+      - name: Run village navigation test
+        run: timeout 45s ./godot --headless --path . --script tests/village_navigation_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
