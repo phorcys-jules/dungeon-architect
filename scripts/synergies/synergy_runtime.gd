@@ -31,7 +31,12 @@ func combined_effects() -> Dictionary:
 func presentation() -> Array[Dictionary]:
     var result: Array[Dictionary] = []
     for entry in active:
-        result.append({"id":entry.id,"name":entry.name,"effect":entry.effect.duplicate(true)})
+        result.append({
+            "id": entry.id,
+            "name": entry.name,
+            "description": String(entry.get("description", "Synergie active pendant cette run.")),
+            "effect": entry.effect.duplicate(true),
+        })
     return result
 
 func to_dict() -> Dictionary:

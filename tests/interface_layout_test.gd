@@ -12,6 +12,8 @@ func _init() -> void:
     _assert_no_overlap(game.wave_label, game.gold_label)
     _assert_no_overlap(game.gold_label, game.start_button)
     _assert_no_overlap(game.objectives_label, game.modifiers_label)
+    _assert_no_overlap(game.objectives_label, game.modifiers_scroll)
+    _assert_no_overlap(game.modifiers_scroll, game.shortcut_title)
     _assert_no_overlap(game.modifiers_label, game.trap_button)
     _assert_no_overlap(game.trap_button, game.defender_button)
     _assert_no_overlap(game.defender_button, game.door_button)
@@ -22,6 +24,9 @@ func _init() -> void:
     assert(game.result_summary.scroll_active)
     assert(game.status_label.text_overrun_behavior == TextServer.OVERRUN_TRIM_ELLIPSIS)
     assert(game.result_panel.size.y >= 450.0)
+    assert(not game.effect_rows.is_empty())
+    for row: Button in game.effect_rows:
+        assert(not row.tooltip_text.is_empty())
     print("Interface layout test passed")
     quit(0)
 

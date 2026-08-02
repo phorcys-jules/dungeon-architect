@@ -55,22 +55,36 @@ func adventurer_health_multiplier() -> float:
 func adventurer_speed_multiplier() -> float:
     return float(events.combined_effects().get("adventurer_speed_multiplier", 1.0))
 
+func event_multiplier(key: String, fallback: float = 1.0) -> float:
+    return float(events.combined_effects().get(key, fallback))
+
+func synergy_bonus(key: String, fallback: float = 0.0) -> float:
+    return float(synergies.combined_effects().get(key, fallback))
+
 func hud_snapshot() -> Dictionary:
     var challenge_labels: Array[String] = []
     for challenge_id in challenges.active:
         var progress := challenges.progress(challenge_id)
         challenge_labels.append("%s%s" % [String(progress.get("name", challenge_id)), " ✓" if bool(progress.get("completed", false)) else ""])
     var event_labels: Array[String] = []
+    var effect_entries: Array[Dictionary] = []
     for event in events.active_events:
         event_labels.append(String(event.name))
+        effect_entries.append({
+            "kind": "event",
+            "name": String(event.name),
+            "description": "%s\nDurée restante : %d vague(s)." % [String(event.description), int(event.remaining)],
+        })
     var synergy_labels: Array[String] = []
     for synergy in synergies.presentation():
         synergy_labels.append(String(synergy.name))
+        effect_entries.append({"kind": "synergy", "name": String(synergy.name), "description": String(synergy.description)})
     return {
         "challenges": challenge_labels,
         "events": event_labels,
         "synergies": synergy_labels,
         "modifiers": events.combined_effects(),
+        "effect_entries": effect_entries,
     }
 
 func finish_run(result: Dictionary) -> Dictionary:

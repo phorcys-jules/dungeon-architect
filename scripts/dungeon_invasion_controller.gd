@@ -152,7 +152,7 @@ func _spawn_mobile_monsters() -> void:
     for index in MONSTER_HOME_CELLS.size():
         var monster: MobileMonster = MobileMonsterScript.new()
         var archetype := MONSTER_ARCHETYPES[index]
-        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed, roundi(float(42 + archetype.base_damage * 2) * _monster_health_multiplier()))
+        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed * _monster_speed_multiplier(), roundi(float(42 + archetype.base_damage * 2) * _monster_health_multiplier()))
         monster.world_position = Vector2(MONSTER_HOME_CELLS[index]) * CELL_SIZE
         mobile_monsters.append(monster)
         monster_facings.append(1.0)
@@ -224,7 +224,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             if loop_rules.is_panicking():
                 _consume_panicked_monster(index, monster, archetype)
             else:
-                var damage := roundi(float(MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])) * _monster_damage_multiplier())
+                var damage := roundi(float(MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])) * _monster_damage_multiplier() * _monster_ambush_multiplier(archetype.archetype_id, monster_burst_available[index]))
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
                 _play_monster_attack(archetype.archetype_id, attack_origin)
                 adventurer_health.take_damage(damage)
@@ -260,7 +260,7 @@ func _try_adventurer_attack() -> bool:
         return false
     var target := mobile_monsters[target_index]
     var target_center := GRID_ORIGIN + target.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-    var damage := roundi(float(profile.damage) * (1.8 if empowered else 1.0))
+    var damage := roundi(float(profile.damage) * (1.8 if empowered else 1.0) * (1.0 - _monster_evasion(MONSTER_ARCHETYPES[target_index].archetype_id)))
     var respawn_delay := _monster_respawn_delay(loop_rules.panic_time_left + 0.5 if empowered else 3.0)
     var applied_damage := target.take_damage(damage, respawn_delay)
     if applied_damage <= 0:
@@ -462,6 +462,15 @@ func _monster_respawn_delay(base_delay: float) -> float:
     return base_delay
 
 func _monster_damage_multiplier() -> float:
+    return 1.0
+
+func _monster_speed_multiplier() -> float:
+    return 1.0
+
+func _monster_evasion(_archetype_id: StringName) -> float:
+    return 0.0
+
+func _monster_ambush_multiplier(_archetype_id: StringName, _first_hit: bool) -> float:
     return 1.0
 
 func _monster_health_multiplier() -> float:

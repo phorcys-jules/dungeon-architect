@@ -12,6 +12,9 @@ var relics_protected_this_run := 0
 var v06_integration := V06RunIntegration.new()
 var objectives_label: Label
 var modifiers_label: Label
+var modifiers_scroll: ScrollContainer
+var modifiers_list: VBoxContainer
+var effect_rows: Array[Button] = []
 var village_progression := V04ProgressionService.new()
 var black_market := VillageBlackMarket.new()
 var village_modifiers: Dictionary = {}
@@ -36,10 +39,19 @@ func _build_interface() -> void:
     add_child(objectives_label)
     modifiers_label = Label.new()
     modifiers_label.position = Vector2(772, 252)
-    modifiers_label.size = Vector2(152, 178)
-    modifiers_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    modifiers_label.size = Vector2(152, 20)
+    modifiers_label.text = "EFFETS ACTIFS"
     modifiers_label.add_theme_font_size_override("font_size", 12)
     add_child(modifiers_label)
+    modifiers_scroll = ScrollContainer.new()
+    modifiers_scroll.position = Vector2(768, 274)
+    modifiers_scroll.size = Vector2(160, 154)
+    modifiers_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    add_child(modifiers_scroll)
+    modifiers_list = VBoxContainer.new()
+    modifiers_list.custom_minimum_size = Vector2(156, 0)
+    modifiers_list.add_theme_constant_override("separation", 2)
+    modifiers_scroll.add_child(modifiers_list)
 
 func _build_run_end_actions() -> void:
     village_button = Button.new()
@@ -87,6 +99,7 @@ func _prepare_current_wave() -> void:
     adventurer_health.reset()
     if not announcement.is_empty():
         status_label.text += "\nÉvénement : %s — %s" % [String(announcement.title), String(announcement.body)]
+    _refresh_active_gameplay_modifiers()
     _refresh_v06_hud()
 
 func _on_adventurer_died() -> void:
@@ -136,6 +149,7 @@ func _current_adventurer_speed_multiplier() -> float:
 func _configure_trap(trap: SpikeTrap) -> void:
     trap.damage = roundi(trap.damage * (1.0 + float(village_modifiers.get("trap_damage_multiplier", 0.0))) * active_biome.rule_value("trap_damage_multiplier", 1.0))
     trap.effect_duration *= _effect_duration_multiplier()
+    trap.cooldown_duration *= v06_integration.event_multiplier("trap_cooldown_multiplier")
 
 func _configure_defender(defender: Defender) -> void:
     defender.cooldown = maxf(0.2, defender.cooldown / (1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))))
@@ -161,7 +175,18 @@ func _monster_respawn_delay(base_delay: float) -> float:
     return maxf(0.5, base_delay / (1.0 + speed_bonus))
 
 func _monster_damage_multiplier() -> float:
-    return 1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))
+    return (1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))) * v06_integration.event_multiplier("monster_damage_multiplier")
+
+func _monster_speed_multiplier() -> float:
+    return v06_integration.event_multiplier("monster_speed_multiplier")
+
+func _monster_evasion(archetype_id: StringName) -> float:
+    return v06_integration.synergy_bonus("evasion") if archetype_id == &"ghost" else 0.0
+
+func _monster_ambush_multiplier(archetype_id: StringName, first_hit: bool) -> float:
+    if archetype_id == &"mimic" and first_hit:
+        return 1.0 + v06_integration.synergy_bonus("ambush_damage")
+    return 1.0
 
 func _monster_health_multiplier() -> float:
     return 1.0 + float(village_modifiers.get("monster_health_multiplier", 0.0))
@@ -182,11 +207,47 @@ func _refresh_v06_hud() -> void:
         return
     var snapshot := v06_integration.hud_snapshot()
     objectives_label.text = "OBJECTIFS\n%s" % ("\n".join(snapshot.challenges) if not snapshot.challenges.is_empty() else "Aucun")
-    var active_lines: Array[String] = []
-    active_lines.append_array(_village_effect_lines())
-    active_lines.append_array(snapshot.events)
-    active_lines.append_array(snapshot.synergies)
-    modifiers_label.text = "EFFETS ACTIFS\n%s" % ("\n".join(active_lines) if not active_lines.is_empty() else "Aucun")
+    _refresh_effect_rows(_village_effect_entries() + snapshot.effect_entries)
+
+func _refresh_effect_rows(entries: Array) -> void:
+    for row in effect_rows:
+        modifiers_list.remove_child(row)
+        row.queue_free()
+    effect_rows.clear()
+    if entries.is_empty():
+        entries = [{"name": "Aucun", "description": "Aucun modificateur n'est actif pour cette vague."}]
+    for entry: Dictionary in entries:
+        var row := Button.new()
+        row.text = String(entry.name)
+        row.tooltip_text = String(entry.description)
+        row.flat = true
+        row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+        row.custom_minimum_size = Vector2(156, 20)
+        row.mouse_default_cursor_shape = Control.CURSOR_HELP
+        row.add_theme_font_size_override("font_size", 12)
+        row.add_theme_color_override("font_hover_color", Color("ffe08a"))
+        var hover_style := StyleBoxFlat.new()
+        hover_style.bg_color = Color("273044d9")
+        hover_style.corner_radius_top_left = 4
+        hover_style.corner_radius_top_right = 4
+        hover_style.corner_radius_bottom_left = 4
+        hover_style.corner_radius_bottom_right = 4
+        row.add_theme_stylebox_override("hover", hover_style)
+        modifiers_list.add_child(row)
+        effect_rows.append(row)
+
+func _village_effect_entries() -> Array[Dictionary]:
+    var entries: Array[Dictionary] = []
+    for line in _village_effect_lines():
+        entries.append({"kind": "village", "name": line, "description": "Bonus permanent accordé par les améliorations du village."})
+    return entries
+
+func _refresh_active_gameplay_modifiers() -> void:
+    for trap: SpikeTrap in traps.values():
+        trap.configure(TrapCatalogScript.definition(trap.trap_id))
+        _configure_trap(trap)
+    for index in mobile_monsters.size():
+        mobile_monsters[index].move_speed = MONSTER_ARCHETYPES[index].base_speed * _monster_speed_multiplier()
 
 func _village_effect_lines() -> Array[String]:
     var lines: Array[String] = ["Tanière : %d défenseurs" % _max_defenders()]
