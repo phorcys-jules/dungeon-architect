@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="SynergyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/synergy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+synergy_id = "slime_ice"
+display_name = "Gelée glissante"
+required_tags = Array[StringName]([&"slime", &"ice"])
+granted_tags = Array[StringName]([&"slippery"])
+modifiers = {"adventurer_turn_control_multiplier": 0.7, "slow_duration_multiplier": 1.25}
