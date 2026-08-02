@@ -2,6 +2,7 @@ extends SceneTree
 
 const VillageScene := preload("res://scenes/village_v03_screen.tscn")
 
+# Release-blocking coverage for the village → run transition.
 func _init() -> void:
     var screen := VillageScene.instantiate()
     root.add_child(screen)
