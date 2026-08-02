@@ -94,6 +94,9 @@ jobs:
       - name: Run permanent reward test
         run: timeout 45s ./godot --headless --path . --script tests/run_reward_service_test.gd
 
+      - name: Run roguelite synergy build test
+        run: timeout 45s ./godot --headless --path . --script tests/roguelite_synergy_build_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
