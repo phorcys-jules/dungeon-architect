@@ -11,5 +11,7 @@ func _init() -> void:
     assert(CharacterAnimationRuntime.damage_tint(0.0) == Color.WHITE)
     assert(CharacterAnimationRuntime.attack_scale(0.09) > 1.0)
     assert(is_equal_approx(CharacterAnimationRuntime.attack_scale(0.0), 1.0))
+    assert(CharacterAnimationRuntime.attack_offset(0.11, Vector2.RIGHT).x > 0.0)
+    assert(CharacterAnimationRuntime.attack_offset(0.0, Vector2.RIGHT) == Vector2.ZERO)
     print("Character animation runtime test passed")
     quit(0)

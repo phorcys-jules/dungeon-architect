@@ -33,6 +33,10 @@ func _init() -> void:
         assert(texture != null)
         assert(texture.get_width() == 128)
         assert(texture.get_height() == 128)
+    game._spawn_combat_effect(&"projectile", Vector2.ZERO, Vector2.RIGHT * 48.0, Color.WHITE, 0.3)
+    assert(game.combat_effects.size() == 1)
+    game._tick_combat_presentation(0.1)
+    assert(float(game.combat_effects[0].remaining) < 0.3)
     assert(game.ROOM_TEXTURES.size() == 5)
     for room_id in ["slime_pool", "crossroads", "false_treasure", "monster_portal", "fog_chamber"]:
         var room_texture: Texture2D = game.ROOM_TEXTURES.get(room_id)

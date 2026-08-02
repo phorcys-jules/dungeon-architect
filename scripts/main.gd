@@ -45,6 +45,10 @@ var adventurer_position := Vector2.ZERO
 var character_animation_time := 0.0
 var adventurer_facing := 1.0
 var adventurer_damage_flash := 0.0
+var adventurer_attack_flash := 0.0
+var adventurer_attack_direction := Vector2.RIGHT
+var defender_attack_flashes: Dictionary = {}
+var combat_effects: Array[Dictionary] = []
 var path: Array[Vector2] = []
 var path_index := 0
 var game_state := GameState.PREPARATION
@@ -80,8 +84,7 @@ func _ready() -> void:
     queue_redraw()
 
 func _process(delta: float) -> void:
-    character_animation_time += delta
-    adventurer_damage_flash = maxf(adventurer_damage_flash - delta, 0.0)
+    _tick_combat_presentation(delta)
     for trap: SpikeTrap in traps.values():
         trap.tick(delta)
     for defender: Defender in defenders.values():
@@ -144,6 +147,7 @@ func _draw() -> void:
     _draw_traps()
     _draw_defenders()
     _draw_adventurer()
+    _draw_combat_effects()
 
 func _build_level() -> void:
     for x in range(2, 13):
@@ -324,6 +328,8 @@ func _start_new_campaign() -> void:
         defender.queue_free()
     traps.clear()
     defenders.clear()
+    defender_attack_flashes.clear()
+    combat_effects.clear()
     door_closed = false
     door_purchased = false
     astar.set_point_solid(DOOR, false)
@@ -344,6 +350,9 @@ func _prepare_current_wave() -> void:
         trap.reset()
     for defender: Defender in defenders.values():
         defender.reset()
+    defender_attack_flashes.clear()
+    combat_effects.clear()
+    adventurer_attack_flash = 0.0
     status_label.text = "Préparez les défenses pour %s." % waves.get_label()
     _refresh_all_ui()
     queue_redraw()
@@ -401,7 +410,7 @@ func _place_defender(cell: Vector2i) -> void:
     var defender: Defender = DefenderScript.new()
     defender.setup(cell, _world_from_cell(cell))
     _configure_defender(defender)
-    defender.attacked.connect(func(damage: int): run_stats.record_defender_attack(damage); status_label.text = "Le défenseur inflige %d dégâts." % damage)
+    defender.attacked.connect(func(damage: int): _on_defender_attacked(cell, damage))
     add_child(defender)
     defenders[cell] = defender
     status_label.text = "Défenseur placé pour %d or." % DEFENDER_COST
@@ -562,7 +571,10 @@ func _draw_defenders() -> void:
         var defender: Defender = defenders[cell]
         var center := _world_from_cell(cell)
         var tint := Color("c9a7ff") if defender.is_ready else Color("766484")
-        _draw_character_frame(MonsterSprite, center, tint, not defender.is_ready)
+        var attack_remaining := float(defender_attack_flashes.get(cell, 0.0))
+        var direction := adventurer_position - center
+        center += CharacterAnimationRuntimeScript.attack_offset(attack_remaining, direction, 0.24, 8.0)
+        _draw_character_frame(MonsterSprite, center, tint, not defender.is_ready, 1.0, 1.0, CharacterAnimationRuntimeScript.attack_scale(attack_remaining, 0.24))
 
 func _draw_adventurer() -> void:
     if adventurer_health.is_dead:
@@ -571,7 +583,9 @@ func _draw_adventurer() -> void:
     var texture: Texture2D = ADVENTURER_TEXTURES.get(adventurer_id, ADVENTURER_TEXTURES.champion)
     var moving := game_state == GameState.INVASION and path_index < path.size()
     var tint := CharacterAnimationRuntimeScript.damage_tint(adventurer_damage_flash)
-    _draw_character_frame(texture, adventurer_position, tint, moving, adventurer_facing, _current_adventurer_speed_multiplier())
+    var draw_position := adventurer_position + CharacterAnimationRuntimeScript.attack_offset(adventurer_attack_flash, adventurer_attack_direction)
+    var attack_scale := CharacterAnimationRuntimeScript.attack_scale(adventurer_attack_flash, 0.22)
+    _draw_character_frame(texture, draw_position, tint, moving, adventurer_facing, _current_adventurer_speed_multiplier(), attack_scale)
     var bar_position := adventurer_position + Vector2(-18, -25)
     draw_rect(Rect2(bar_position, Vector2(36, 5)), Color("2a2d36"))
     draw_rect(Rect2(bar_position, Vector2(36.0 * adventurer_health.get_health_ratio(), 5)), Color("63d471"))
@@ -592,6 +606,101 @@ func _draw_collectible(texture: Texture2D, center: Vector2, size: Vector2 = COLL
 func _on_adventurer_damaged(_amount: int, _current_health: int) -> void:
     adventurer_damage_flash = 0.28
     queue_redraw()
+
+func _on_defender_attacked(cell: Vector2i, damage: int) -> void:
+    run_stats.record_defender_attack(damage)
+    status_label.text = "Le défenseur inflige %d dégâts." % damage
+    defender_attack_flashes[cell] = 0.24
+    _spawn_combat_effect(&"projectile", _world_from_cell(cell), adventurer_position, Color("b978ff"), 0.3)
+
+func _tick_combat_presentation(delta: float) -> void:
+    character_animation_time += delta
+    adventurer_damage_flash = maxf(adventurer_damage_flash - delta, 0.0)
+    adventurer_attack_flash = maxf(adventurer_attack_flash - delta, 0.0)
+    for cell in defender_attack_flashes.keys():
+        var remaining := maxf(float(defender_attack_flashes[cell]) - delta, 0.0)
+        if remaining <= 0.0:
+            defender_attack_flashes.erase(cell)
+        else:
+            defender_attack_flashes[cell] = remaining
+    for index in range(combat_effects.size() - 1, -1, -1):
+        combat_effects[index].remaining = maxf(float(combat_effects[index].remaining) - delta, 0.0)
+        if float(combat_effects[index].remaining) <= 0.0:
+            combat_effects.remove_at(index)
+
+func _play_clash(monster_position: Vector2, effect_kind: StringName, color: Color) -> void:
+    var direction := monster_position - adventurer_position
+    adventurer_attack_direction = direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
+    adventurer_facing = CharacterAnimationRuntimeScript.facing_sign(direction.x, adventurer_facing)
+    adventurer_attack_flash = 0.22
+    _spawn_combat_effect(effect_kind, monster_position, adventurer_position, color, 0.34)
+    _spawn_combat_effect(&"slash", adventurer_position, monster_position, Color("fff0b8"), 0.24)
+
+func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, color: Color, duration: float) -> void:
+    combat_effects.append({
+        "kind": kind,
+        "origin": origin,
+        "target": target,
+        "color": color,
+        "duration": duration,
+        "remaining": duration,
+    })
+    if combat_effects.size() > 24:
+        combat_effects.pop_front()
+
+func _draw_combat_effects() -> void:
+    for effect in combat_effects:
+        var duration := maxf(float(effect.duration), 0.001)
+        var progress := 1.0 - clampf(float(effect.remaining) / duration, 0.0, 1.0)
+        var origin: Vector2 = effect.origin
+        var target: Vector2 = effect.target
+        var color: Color = effect.color
+        match StringName(effect.kind):
+            &"projectile", &"spectral", &"web":
+                _draw_projectile_effect(origin, target, progress, color, StringName(effect.kind))
+            &"splash":
+                _draw_splash_effect(target, progress, color)
+            _:
+                _draw_slash_effect(origin, target, progress, color)
+
+func _draw_projectile_effect(origin: Vector2, target: Vector2, progress: float, color: Color, kind: StringName) -> void:
+    var eased := ease(clampf(progress, 0.0, 1.0), -1.5)
+    var position := origin.lerp(target, eased)
+    var trail_start := origin.lerp(target, maxf(eased - 0.18, 0.0))
+    draw_line(trail_start, position, Color(color, 0.45), 4.0 if kind == &"web" else 3.0)
+    if kind == &"web":
+        draw_arc(position, 6.0, 0.0, TAU, 8, color, 2.0)
+        draw_line(position - Vector2(5, 5), position + Vector2(5, 5), color, 1.0)
+        draw_line(position + Vector2(-5, 5), position + Vector2(5, -5), color, 1.0)
+    else:
+        var radius := 7.0 if kind == &"spectral" else 5.0
+        draw_circle(position, radius, Color(color, 0.35))
+        draw_circle(position, radius * 0.5, color)
+    if progress > 0.72:
+        _draw_impact(target, (progress - 0.72) / 0.28, color)
+
+func _draw_slash_effect(origin: Vector2, target: Vector2, progress: float, color: Color) -> void:
+    var direction := target - origin
+    var angle := direction.angle() if not direction.is_zero_approx() else 0.0
+    var center := origin.lerp(target, 0.55)
+    var alpha := sin(clampf(progress, 0.0, 1.0) * PI)
+    draw_arc(center, 15.0 + progress * 7.0, angle - 0.9, angle + 0.9, 12, Color(color, alpha), 3.0)
+    if progress > 0.55:
+        _draw_impact(target, (progress - 0.55) / 0.45, color)
+
+func _draw_splash_effect(target: Vector2, progress: float, color: Color) -> void:
+    var alpha := 1.0 - progress
+    draw_circle(target, 5.0 + progress * 19.0, Color(color, alpha * 0.25))
+    draw_arc(target, 7.0 + progress * 17.0, 0.0, TAU, 18, Color(color, alpha), 2.0)
+    for direction in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
+        var drop := target + direction.rotated(progress * 0.8) * (8.0 + progress * 15.0)
+        draw_circle(drop, 3.0 * alpha, Color(color, alpha))
+
+func _draw_impact(target: Vector2, progress: float, color: Color) -> void:
+    var alpha := 1.0 - clampf(progress, 0.0, 1.0)
+    for index in 8:
+        var direction := Vector2.RIGHT.rotated(TAU * float(index) / 8.0)
+        draw_line(target + direction * 5.0, target + direction * (10.0 + progress * 10.0), Color(color, alpha), 2.0)
 
 func _world_from_cell(cell: Vector2i) -> Vector2:
     return GRID_ORIGIN + Vector2(cell) * CELL_SIZE + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)

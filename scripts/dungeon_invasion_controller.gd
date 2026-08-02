@@ -214,6 +214,8 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 status_label.text = "Un monstre paniqué retourne dans son repaire."
             else:
                 var damage := MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])
+                var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+                _play_monster_attack(archetype.archetype_id, attack_origin)
                 adventurer_health.take_damage(damage)
                 if archetype.has_ability(&"first_hit_burst") and monster_burst_available[index]:
                     monster_burst_available[index] = false
@@ -221,6 +223,17 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                     status_label.text = "Le mimic bondit hors de sa cachette : %d dégâts !" % damage
                 monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
+
+func _play_monster_attack(archetype_id: StringName, attack_origin: Vector2) -> void:
+    match archetype_id:
+        &"ghost":
+            _play_clash(attack_origin, &"spectral", Color("9edcff"))
+        &"slime":
+            _play_clash(attack_origin, &"splash", Color("a66cff"))
+        &"spider":
+            _play_clash(attack_origin, &"web", Color("e4d3ff"))
+        _:
+            _play_clash(attack_origin, &"slash", Color("ff9f68"))
 
 func _apply_monster_zone_ability(index: int, archetype: MonsterArchetypeData, previous_cell: Vector2i, current_cell: Vector2i) -> void:
     if archetype.has_ability(&"slow_trail"):
@@ -312,6 +325,7 @@ func _draw() -> void:
         if loop_rules.is_panicking():
             tint = Color("9eeeff")
         var scale := CharacterAnimationRuntimeScript.attack_scale(monster_attack_flashes[index])
+        center += CharacterAnimationRuntimeScript.attack_offset(monster_attack_flashes[index], adventurer_position - center, 0.18, 11.0)
         if monster_ability_flashes[index] > 0.0:
             scale += 0.08
         _draw_character_frame(texture, center, tint, monster.has_path(), monster_facings[index], archetype.base_speed / 120.0, scale, index * 0.07)

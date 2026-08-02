@@ -24,6 +24,7 @@ func _prepare_current_wave() -> void:
     ]
 
 func _process(delta: float) -> void:
+    _tick_combat_presentation(delta)
     for trap: SpikeTrap in traps.values():
         trap.tick(delta)
     for defender: Defender in defenders.values():

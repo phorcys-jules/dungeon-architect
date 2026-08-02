@@ -51,6 +51,14 @@ dans `assets/sprites/collectibles/` : la relique d'âme à collecter, la flamme 
 et le coffre final. Ils sont affichés entre 38 et 44 pixels pour rester lisibles sans masquer
 les cases voisines. Leur disparition et leurs effets restent pilotés par les contrôleurs de jeu.
 
+## Animations de combat
+
+Les combattants possèdent une anticipation courte, une impulsion vers leur cible et un retour
+au repos. Les défenseurs lancent des projectiles violets et les quatre archétypes mobiles ont
+un effet identifiable : frappe spectrale du fantôme, éclaboussure du slime, morsure du mimic
+et projectile de toile de l'araignée. Au contact, l'aventurier répond par un arc d'arme doré ;
+les impacts produisent une gerbe brève et sa réception des dégâts reste signalée par un flash.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;

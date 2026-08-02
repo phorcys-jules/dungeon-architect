@@ -175,7 +175,9 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 monster.world_position = _world_from_cell(monster.home_cell)
                 status_label.text = "Un monstre paniqué retourne dans son repaire."
             else:
+                _play_monster_attack(MONSTER_ARCHETYPES[index].archetype_id, monster.world_position)
                 adventurer_health.take_damage(MONSTER_HIT_DAMAGE)
+                monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
                 monster.world_position = _world_from_cell(monster.home_cell)
 

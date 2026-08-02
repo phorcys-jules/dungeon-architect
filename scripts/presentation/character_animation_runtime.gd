@@ -25,3 +25,9 @@ static func attack_scale(remaining: float, duration: float = 0.18) -> float:
         return 1.0
     var progress := 1.0 - clampf(remaining / duration, 0.0, 1.0)
     return 1.0 + sin(progress * PI) * 0.18
+
+static func attack_offset(remaining: float, direction: Vector2, duration: float = 0.22, distance: float = 10.0) -> Vector2:
+    if remaining <= 0.0 or duration <= 0.0 or direction.is_zero_approx():
+        return Vector2.ZERO
+    var progress := 1.0 - clampf(remaining / duration, 0.0, 1.0)
+    return direction.normalized() * sin(progress * PI) * distance
