@@ -1,0 +1,25 @@
+name: v0.5 Difficulty CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      GODOT_RELEASE: 4.7.1-stable
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y unzip
+      - name: Download Godot
+        run: |
+          curl --fail --location --retry 3 --output godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          unzip godot.zip -d godot-bin
+          mv "godot-bin/Godot_v${GODOT_RELEASE}_linux.x86_64" godot
+          chmod +x godot
+      - run: timeout 60s ./godot --headless --path . --import
+      - run: timeout 45s ./godot --headless --path . --script tests/difficulty_director_test.gd
