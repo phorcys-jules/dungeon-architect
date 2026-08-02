@@ -65,6 +65,12 @@ la menace la plus dangereuse. Chaque monstre possède des points de vie visibles
 neutralisée disparaît quelques secondes avant de revenir à son repaire. L'aventurier ralentit
 brièvement pendant sa frappe puis reprend automatiquement son objectif de run.
 
+La bénédiction fonctionne comme une pac-gomme : elle interrompt immédiatement les routes de
+poursuite, renforce portée, dégâts et cadence de l'aventurier, puis force chaque monstre à
+chercher le coin praticable le plus éloigné. Un contact pendant cette phase neutralise le
+monstre jusqu'à la fin du pouvoir. Un halo pulsant indique la durée active et les deux camps
+recalculent leurs objectifs lorsque la chasse reprend.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;

@@ -70,6 +70,7 @@ var room_deck := RoomDeck.new()
 var placed_rooms: Dictionary = {}
 var active_biome := BiomeRuntime.new()
 var adventurer_attack_cooldown := 0.0
+var power_pellet_was_active := false
 
 func _build_level() -> void:
     active_biome.select_for_zone(campaign_seed, 0)
@@ -102,6 +103,7 @@ func _ready() -> void:
 func _prepare_current_wave() -> void:
     blessing_available = true
     adventurer_attack_cooldown = 0.0
+    power_pellet_was_active = false
     slime_trails.clear()
     spider_webs.clear()
     super._prepare_current_wave()
@@ -112,7 +114,10 @@ func _prepare_current_wave() -> void:
         monster_ability_cooldowns[index] = 0.0
 
 func _process(delta: float) -> void:
+    var panic_before_tick := loop_rules.is_panicking()
     loop_rules.tick(delta)
+    if panic_before_tick and not loop_rules.is_panicking():
+        _on_power_pellet_expired()
     adventurer_attack_cooldown = maxf(adventurer_attack_cooldown - delta, 0.0)
     for index in monster_attack_flashes.size():
         monster_attack_flashes[index] = maxf(monster_attack_flashes[index] - delta, 0.0)
@@ -131,9 +136,7 @@ func _process(delta: float) -> void:
         last_adventurer_cell = current_cell
 
     if blessing_available and current_cell == BLESSING_CELL:
-        blessing_available = false
-        loop_rules.activate_panic()
-        status_label.text = "Bénédiction activée : les monstres paniquent !"
+        _activate_power_pellet()
 
     _update_mobile_monsters(delta, current_cell)
     _check_capture(current_cell)
@@ -188,7 +191,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 status_label.text = "Le fantôme traverse un mur pour intercepter l'aventurier."
 
         if not monster.has_path():
-            var target := monster.home_cell if loop_rules.is_panicking() else targets[index]
+            var target := loop_rules.get_flee_target(monster.cell, adventurer_cell, GRID_SIZE, blocked, occupied) if loop_rules.is_panicking() else targets[index]
             if not loop_rules.is_panicking():
                 target = MonsterTacticalRuntimeScript.tactical_target(
                     archetype.archetype_id,
@@ -219,8 +222,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
 
         if monster_cell == adventurer_cell:
             if loop_rules.is_panicking():
-                monster.reset_to_home(CELL_SIZE)
-                status_label.text = "Un monstre paniqué retourne dans son repaire."
+                _consume_panicked_monster(index, monster, archetype)
             else:
                 var damage := MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
@@ -238,7 +240,8 @@ func _try_adventurer_attack() -> bool:
         return false
     var adventurer_data := waves.get_adventurer_data()
     var profile: Dictionary = AdventurerCombatAiScript.profile(adventurer_data.id)
-    var attack_range := float(profile.range_cells) * CELL_SIZE
+    var empowered := loop_rules.is_panicking()
+    var attack_range := (float(profile.range_cells) + (1.25 if empowered else 0.0)) * CELL_SIZE
     var candidates: Array[Dictionary] = []
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
@@ -257,11 +260,13 @@ func _try_adventurer_attack() -> bool:
         return false
     var target := mobile_monsters[target_index]
     var target_center := GRID_ORIGIN + target.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-    var applied_damage := target.take_damage(int(profile.damage))
+    var damage := roundi(float(profile.damage) * (1.8 if empowered else 1.0))
+    var respawn_delay := loop_rules.panic_time_left + 0.5 if empowered else 3.0
+    var applied_damage := target.take_damage(damage, respawn_delay)
     if applied_damage <= 0:
         return false
-    adventurer_attack_cooldown = float(profile.cooldown)
-    _play_adventurer_attack(target_center, bool(profile.ranged))
+    adventurer_attack_cooldown = float(profile.cooldown) * (0.62 if empowered else 1.0)
+    _play_adventurer_attack(target_center, bool(profile.ranged), empowered)
     monster_ability_flashes[target_index] = 0.2
     if target.is_active():
         status_label.text = "%s attaque %s : %d dégâts." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name, applied_damage]
@@ -269,6 +274,36 @@ func _try_adventurer_attack() -> bool:
         target.reset_to_home(CELL_SIZE)
         status_label.text = "%s neutralise %s, qui reviendra bientôt." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name]
     return true
+
+func _activate_power_pellet() -> void:
+    blessing_available = false
+    loop_rules.activate_panic()
+    power_pellet_was_active = true
+    for index in mobile_monsters.size():
+        mobile_monsters[index].path.clear()
+        mobile_monsters[index].path_index = 0
+        monster_ability_flashes[index] = 0.35
+    adventurer_attack_cooldown = 0.0
+    _spawn_combat_effect(&"splash", adventurer_position, adventurer_position, Color("fff36b"), 0.55)
+    status_label.text = "Pac-gomme activée : l'aventurier chasse, les monstres fuient pendant %.0f s !" % loop_rules.panic_duration
+
+func _consume_panicked_monster(index: int, monster: MobileMonster, archetype: MonsterArchetypeData) -> void:
+    var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+    monster.take_damage(monster.current_health, loop_rules.panic_time_left + 0.5)
+    monster.reset_to_home(CELL_SIZE)
+    monster_ability_flashes[index] = 0.35
+    _play_adventurer_attack(center, false, true)
+    _spawn_combat_effect(&"splash", center, center, Color("fff36b"), 0.45)
+    status_label.text = "%s dévore l'énergie de %s !" % [waves.get_adventurer_name(), archetype.display_name]
+
+func _on_power_pellet_expired() -> void:
+    if not power_pellet_was_active:
+        return
+    power_pellet_was_active = false
+    for monster in mobile_monsters:
+        monster.path.clear()
+        monster.path_index = 0
+    status_label.text = "La pac-gomme est épuisée : les monstres reprennent la chasse."
 
 func _play_monster_attack(archetype_id: StringName, attack_origin: Vector2) -> void:
     match archetype_id:
@@ -363,6 +398,10 @@ func _draw() -> void:
         _draw_web(_world_from_cell(cell))
     if blessing_available:
         _draw_collectible(BLESSING_TEXTURE, _world_from_cell(BLESSING_CELL), Vector2(40, 40))
+    if loop_rules.is_panicking() and not adventurer_health.is_dead:
+        var pulse := 18.0 + sin(character_animation_time * 10.0) * 3.0
+        draw_circle(adventurer_position, pulse, Color("fff36b", 0.12))
+        draw_arc(adventurer_position, pulse, 0.0, TAU, 24, Color("fff36b", 0.8), 2.0)
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         if not monster.is_active():

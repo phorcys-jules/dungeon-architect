@@ -631,13 +631,13 @@ func _tick_combat_presentation(delta: float) -> void:
 func _play_clash(monster_position: Vector2, effect_kind: StringName, color: Color) -> void:
     _spawn_combat_effect(effect_kind, monster_position, adventurer_position, color, 0.34)
 
-func _play_adventurer_attack(target: Vector2, ranged: bool) -> void:
+func _play_adventurer_attack(target: Vector2, ranged: bool, empowered: bool = false) -> void:
     var direction := target - adventurer_position
     adventurer_attack_direction = direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
     adventurer_facing = CharacterAnimationRuntimeScript.facing_sign(direction.x, adventurer_facing)
     adventurer_attack_flash = 0.22
     var kind: StringName = &"projectile" if ranged else &"slash"
-    var color := Color("78d8ff") if ranged else Color("fff0b8")
+    var color := Color("fff36b") if empowered else (Color("78d8ff") if ranged else Color("fff0b8"))
     _spawn_combat_effect(kind, adventurer_position, target, color, 0.28 if ranged else 0.24)
 
 func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, color: Color, duration: float) -> void:

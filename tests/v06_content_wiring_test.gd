@@ -44,6 +44,22 @@ func _init() -> void:
     assert(game.combat_effects.size() == 1)
     game._tick_combat_presentation(0.1)
     assert(float(game.combat_effects[0].remaining) < 0.3)
+    game.combat_effects.clear()
+    combat_target.revive_at_home(game.CELL_SIZE)
+    combat_target.world_position = Vector2(game.ENTRANCE) * game.CELL_SIZE
+    combat_target.set_path([Vector2i(1, 5)])
+    game._activate_power_pellet()
+    assert(game.loop_rules.is_panicking())
+    assert(not game.blessing_available)
+    assert(not combat_target.has_path())
+    game.adventurer_attack_cooldown = 0.0
+    var powered_health := combat_target.current_health
+    assert(game._try_adventurer_attack())
+    assert(powered_health - combat_target.current_health > int(game.AdventurerCombatAiScript.profile("scout").damage))
+    game.loop_rules.tick(game.loop_rules.panic_duration)
+    game._on_power_pellet_expired()
+    assert(not game.loop_rules.is_panicking())
+    combat_target.revive_at_home(game.CELL_SIZE)
     assert(game.ROOM_TEXTURES.size() == 5)
     for room_id in ["slime_pool", "crossroads", "false_treasure", "monster_portal", "fog_chamber"]:
         var room_texture: Texture2D = game.ROOM_TEXTURES.get(room_id)

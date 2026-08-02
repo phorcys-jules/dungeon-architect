@@ -146,7 +146,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
         if not monster.is_active():
             continue
         if not monster.has_path():
-            var target := monster.home_cell if loop_rules.is_panicking() else targets[index]
+            var target := loop_rules.get_flee_target(monster.cell, adventurer_cell, GRID_SIZE, blocked, occupied) if loop_rules.is_panicking() else targets[index]
             target.x = clampi(target.x, 0, GRID_SIZE.x - 1)
             target.y = clampi(target.y, 0, GRID_SIZE.y - 1)
             if walls.has(target):
@@ -175,8 +175,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
 
         if monster_cell == adventurer_cell:
             if loop_rules.is_panicking():
-                monster.reset_to_home(CELL_SIZE)
-                status_label.text = "Un monstre paniqué retourne dans son repaire."
+                _consume_panicked_monster(index, monster, MONSTER_ARCHETYPES[index])
             else:
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
                 _play_monster_attack(MONSTER_ARCHETYPES[index].archetype_id, attack_origin)
