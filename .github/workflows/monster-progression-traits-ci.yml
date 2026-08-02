@@ -5,7 +5,9 @@ on:
     paths:
       - "scripts/meta/monster_progression.gd"
       - "scripts/meta/monster_traits.gd"
+      - "scripts/meta/monster_family_catalog.gd"
       - "tests/monster_progression_traits_test.gd"
+      - "tests/monster_family_catalog_test.gd"
       - ".github/workflows/monster-progression-traits-ci.yml"
 
 jobs:
@@ -25,3 +27,5 @@ jobs:
         run: timeout 60s ./godot --headless --path . --import
       - name: Test progression and traits
         run: timeout 45s ./godot --headless --path . --script tests/monster_progression_traits_test.gd
+      - name: Test family affinities
+        run: timeout 45s ./godot --headless --path . --script tests/monster_family_catalog_test.gd
