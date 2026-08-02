@@ -88,6 +88,9 @@ jobs:
       - name: Run village den screen integration test
         run: timeout 45s ./godot --headless --path . --script tests/village_den_screen_integration_test.gd
 
+      - name: Run permanent reward test
+        run: timeout 45s ./godot --headless --path . --script tests/run_reward_service_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
