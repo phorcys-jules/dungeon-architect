@@ -89,6 +89,27 @@ func _set_construction_mode(mode: ConstructionMode) -> void:
     status_label.text = "Cliquez sur une case libre pour placer un mur." if mode == ConstructionMode.PLACE_WALL else "Cliquez sur un mur construit pour le retirer."
     _refresh_build_ui()
 
+func _activate_extended_build_shortcut(slot: int) -> void:
+    match slot:
+        8:
+            _set_construction_mode(ConstructionMode.PLACE_WALL)
+            status_label.text = "[8] Placement de mur sélectionné."
+        9:
+            _set_construction_mode(ConstructionMode.REMOVE_WALL)
+            status_label.text = "[9] Retrait de mur sélectionné."
+
+func _active_build_shortcut() -> int:
+    match construction_mode:
+        ConstructionMode.PLACE_WALL: return 8
+        ConstructionMode.REMOVE_WALL: return 9
+        _: return super._active_build_shortcut()
+
+func _refresh_shortcut_bar() -> void:
+    super._refresh_shortcut_bar()
+    if shortcut_buttons.has(8):
+        (shortcut_buttons[8] as Button).tooltip_text = "8 — Placer un mur"
+        (shortcut_buttons[9] as Button).tooltip_text = "9 — Retirer un mur construit"
+
 func _try_place_free_wall(cell: Vector2i) -> void:
     if not _is_valid_build_cell(cell):
         status_label.text = "Cette case ne peut pas recevoir de mur."

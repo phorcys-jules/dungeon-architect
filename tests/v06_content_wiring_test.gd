@@ -10,6 +10,25 @@ func _init() -> void:
     assert(game.mobile_monsters.size() == 4)
     assert(game.monster_ability_cooldowns.size() == 4)
     assert(game.monster_burst_available == [true, true, true, true])
+    assert(game.shortcut_buttons.size() == 9)
+    var all_traps: Array[StringName] = []
+    all_traps.assign(TrapCatalog.ORDER)
+    game.set_unlocked_traps(all_traps)
+    game._activate_build_shortcut(4)
+    assert(game.selected_trap_id == &"frost_sigil")
+    assert(game._active_build_shortcut() == 4)
+    game._activate_build_shortcut(7)
+    assert(game.build_mode == game.BuildMode.DEFENDER)
+    game._activate_build_shortcut(8)
+    assert(game.construction_mode == game.ConstructionMode.PLACE_WALL)
+    game._activate_build_shortcut(9)
+    assert(game.construction_mode == game.ConstructionMode.REMOVE_WALL)
+    game._activate_build_shortcut(7)
+    var trap_key := InputEventKey.new()
+    trap_key.keycode = KEY_3
+    trap_key.pressed = true
+    game._unhandled_input(trap_key)
+    assert(game.selected_trap_id == &"fire_rune")
     var combat_target: MobileMonster = game.mobile_monsters[0]
     combat_target.world_position = Vector2(game.ENTRANCE) * game.CELL_SIZE
     var previous_monster_health := combat_target.current_health

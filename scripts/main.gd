@@ -54,6 +54,8 @@ var unlocked_trap_ids: Array[StringName] = [&"spikes"]
 var selected_trap_id: StringName = &"spikes"
 var trap_slow_multiplier := 1.0
 var active_trap_slows: Array[Dictionary] = []
+var shortcut_buttons: Dictionary = {}
+var shortcut_title: Label
 var path: Array[Vector2] = []
 var path_index := 0
 var game_state := GameState.PREPARATION
@@ -125,11 +127,10 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode >= KEY_1 and event.keycode <= KEY_9:
+            _activate_build_shortcut(int(event.keycode - KEY_1) + 1)
+            return
         match event.keycode:
-            KEY_1:
-                _cycle_trap_type()
-            KEY_2:
-                _set_build_mode(BuildMode.DEFENDER)
             KEY_SPACE, KEY_ENTER:
                 _on_primary_button_pressed()
             KEY_D:
@@ -262,6 +263,7 @@ func _build_interface() -> void:
     _style_action_button(trap_button, Color("6f4b8b"))
     trap_button.pressed.connect(_cycle_trap_type)
     add_child(trap_button)
+    trap_button.visible = false
 
     defender_button = Button.new()
     defender_button.position = Vector2(772, 486)
@@ -269,6 +271,7 @@ func _build_interface() -> void:
     _style_action_button(defender_button, Color("456990"))
     defender_button.pressed.connect(func(): _set_build_mode(BuildMode.DEFENDER))
     add_child(defender_button)
+    defender_button.visible = false
 
     door_button = Button.new()
     door_button.position = Vector2(772, 528)
@@ -276,6 +279,7 @@ func _build_interface() -> void:
     _style_action_button(door_button, Color("8d5b4c"))
     door_button.pressed.connect(_toggle_door)
     add_child(door_button)
+    _build_shortcut_bar()
 
     start_button = Button.new()
     start_button.position = Vector2(752, 28)
@@ -555,6 +559,7 @@ func _refresh_build_ui() -> void:
     build_label.text = "Mode : %s (%d or) | Pièges : %d | Défenseurs : %d" % [mode_name, cost, traps.size(), defenders.size()]
     trap_button.text = "%s (%d)" % [String(trap_definition.name), int(trap_definition.cost)]
     defender_button.text = "Défenseur (%d or)" % DEFENDER_COST
+    _refresh_shortcut_bar()
 
 func _refresh_door_ui() -> void:
     if door_button:
@@ -754,6 +759,80 @@ func set_unlocked_traps(trap_ids: Array[StringName]) -> void:
     if not unlocked_trap_ids.has(selected_trap_id):
         selected_trap_id = unlocked_trap_ids[0]
     _refresh_build_ui()
+
+func _build_shortcut_bar() -> void:
+    shortcut_title = Label.new()
+    shortcut_title.position = Vector2(772, 430)
+    shortcut_title.size = Vector2(152, 18)
+    shortcut_title.text = "CONSTRUCTION  [1—9]"
+    shortcut_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    shortcut_title.add_theme_font_size_override("font_size", 11)
+    shortcut_title.add_theme_color_override("font_color", Color("b9c6dc"))
+    add_child(shortcut_title)
+    for slot in range(1, 10):
+        var button := Button.new()
+        button.name = "Shortcut%d" % slot
+        var column := (slot - 1) % 3
+        var row := (slot - 1) / 3
+        button.position = Vector2(772 + column * 52, 450 + row * 35)
+        button.size = Vector2(48, 31)
+        button.toggle_mode = true
+        button.add_theme_font_size_override("font_size", 10)
+        button.pressed.connect(_activate_build_shortcut.bind(slot))
+        add_child(button)
+        shortcut_buttons[slot] = button
+    door_button.position = Vector2(772, 557)
+    door_button.size = Vector2(152, 27)
+
+func _activate_build_shortcut(slot: int) -> void:
+    if game_state != GameState.PREPARATION:
+        return
+    if slot >= 1 and slot <= TrapCatalogScript.ORDER.size():
+        var trap_id: StringName = TrapCatalogScript.ORDER[slot - 1]
+        if not unlocked_trap_ids.has(trap_id):
+            var required_level := int(TrapCatalogScript.definition(trap_id).forge_level)
+            status_label.text = "%s verrouillé — forge niveau %d requise." % [String(TrapCatalogScript.definition(trap_id).name), required_level]
+            return
+        selected_trap_id = trap_id
+        _set_build_mode(BuildMode.SPIKE_TRAP)
+        status_label.text = "[%d] %s sélectionné." % [slot, String(_selected_trap_definition().name)]
+    elif slot == 7:
+        _set_build_mode(BuildMode.DEFENDER)
+        status_label.text = "[7] Défenseur sélectionné."
+    else:
+        _activate_extended_build_shortcut(slot)
+    _refresh_build_ui()
+
+func _activate_extended_build_shortcut(_slot: int) -> void:
+    pass
+
+func _active_build_shortcut() -> int:
+    if build_mode == BuildMode.DEFENDER:
+        return 7
+    var trap_index := TrapCatalogScript.ORDER.find(selected_trap_id)
+    return trap_index + 1 if trap_index >= 0 else 1
+
+func _refresh_shortcut_bar() -> void:
+    if shortcut_buttons.is_empty():
+        return
+    var labels := {1: "1 PNT", 2: "2 POIX", 3: "3 FEU", 4: "4 GIV", 5: "5 ÂME", 6: "6 NÉA", 7: "7 DÉF", 8: "8 MUR", 9: "9 −MUR"}
+    var active_slot := _active_build_shortcut()
+    for slot in range(1, 10):
+        var button: Button = shortcut_buttons[slot]
+        button.text = labels[slot]
+        button.button_pressed = slot == active_slot
+        button.disabled = game_state != GameState.PREPARATION
+        if slot <= TrapCatalogScript.ORDER.size():
+            var trap_id: StringName = TrapCatalogScript.ORDER[slot - 1]
+            var definition := TrapCatalogScript.definition(trap_id)
+            button.tooltip_text = "%d — %s (%d or)" % [slot, String(definition.name), int(definition.cost)]
+            if not unlocked_trap_ids.has(trap_id):
+                button.disabled = true
+                button.tooltip_text += " — Forge niveau %d" % int(definition.forge_level)
+        elif slot == 7:
+            button.tooltip_text = "7 — Défenseur (%d or)" % DEFENDER_COST
+        else:
+            button.tooltip_text = "%d — emplacement réservé" % slot
 
 func _cycle_trap_type() -> void:
     if game_state != GameState.PREPARATION:

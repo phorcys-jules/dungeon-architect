@@ -102,6 +102,14 @@ ralentissement distinct appliqué à l'aventurier.
 Ces valeurs sont rechargées avant la création du niveau, appliquées aux nouvelles entités et
 récapitulées dans « EFFETS ACTIFS » pendant la run.
 
+## Barre rapide de construction
+
+La colonne d'actions affiche une grille 3 × 3 utilisable au clavier ou à la souris : `1` pointes,
+`2` poix, `3` rune incendiaire, `4` givre, `5` mine d'âme, `6` faille du Néant, `7` défenseur,
+`8` placement de mur et `9` retrait de mur. Les pièges encore verrouillés restent visibles mais
+désactivés, avec le niveau de forge requis dans leur infobulle. La case sélectionnée reste
+enfoncée et les raccourcis sont désactivés hors de la phase de préparation.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;
