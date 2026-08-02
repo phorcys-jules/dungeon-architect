@@ -6,8 +6,11 @@
 script = ExtResource("1")
 id = "scout"
 display_name = "Éclaireur"
-description = "Rapide mais fragile."
+description = "Rapide mais fragile. Résiste mieux aux pièges grâce à son agilité."
 max_health = 90
 speed_multiplier = 1.18
 reward = 25
+flat_armor = 0
+trap_damage_multiplier = 0.7
+defender_damage_multiplier = 1.0
 color = Color(0.35, 0.75, 1, 1)

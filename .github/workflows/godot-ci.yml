@@ -38,31 +38,34 @@ jobs:
           ./godot --version
 
       - name: Import project and validate resources
-        run: ./godot --headless --path . --import
+        run: timeout 60s ./godot --headless --path . --import
 
       - name: Run smoke test
-        run: ./godot --headless --path . --script tests/smoke_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/smoke_test.gd
 
       - name: Run health component test
-        run: ./godot --headless --path . --script tests/health_component_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/health_component_test.gd
 
       - name: Run spike trap test
-        run: ./godot --headless --path . --script tests/spike_trap_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/spike_trap_test.gd
 
       - name: Run defender test
-        run: ./godot --headless --path . --script tests/defender_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/defender_test.gd
 
       - name: Run result statistics test
-        run: ./godot --headless --path . --script tests/run_stats_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/run_stats_test.gd
 
       - name: Run economy test
-        run: ./godot --headless --path . --script tests/economy_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/economy_test.gd
 
       - name: Run wave progression test
-        run: ./godot --headless --path . --script tests/wave_manager_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/wave_manager_test.gd
 
       - name: Run content resources test
-        run: ./godot --headless --path . --script tests/content_resources_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/content_resources_test.gd
+
+      - name: Run damage resolver test
+        run: timeout 45s ./godot --headless --path . --script tests/damage_resolver_test.gd
 
       - name: Install export templates
         run: |
@@ -76,7 +79,7 @@ jobs:
       - name: Export Windows build
         run: |
           mkdir -p build/windows
-          ./godot --headless --path . --export-release "Windows Desktop" build/windows/dungeon-architect.exe
+          timeout 120s ./godot --headless --path . --export-release "Windows Desktop" build/windows/dungeon-architect.exe
           test -s build/windows/dungeon-architect.exe
           test -s build/windows/dungeon-architect.pck
 
