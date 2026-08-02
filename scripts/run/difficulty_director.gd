@@ -27,7 +27,10 @@ func scaled_stats(base_stats: Dictionary, level: Level, wave: int) -> Dictionary
 func should_spawn_elite(level: Level, wave: int, roll: float) -> bool:
     if wave < 3:
         return false
-    var chance := float(profile(level).elite_rate) + float(wave - 3) * 0.015
+    var base_rate := float(profile(level).elite_rate)
+    if base_rate <= 0.0:
+        return false
+    var chance := base_rate + float(wave - 3) * 0.015
     return roll < clampf(chance, 0.0, 0.6)
 
 func elite_affix(seed_value: int, wave: int) -> String:
