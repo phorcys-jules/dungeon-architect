@@ -1,6 +1,6 @@
 extends SceneTree
 
-const VillageScene := preload("res://scenes/village_v03_screen.tscn")
+const VillageScene := preload("res://scenes/village_screen.tscn")
 
 # Release-blocking coverage for the village → run transition.
 func _init() -> void:
