@@ -1,0 +1,22 @@
+name: Dungeon Build Runtime CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          curl --fail --location --retry 3 --output godot.zip "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip"
+          unzip godot.zip -d godot-bin
+          mv godot-bin/Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+      - run: timeout 60s ./godot --headless --path . --import
+      - run: timeout 45s ./godot --headless --path . --script tests/dungeon_build_runtime_test.gd
