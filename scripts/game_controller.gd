@@ -156,6 +156,7 @@ func _finish_campaign(victory: bool, message: String) -> void:
         "duration_seconds": roundi(run_stats.elapsed_time),
         "captures": captures_this_run,
         "resources": {"gold": int(reward.get("total", 0))},
+        "loot": loot_ledger.snapshot(),
         "monster_ids": get_monster_ids(),
         "adventurer_ids": _encountered_adventurer_ids(),
         "room_ids": _placed_room_ids(),

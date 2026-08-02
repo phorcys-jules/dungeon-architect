@@ -73,6 +73,7 @@ var adventurer_attack_cooldown := 0.0
 var power_pellet_was_active := false
 var round_state := PacmanRoundState.new()
 var round_state_label: Label
+var loot_ledger := RunLootLedger.new()
 
 func _build_interface() -> void:
     super._build_interface()
@@ -117,6 +118,7 @@ func _prepare_current_wave() -> void:
     adventurer_attack_cooldown = 0.0
     power_pellet_was_active = false
     round_state.reset(COLLECTIBLE_CELLS.size())
+    loot_ledger.reset()
     slime_trails.clear()
     spider_webs.clear()
     super._prepare_current_wave()
@@ -158,10 +160,16 @@ func _process(delta: float) -> void:
     queue_redraw()
 
 func _on_adventurer_died() -> void:
+    if game_state == GameState.INVASION:
+        loot_ledger.capture_adventurer(_cell_from_world(adventurer_position))
     _refresh_round_state(true)
     super._on_adventurer_died()
+    if game_state == GameState.WAVE_RESULT:
+        result_summary.text += "\n" + loot_ledger.summary()
 
 func _finish_campaign(victory: bool, message: String) -> void:
+    if not victory:
+        loot_ledger.lose_carried_loot()
     _refresh_round_state(true)
     super._finish_campaign(victory, message)
 
@@ -296,7 +304,7 @@ func _try_adventurer_attack() -> bool:
     if target.is_active():
         status_label.text = "%s attaque %s : %d dégâts." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name, applied_damage]
     else:
-        target.reset_to_home(CELL_SIZE)
+        loot_ledger.record_monster_neutralized(target.cell, 1, 2)
         status_label.text = "%s neutralise %s, qui reviendra bientôt." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name]
     return true
 
@@ -315,8 +323,8 @@ func _activate_power_pellet() -> void:
 func _consume_panicked_monster(index: int, monster: MobileMonster, archetype: MonsterArchetypeData) -> void:
     var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
     var respawn_base := archetype.get_effect(&"respawn_delay", 3.0)
+    loot_ledger.record_monster_neutralized(monster.cell, 1, 2)
     monster.take_damage(monster.current_health, _monster_respawn_delay(maxf(respawn_base, loop_rules.panic_time_left + 0.5)))
-    monster.reset_to_home(CELL_SIZE)
     monster_ability_flashes[index] = 0.35
     _play_adventurer_attack(center, false, true)
     _spawn_combat_effect(&"splash", center, center, Color("fff36b"), 0.45)
@@ -420,6 +428,11 @@ func _draw() -> void:
     draw_rect(lair_rect, Color("20152f", 0.52), true)
     draw_rect(lair_rect, Color("b995d6", 0.8), false, 2.0)
     draw_string(ThemeDB.fallback_font, lair_rect.position + Vector2(12, 17), "REPAIRE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("dec9f5"))
+    for drop: Dictionary in loot_ledger.world_drops:
+        var drop_center := _world_from_cell(Vector2i(drop.cell))
+        var drop_color := Color("8ff0df") if String(drop.kind) == "ectoplasm" else Color("ffd166")
+        draw_circle(drop_center, 8.0, Color(drop_color, 0.28))
+        draw_circle(drop_center, 4.0, drop_color)
     for cell: Vector2i in slime_trails:
         var trail_center := _world_from_cell(cell)
         draw_circle(trail_center, 13.0, Color("7145c7", 0.48))
@@ -515,6 +528,9 @@ func _monster_ambush_multiplier(_archetype_id: StringName, _first_hit: bool) -> 
 
 func _slime_slow_multiplier(base_multiplier: float) -> float:
     return base_multiplier
+
+func _on_collectible_loot_collected(_cell: Vector2i) -> void:
+    loot_ledger.collect_relic(3)
 
 func _monster_health_multiplier() -> float:
     return 1.0

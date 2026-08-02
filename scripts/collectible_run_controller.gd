@@ -60,6 +60,7 @@ func _process(delta: float) -> void:
 
 func _on_route_target_reached(cell: Vector2i) -> void:
     if collectible_route.collect_at(cell):
+        _on_collectible_loot_collected(cell)
         status_label.text = "Relique collectée. Il en reste %d." % collectible_route.get_remaining_count()
         _recalculate_path()
         return
@@ -98,3 +99,6 @@ func _draw() -> void:
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
     return super._is_valid_build_cell(cell) and not COLLECTIBLE_CELLS.has(cell)
+
+func _on_collectible_loot_collected(_cell: Vector2i) -> void:
+    pass

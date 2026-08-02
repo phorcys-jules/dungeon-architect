@@ -79,6 +79,9 @@ jobs:
       - name: Run Pac-Man round state test
         run: timeout 45s ./godot --headless --path . --script tests/pacman_round_state_test.gd
 
+      - name: Run loot ledger test
+        run: timeout 45s ./godot --headless --path . --script tests/run_loot_ledger_test.gd
+
       - name: Run procedural labyrinth test
         run: timeout 45s ./godot --headless --path . --script tests/labyrinth_generator_test.gd
 
