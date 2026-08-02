@@ -85,6 +85,9 @@ jobs:
       - name: Run village save persistence test
         run: timeout 45s ./godot --headless --path . --script tests/village_save_store_test.gd
 
+      - name: Run village den screen integration test
+        run: timeout 45s ./godot --headless --path . --script tests/village_den_screen_integration_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
