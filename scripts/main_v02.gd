@@ -2,6 +2,7 @@ extends "res://scripts/main_pacman.gd"
 
 const MobileMonsterScript := preload("res://scripts/monsters/mobile_monster.gd")
 const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd")
+const LabyrinthGeneratorScript := preload("res://scripts/core/labyrinth_generator.gd")
 
 const BLESSING_CELL := Vector2i(7, 8)
 const MONSTER_HOME_CELLS: Array[Vector2i] = [Vector2i(6, 5), Vector2i(8, 5)]
@@ -13,13 +14,27 @@ var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [
     PacmanLoopRules.Behaviour.AMBUSHER,
 ]
 var loop_rules: PacmanLoopRules = PacmanLoopRulesScript.new()
+var labyrinth_generator: LabyrinthGenerator = LabyrinthGeneratorScript.new()
+var campaign_seed := int(Time.get_unix_time_from_system())
 var blessing_available := true
 var last_adventurer_cell := ENTRANCE
 var adventurer_direction := Vector2i.RIGHT
 
+func _build_level() -> void:
+    labyrinth_generator.size = GRID_SIZE
+    labyrinth_generator.entrance = ENTRANCE
+    labyrinth_generator.treasure = TREASURE
+    var required_cells: Array[Vector2i] = COLLECTIBLE_CELLS.duplicate()
+    required_cells.append(BLESSING_CELL)
+    required_cells.append_array(MONSTER_HOME_CELLS)
+    required_cells.append(DOOR)
+    var layout := labyrinth_generator.generate(campaign_seed, required_cells)
+    walls.assign(layout.get("walls", []))
+
 func _ready() -> void:
     super._ready()
     _spawn_mobile_monsters()
+    status_label.text += "\nSeed du labyrinthe : %d" % campaign_seed
 
 func _prepare_current_wave() -> void:
     blessing_available = true

@@ -76,6 +76,9 @@ jobs:
       - name: Run Pac-Man loop rules test
         run: timeout 45s ./godot --headless --path . --script tests/pacman_loop_rules_test.gd
 
+      - name: Run procedural labyrinth test
+        run: timeout 45s ./godot --headless --path . --script tests/labyrinth_generator_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
