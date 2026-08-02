@@ -16,12 +16,12 @@ func _init() -> void:
         quit(1)
         return
     var duplicate := controller.finish(2, 1, 3, false)
-    if int(duplicate.get("total", 0)) != 60 or store.load_den().stored_resources != 60:
+    if int(duplicate.get("total", 0)) != 60 or store.load_den().soul_shards != 60:
         quit(1)
         return
     controller.begin_run("run-end-2")
     var second := controller.finish(1, 0, 0, false)
-    if int(second.get("total", 0)) != 12 or store.load_den().stored_resources != 72:
+    if int(second.get("total", 0)) != 12 or store.load_den().soul_shards != 72:
         quit(1)
         return
     store.delete_save()

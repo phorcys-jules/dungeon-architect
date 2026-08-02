@@ -11,7 +11,7 @@ func _init() -> void:
     den_store.delete_save()
     meta_store.delete_save()
     var den := DenProgression.new()
-    den.add_resources(200)
+    den.add_soul_shards(200)
     assert(den_store.save_den(den))
     var screen := VillageScene.instantiate()
     screen.set_save_store(den_store)
@@ -43,7 +43,7 @@ func _init() -> void:
     if int(screen.progression_service.state.buildings.forge) != 1:
         quit(1)
         return
-    if den_store.load_den().stored_resources != 140:
+    if den_store.load_den().soul_shards != 140:
         quit(1)
         return
     den_store.delete_save()

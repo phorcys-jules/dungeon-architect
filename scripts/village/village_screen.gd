@@ -129,8 +129,8 @@ func _select_building(building_id: String) -> void:
 func _show_den() -> void:
     var den := save_store.load_den()
     title_label.text = "Tanière — niveau %d/%d" % [den.level, DenProgression.MAX_LEVEL]
-    status_label.text = "Capacité : %d monstres\nRessources : %d\n\nEffet : +2 places par niveau." % [den.get_capacity(), den.stored_resources]
-    upgrade_button.text = "Améliorer (%d ressources)" % den.get_upgrade_cost() if den.level < DenProgression.MAX_LEVEL else "Niveau maximum"
+    status_label.text = "Capacité : %d monstres\n%s : %s\n\nEffet : +2 places par niveau." % [den.get_capacity(), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
+    upgrade_button.text = "Améliorer (%s)" % den.currency.formatted(den.get_upgrade_cost()) if den.level < DenProgression.MAX_LEVEL else "Niveau maximum"
     upgrade_button.disabled = not den.can_upgrade()
 
 func _show_progression_building(building_id: String) -> void:
@@ -142,8 +142,9 @@ func _show_progression_building(building_id: String) -> void:
     var den := save_store.load_den()
     var effect_value := building.bonus_per_level * level
     title_label.text = "%s — niveau %d/%d" % [building.display_name, level, building.max_level]
-    status_label.text = "Ressources : %d\n\nEffet actuel : %s %+d%%\nProchain niveau : %+d%%" % [
-        den.stored_resources,
+    status_label.text = "%s : %s\n\nEffet actuel : %s %+d%%\nProchain niveau : %+d%%" % [
+        VillageCurrency.DISPLAY_NAME,
+        den.currency.formatted(),
         _effect_label(String(building.bonus_key)),
         roundi(effect_value * 100.0),
         roundi(building.bonus_per_level * 100.0),
@@ -153,8 +154,8 @@ func _show_progression_building(building_id: String) -> void:
         upgrade_button.disabled = true
     else:
         var cost := building.cost_for_level(level + 1)
-        upgrade_button.text = "Améliorer (%d ressources)" % cost
-        upgrade_button.disabled = den.stored_resources < cost
+        upgrade_button.text = "Améliorer (%s)" % den.currency.formatted(cost)
+        upgrade_button.disabled = not den.currency.can_afford(cost)
 
 func _show_market() -> void:
     var offer := _first_available_offer()
@@ -165,9 +166,9 @@ func _show_market() -> void:
         upgrade_button.text = "Stock épuisé"
         upgrade_button.disabled = true
         return
-    status_label.text = "%s\nRareté : %s\n\nMalédiction : %s\nRessources : %d" % [String(offer.name), String(offer.rarity).capitalize(), String(offer.curse.id), den.stored_resources]
-    upgrade_button.text = "Acheter (%d ressources)" % int(offer.price)
-    upgrade_button.disabled = den.stored_resources < int(offer.price)
+    status_label.text = "%s\nRareté : %s\n\nMalédiction : %s\n%s : %s" % [String(offer.name), String(offer.rarity).capitalize(), String(offer.curse.id), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
+    upgrade_button.text = "Acheter (%s)" % den.currency.formatted(int(offer.price))
+    upgrade_button.disabled = not den.currency.can_afford(int(offer.price))
 
 func _on_upgrade_pressed() -> void:
     var den := save_store.load_den()
@@ -177,14 +178,14 @@ func _on_upgrade_pressed() -> void:
             upgrade_requested.emit()
     elif selected_building == "market":
         var offer := _first_available_offer()
-        var purchase := black_market.buy(String(offer.get("id", "")), den.stored_resources)
+        var purchase := black_market.buy(String(offer.get("id", "")), den.soul_shards)
         if bool(purchase.get("ok", false)):
-            den.stored_resources += int(purchase.gold_delta)
+            den.soul_shards += int(purchase.gold_delta)
             save_store.save_den(den)
     else:
-        var purchase := progression_service.buy_building_level(StringName(selected_building), den.stored_resources)
+        var purchase := progression_service.buy_building_level(StringName(selected_building), den.soul_shards)
         if bool(purchase.get("success", false)):
-            den.stored_resources = int(purchase.remaining)
+            den.soul_shards = int(purchase.remaining)
             save_store.save_den(den)
     _persist_village_state()
     _select_building(selected_building)

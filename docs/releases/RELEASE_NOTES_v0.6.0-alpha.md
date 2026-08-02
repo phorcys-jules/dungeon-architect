@@ -1,5 +1,11 @@
 # Dungeon Architect v0.6.0-alpha
 
+## Économie du village
+
+- Les améliorations et le marché noir utilisent désormais une monnaie permanente explicite : les **Éclats d'âme** (`◆`).
+- Les Éclats d'âme sont gagnés à la fin de chaque run et conservés dans le village.
+- Les anciennes « ressources » sont migrées automatiquement sans perte vers le nouveau portefeuille.
+
 Cette version transforme les systèmes roguelite développés après la v0.5 en une boucle de jeu intégrée et testable de bout en bout.
 
 ## Nouveautés intégrées

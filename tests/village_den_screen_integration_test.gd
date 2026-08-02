@@ -9,7 +9,7 @@ func _init() -> void:
     store.delete_save()
 
     var den := DenProgression.new()
-    den.add_resources(40)
+    den.add_soul_shards(40)
     if not store.save_den(den):
         quit(1)
         return
@@ -19,14 +19,14 @@ func _init() -> void:
     root.add_child(screen)
     await process_frame
 
-    if screen.view_model.den.stored_resources != 40:
+    if screen.view_model.den.soul_shards != 40:
         store.delete_save()
         quit(1)
         return
 
     screen._on_upgrade_pressed()
     var restored := store.load_den()
-    if restored.level != 1 or restored.stored_resources != 0:
+    if restored.level != 1 or restored.soul_shards != 0:
         store.delete_save()
         quit(1)
         return

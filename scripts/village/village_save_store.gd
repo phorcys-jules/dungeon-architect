@@ -1,7 +1,7 @@
 class_name VillageSaveStore
 extends RefCounted
 
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const DEFAULT_PATH := "user://village_save.json"
 
 var save_path := DEFAULT_PATH
@@ -36,7 +36,8 @@ func load_den() -> DenProgression:
     if typeof(parsed) != TYPE_DICTIONARY:
         return den
     var payload: Dictionary = parsed
-    if int(payload.get("version", 0)) != SAVE_VERSION:
+    var version := int(payload.get("version", 0))
+    if version < 1 or version > SAVE_VERSION:
         return den
     var den_data: Variant = payload.get("den", {})
     if typeof(den_data) == TYPE_DICTIONARY:

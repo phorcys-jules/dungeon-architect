@@ -7,14 +7,14 @@ func _init() -> void:
     if den.get_capacity() != 2:
         quit(1)
         return
-    den.add_resources(40)
+    den.add_soul_shards(40)
     if not den.upgrade() or den.level != 1 or den.get_capacity() != 4:
         quit(1)
         return
     var saved := den.serialize()
     var restored: DenProgression = DenProgressionScript.new()
     restored.restore(saved)
-    if restored.level != 1 or restored.stored_resources != den.stored_resources:
+    if restored.level != 1 or restored.soul_shards != den.soul_shards:
         quit(1)
         return
     print("Den progression test passed")

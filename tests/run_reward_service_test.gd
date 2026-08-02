@@ -12,12 +12,14 @@ func _init() -> void:
     if not bool(reward.get("claimed", false)) or int(reward.get("total", 0)) != 126:
         quit(1)
         return
+    assert(String(reward.currency_id) == VillageCurrency.ID)
+    assert(String(reward.currency_name) == VillageCurrency.DISPLAY_NAME)
     var den := store.load_den()
-    if den.stored_resources != 126:
+    if den.soul_shards != 126:
         quit(1)
         return
     var duplicate := service.claim("run-1", 3, 2, 4, true)
-    if bool(duplicate.get("claimed", true)) or store.load_den().stored_resources != 126:
+    if bool(duplicate.get("claimed", true)) or store.load_den().soul_shards != 126:
         quit(1)
         return
     store.delete_save()
