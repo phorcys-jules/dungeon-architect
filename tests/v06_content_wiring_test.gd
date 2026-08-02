@@ -6,6 +6,9 @@ func _init() -> void:
     var game := MainScene.instantiate()
     root.add_child(game)
     await process_frame
+    var full_team: Array[String] = ["ghost", "slime", "mimic", "spider"]
+    game.set_monster_team(full_team)
+    game._spawn_mobile_monsters()
     assert(game.MONSTER_ARCHETYPES.size() == 4)
     assert(game.mobile_monsters.size() == 4)
     assert(game.monster_ability_cooldowns.size() == 4)
