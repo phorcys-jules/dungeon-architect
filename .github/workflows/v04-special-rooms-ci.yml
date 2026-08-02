@@ -1,0 +1,27 @@
+name: v0.4 Special Rooms CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y unzip
+      - name: Download Godot
+        run: |
+          curl --fail --location --retry 3 -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip godot.zip -d godot-bin
+          mv godot-bin/Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+      - name: Import
+        run: timeout 60s ./godot --headless --path . --import
+      - name: Test special rooms
+        run: timeout 45s ./godot --headless --path . --script tests/special_room_catalog_test.gd
