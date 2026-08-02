@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MonsterArchetypeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/monster_archetype_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+archetype_id = "mimic"
+display_name = "Mimic"
+base_speed = 72.0
+base_damage = 20
+tags = Array[StringName]([&"mimic", &"treasure", &"ambush"])
+abilities = Array[StringName]([&"first_hit_burst"])
+effect_values = {"first_hit_multiplier": 1.6, "reveal_range": 1.0}
