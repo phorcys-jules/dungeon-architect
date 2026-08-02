@@ -154,7 +154,8 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     _try_adventurer_attack()
     var occupied: Array[Vector2i] = []
     for monster in mobile_monsters:
-        occupied.append(monster.cell)
+        if monster.is_active():
+            occupied.append(monster.cell)
 
     var blocked: Array[Vector2i] = walls.duplicate()
     if door_closed:
@@ -185,7 +186,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
         monster_facings[index] = CharacterAnimationRuntimeScript.facing_sign(monster.world_position.x - previous_position.x, monster_facings[index])
         var monster_cell := monster.cell
         if reached_cell:
-            _apply_monster_zone_ability(index, MONSTER_ARCHETYPES[index], previous_cell, monster_cell)
+            _apply_monster_zone_ability(index, active_monster_archetypes[index], previous_cell, monster_cell)
         if float(passage_cooldowns[index]) <= 0.0:
             var passage_destination := dungeon_build.resolve_monster_passage(monster_cell, _monster_passage_tags(index))
             if passage_destination != monster_cell:
@@ -199,22 +200,28 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
 
         if monster_cell == adventurer_cell:
             if loop_rules.is_panicking():
-                _consume_panicked_monster(index, monster, MONSTER_ARCHETYPES[index])
+                _consume_panicked_monster(index, monster, active_monster_archetypes[index])
             else:
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-                _play_monster_attack(MONSTER_ARCHETYPES[index].archetype_id, attack_origin)
-                adventurer_health.take_damage(roundi(float(MONSTER_HIT_DAMAGE) * _monster_damage_multiplier()))
+                _play_monster_attack(active_monster_archetypes[index].archetype_id, attack_origin)
+                var monster_damage := float(MONSTER_HIT_DAMAGE) * _monster_damage_multiplier()
+                monster_damage *= _monster_specific_damage_multiplier(active_monster_archetypes[index].archetype_id)
+                adventurer_health.take_damage(roundi(monster_damage))
                 monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
 
 func _monster_passage_tags(index: int) -> Array[String]:
+    var tags: Array[String] = []
+    for tag in active_monster_archetypes[index].tags:
+        tags.append(String(tag))
     match monster_behaviours[index]:
         PacmanLoopRules.Behaviour.CHASER:
-            return ["ghost"]
+            tags.append("chaser")
         PacmanLoopRules.Behaviour.AMBUSHER, PacmanLoopRules.Behaviour.HERDER:
-            return ["ambusher"]
+            tags.append("ambusher")
         _:
-            return ["guardian"]
+            tags.append("guardian")
+    return tags
 
 func _draw() -> void:
     super._draw()

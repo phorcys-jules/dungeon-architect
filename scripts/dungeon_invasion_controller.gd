@@ -14,6 +14,10 @@ const MONSTER_ARCHETYPES: Array[MonsterArchetypeData] = [
     preload("res://resources/monsters/mimic.tres"),
     preload("res://resources/monsters/spider.tres"),
 ]
+const MONSTER_ARCHETYPE_BY_ID := {
+    "ghost": MONSTER_ARCHETYPES[0], "slime": MONSTER_ARCHETYPES[1],
+    "mimic": MONSTER_ARCHETYPES[2], "spider": MONSTER_ARCHETYPES[3],
+}
 const MONSTER_TEXTURES := {
     "ghost": preload("res://assets/sprites/characters/animations/monster_ghost_walk.png"),
     "slime": preload("res://assets/sprites/characters/animations/monster_slime_walk.png"),
@@ -46,6 +50,7 @@ const MONSTER_HOME_CELLS: Array[Vector2i] = [Vector2i(6, 5), Vector2i(8, 5), Vec
 const MONSTER_HIT_DAMAGE := 20
 
 var mobile_monsters: Array[MobileMonster] = []
+var active_monster_archetypes: Array[MonsterArchetypeData] = MONSTER_ARCHETYPES.duplicate()
 var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [
     PacmanLoopRules.Behaviour.CHASER,
     PacmanLoopRules.Behaviour.AMBUSHER,
@@ -125,7 +130,7 @@ func _prepare_current_wave() -> void:
     _refresh_round_state()
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
-        monster.hold_at_home(MONSTER_ARCHETYPES[index].get_effect(&"release_delay", float(index) * 0.8), CELL_SIZE)
+        monster.hold_at_home(active_monster_archetypes[index].get_effect(&"release_delay", float(index) * 0.8), CELL_SIZE)
         monster_burst_available[index] = true
         monster_ability_cooldowns[index] = 0.0
 
@@ -180,10 +185,11 @@ func _spawn_mobile_monsters() -> void:
     monster_ability_flashes.clear()
     monster_ability_cooldowns.clear()
     monster_burst_available.clear()
-    for index in MONSTER_HOME_CELLS.size():
+    for index in active_monster_archetypes.size():
         var monster: MobileMonster = MobileMonsterScript.new()
-        var archetype := MONSTER_ARCHETYPES[index]
-        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed * _monster_speed_multiplier(), roundi(float(42 + archetype.base_damage * 2) * _monster_health_multiplier()))
+        var archetype := active_monster_archetypes[index]
+        var progression := _monster_progression_multipliers(archetype.archetype_id)
+        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed * _monster_speed_multiplier() * float(progression.speed), roundi(float(42 + archetype.base_damage * 2) * _monster_health_multiplier() * float(progression.health)))
         monster.world_position = Vector2(MONSTER_HOME_CELLS[index]) * CELL_SIZE
         mobile_monsters.append(monster)
         monster_facings.append(1.0)
@@ -208,7 +214,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
 
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
-        var archetype := MONSTER_ARCHETYPES[index]
+        var archetype := active_monster_archetypes[index]
         if not monster.is_active():
             continue
         if archetype.has_ability(&"phase") and monster_ability_cooldowns[index] <= 0.0:
@@ -256,7 +262,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             if loop_rules.is_panicking():
                 _consume_panicked_monster(index, monster, archetype)
             else:
-                var damage := roundi(float(MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])) * _monster_damage_multiplier() * _monster_ambush_multiplier(archetype.archetype_id, monster_burst_available[index]))
+                var damage := roundi(float(MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])) * _monster_damage_multiplier() * _monster_specific_damage_multiplier(archetype.archetype_id) * _monster_ambush_multiplier(archetype.archetype_id, monster_burst_available[index]))
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
                 _play_monster_attack(archetype.archetype_id, attack_origin)
                 adventurer_health.take_damage(damage)
@@ -285,15 +291,15 @@ func _try_adventurer_attack() -> bool:
                 "active": monster.is_active(),
                 "distance": distance / CELL_SIZE,
                 "health_ratio": monster.get_health_ratio(),
-                "threat": MONSTER_ARCHETYPES[index].base_damage,
+                "threat": active_monster_archetypes[index].base_damage,
             })
     var target_index := AdventurerCombatAiScript.choose_target(candidates, StringName(profile.strategy))
     if target_index < 0:
         return false
     var target := mobile_monsters[target_index]
     var target_center := GRID_ORIGIN + target.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-    var damage := roundi(float(profile.damage) * (1.8 if empowered else 1.0) * (1.0 - _monster_evasion(MONSTER_ARCHETYPES[target_index].archetype_id)))
-    var respawn_base := MONSTER_ARCHETYPES[target_index].get_effect(&"respawn_delay", 3.0)
+    var damage := roundi(float(profile.damage) * (1.8 if empowered else 1.0) * (1.0 - _monster_evasion(active_monster_archetypes[target_index].archetype_id)))
+    var respawn_base := active_monster_archetypes[target_index].get_effect(&"respawn_delay", 3.0)
     var respawn_delay := _monster_respawn_delay(maxf(respawn_base, loop_rules.panic_time_left + 0.5) if empowered else respawn_base)
     var applied_damage := target.take_damage(damage, respawn_delay)
     if applied_damage <= 0:
@@ -302,10 +308,10 @@ func _try_adventurer_attack() -> bool:
     _play_adventurer_attack(target_center, bool(profile.ranged), empowered)
     monster_ability_flashes[target_index] = 0.2
     if target.is_active():
-        status_label.text = "%s attaque %s : %d dégâts." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name, applied_damage]
+        status_label.text = "%s attaque %s : %d dégâts." % [adventurer_data.display_name, active_monster_archetypes[target_index].display_name, applied_damage]
     else:
         loot_ledger.record_monster_neutralized(target.cell, 1, 2)
-        status_label.text = "%s neutralise %s, qui reviendra bientôt." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name]
+        status_label.text = "%s neutralise %s, qui reviendra bientôt." % [adventurer_data.display_name, active_monster_archetypes[target_index].display_name]
     return true
 
 func _activate_power_pellet() -> void:
@@ -455,7 +461,7 @@ func _draw() -> void:
         if not monster.is_active():
             continue
         var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-        var archetype := MONSTER_ARCHETYPES[index]
+        var archetype := active_monster_archetypes[index]
         var texture: Texture2D = MONSTER_TEXTURES[archetype.archetype_id]
         var tint := Color("f7c66f") if monster_ability_flashes[index] > 0.0 else Color.WHITE
         if loop_rules.is_panicking():
@@ -496,7 +502,7 @@ func _refresh_round_state(resolved: bool = false) -> void:
 
 func get_run_tags() -> Array[String]:
     var tags: Array[String] = ["biome:%s" % active_biome.active_biome_id]
-    for archetype in MONSTER_ARCHETYPES:
+    for archetype in active_monster_archetypes:
         tags.append("monster:%s" % archetype.archetype_id)
     for room: RoomData in placed_rooms.values():
         for tag in room.tags:
@@ -507,9 +513,19 @@ func get_run_tags() -> Array[String]:
 
 func get_monster_ids() -> Array[String]:
     var ids: Array[String] = []
-    for archetype in MONSTER_ARCHETYPES:
+    for archetype in active_monster_archetypes:
         ids.append(archetype.archetype_id)
     return ids
+
+func set_monster_team(monster_ids: Array[String]) -> void:
+    var selected: Array[MonsterArchetypeData] = []
+    for monster_id in monster_ids:
+        var archetype := MONSTER_ARCHETYPE_BY_ID.get(monster_id) as MonsterArchetypeData
+        if archetype != null and not selected.has(archetype):
+            selected.append(archetype)
+        if selected.size() >= MONSTER_HOME_CELLS.size():
+            break
+    active_monster_archetypes = selected if not selected.is_empty() else MONSTER_ARCHETYPES.duplicate()
 
 func _monster_respawn_delay(base_delay: float) -> float:
     return base_delay
@@ -533,6 +549,12 @@ func _on_collectible_loot_collected(_cell: Vector2i) -> void:
     loot_ledger.collect_relic(3)
 
 func _monster_health_multiplier() -> float:
+    return 1.0
+
+func _monster_progression_multipliers(_archetype_id: String) -> Dictionary:
+    return {"health": 1.0, "damage": 1.0, "speed": 1.0}
+
+func _monster_specific_damage_multiplier(_archetype_id: String) -> float:
     return 1.0
 
 func _effect_duration_multiplier() -> float:

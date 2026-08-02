@@ -20,6 +20,8 @@ var black_market := VillageBlackMarket.new()
 var village_modifiers: Dictionary = {}
 var village_den_store := VillageSaveStore.new()
 var village_den := DenProgression.new()
+var monster_roster := MonsterRoster.new()
+var monster_progression := MonsterProgression.new()
 var choice_engine := RogueliteChoiceEngine.new()
 var choice_buttons: Array[Button] = []
 var current_choice_offer: Array[Dictionary] = []
@@ -28,8 +30,9 @@ var run_choice_modifiers: Dictionary = {}
 var pending_run_choice := false
 
 func _ready() -> void:
-    _load_village_progression()
     village_den = village_den_store.load_den()
+    _load_village_progression()
+    set_monster_team(monster_roster.selected_team)
     super._ready()
     run_end.go_to_village.connect(_open_village)
     run_end.restart_run.connect(_restart_from_results)
@@ -99,8 +102,9 @@ func _begin_tracked_run() -> void:
     loop_rules.door_cooldown = 2.0
     _set_choice_buttons_visible(false)
     run_end.begin_run(current_run_id)
-    _load_village_progression()
     village_den = village_den_store.load_den()
+    _load_village_progression()
+    set_monster_team(monster_roster.selected_team)
     var forge_level := int(village_progression.state.buildings.get("forge", 0))
     set_unlocked_traps(TrapCatalogScript.unlocked_for_forge_level(forge_level))
     var tags := get_run_tags()
@@ -169,6 +173,14 @@ func _finish_campaign(victory: bool, message: String) -> void:
         result_summary.text += "\nDéfis réussis : %s" % ", ".join(meta.completed_challenges)
     if not meta.new_achievements.is_empty():
         result_summary.text += "\nSuccès : %s" % ", ".join(meta.new_achievements)
+    var experience_gain := maxi(completed_waves * 6 + captures_this_run * 12, 6)
+    for archetype in active_monster_archetypes:
+        monster_progression.grant_experience(archetype.archetype_id, experience_gain)
+    var persisted_state := v06_integration.store.load_state()
+    persisted_state["monster_roster"] = monster_roster.to_dict()
+    persisted_state["monster_progression"] = monster_progression.to_dict()
+    v06_integration.store.save_state(persisted_state)
+    result_summary.text += "\nÉquipe de monstres : +%d XP" % experience_gain
     _set_run_end_actions_visible(true)
 
 func _start_new_campaign() -> void:
@@ -193,6 +205,18 @@ func _load_village_progression() -> void:
     var state := v06_integration.store.load_state()
     village_progression = V04ProgressionService.new(state.get("v04_progression", {}))
     black_market.from_dict(state.get("black_market", {}))
+    if state.has("monster_roster"):
+        monster_roster.from_dict(state.monster_roster)
+    else:
+        monster_roster.recruited = ["ghost", "slime", "mimic", "spider"]
+        monster_roster.selected_team = monster_roster.recruited.duplicate()
+    monster_roster.capacity = mini(village_den.get_capacity(), MONSTER_HOME_CELLS.size())
+    if monster_roster.selected_team.size() > monster_roster.capacity:
+        monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
+    monster_progression.from_dict(state.get("monster_progression", {}))
+    var families := {"ghost": "spectral", "slime": "ooze", "mimic": "construct", "spider": "beast"}
+    for monster_id in monster_roster.recruited:
+        monster_progression.ensure_monster(monster_id, String(families.get(monster_id, "beast")))
     village_modifiers = village_progression.combined_modifiers()
     var market_modifiers := black_market.combined_modifiers()
     for key in market_modifiers:
@@ -228,6 +252,12 @@ func _slime_slow_multiplier(base_multiplier: float) -> float:
 
 func _monster_health_multiplier() -> float:
     return 1.0 + float(village_modifiers.get("monster_health_multiplier", 0.0))
+
+func _monster_progression_multipliers(archetype_id: String) -> Dictionary:
+    return monster_progression.stat_multipliers(archetype_id)
+
+func _monster_specific_damage_multiplier(archetype_id: String) -> float:
+    return float(monster_progression.stat_multipliers(archetype_id).damage)
 
 func _effect_duration_multiplier() -> float:
     return 1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))
@@ -349,7 +379,8 @@ func _refresh_active_gameplay_modifiers() -> void:
         trap.configure(TrapCatalogScript.definition(trap.trap_id))
         _configure_trap(trap)
     for index in mobile_monsters.size():
-        mobile_monsters[index].move_speed = MONSTER_ARCHETYPES[index].base_speed * _monster_speed_multiplier()
+        var progression := _monster_progression_multipliers(active_monster_archetypes[index].archetype_id)
+        mobile_monsters[index].move_speed = active_monster_archetypes[index].base_speed * _monster_speed_multiplier() * float(progression.speed)
 
 func _village_effect_lines() -> Array[String]:
     var lines: Array[String] = ["Tanière : %d défenseurs" % _max_defenders()]

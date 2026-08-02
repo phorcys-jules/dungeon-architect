@@ -31,11 +31,14 @@ var selected_building := "den"
 var building_buttons: Dictionary = {}
 var music_player: AudioStreamPlayer
 var ambient_animator: VillageAmbientAnimator
+var monster_roster := MonsterRoster.new()
+var roster_buttons: Dictionary = {}
 
 func _ready() -> void:
     super._ready()
     _load_village_state()
     _build_village_map()
+    _build_roster_controls()
     _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
@@ -44,8 +47,17 @@ func _ready() -> void:
 
 func _load_village_state() -> void:
     var state := meta_store.load_state()
+    var den := save_store.load_den()
     progression_service = V04ProgressionService.new(state.get("v04_progression", {}))
     black_market.from_dict(state.get("black_market", {}))
+    if state.has("monster_roster"):
+        monster_roster.from_dict(state.monster_roster)
+    else:
+        monster_roster.recruited = ["ghost", "slime", "mimic", "spider"]
+        monster_roster.selected_team = monster_roster.recruited.duplicate()
+    monster_roster.capacity = mini(den.get_capacity(), 4)
+    if monster_roster.selected_team.size() > monster_roster.capacity:
+        monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
 
@@ -120,6 +132,64 @@ func _building_style(color: Color, alpha: float) -> StyleBoxFlat:
     style.content_margin_bottom = 8
     return style
 
+func _build_roster_controls() -> void:
+    var content := get_node("Panel/Margin/Content") as VBoxContainer
+    var heading := Label.new()
+    heading.text = "ÉQUIPE DE MONSTRES"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(heading)
+    content.move_child(heading, 2)
+    var row := HBoxContainer.new()
+    row.alignment = BoxContainer.ALIGNMENT_CENTER
+    row.add_theme_constant_override("separation", 4)
+    content.add_child(row)
+    content.move_child(row, 3)
+    var labels := {"ghost": "Fantôme", "slime": "Slime", "mimic": "Mimic", "spider": "Araignée"}
+    for monster_id in labels:
+        var button := Button.new()
+        button.text = labels[monster_id]
+        button.toggle_mode = true
+        button.custom_minimum_size = Vector2(58, 34)
+        button.add_theme_font_size_override("font_size", 10)
+        button.tooltip_text = "Ajouter ou retirer %s de l'équipe active." % labels[monster_id]
+        button.pressed.connect(_toggle_roster_monster.bind(String(monster_id)))
+        row.add_child(button)
+        roster_buttons[monster_id] = button
+    _refresh_roster_controls()
+
+func _toggle_roster_monster(monster_id: String) -> void:
+    var den := save_store.load_den()
+    if not monster_roster.recruited.has(monster_id):
+        var recruitment := monster_roster.recruit(monster_id, den.soul_shards)
+        if not bool(recruitment.ok):
+            status_label.text = "Éclats d'âme insuffisants pour recruter ce monstre."
+            _refresh_roster_controls()
+            return
+        den.soul_shards += int(recruitment.gold_delta)
+        save_store.save_den(den)
+    var team := monster_roster.selected_team.duplicate()
+    if team.has(monster_id):
+        if team.size() <= 1:
+            status_label.text = "L'équipe doit conserver au moins un monstre."
+            _refresh_roster_controls()
+            return
+        team.erase(monster_id)
+    else:
+        if team.size() >= monster_roster.capacity:
+            status_label.text = "L'équipe est complète (%d monstres)." % monster_roster.capacity
+            _refresh_roster_controls()
+            return
+        team.append(monster_id)
+    monster_roster.select_team(team)
+    _persist_village_state()
+    _show_den()
+
+func _refresh_roster_controls() -> void:
+    for monster_id in roster_buttons:
+        var button := roster_buttons[monster_id] as Button
+        button.button_pressed = monster_roster.selected_team.has(String(monster_id))
+        button.modulate = Color.WHITE if monster_roster.recruited.has(String(monster_id)) else Color("8b8b9b")
+
 func _start_village_music() -> void:
     music_player = AudioStreamPlayer.new()
     music_player.name = "VillageAmbience"
@@ -153,9 +223,10 @@ func _select_building(building_id: String) -> void:
 func _show_den() -> void:
     var den := save_store.load_den()
     title_label.text = "Tanière — niveau %d/%d" % [den.level, DenProgression.MAX_LEVEL]
-    status_label.text = "Capacité : %d monstres\n%s : %s\n\nEffet : +2 places par niveau." % [den.get_capacity(), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
+    status_label.text = "Équipe : %s\nCapacité : %d monstres\n%s : %s\n\nEffet : +2 places par niveau." % [", ".join(monster_roster.selected_team), den.get_capacity(), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
     upgrade_button.text = "Améliorer (%s)" % den.currency.formatted(den.get_upgrade_cost()) if den.level < DenProgression.MAX_LEVEL else "Niveau maximum"
     upgrade_button.disabled = not den.can_upgrade()
+    _refresh_roster_controls()
 
 func _show_progression_building(building_id: String) -> void:
     var building := _building_data(building_id)
@@ -219,6 +290,7 @@ func _on_upgrade_pressed() -> void:
     if selected_building == "den":
         if den.upgrade():
             save_store.save_den(den)
+            monster_roster.capacity = mini(den.get_capacity(), 4)
             upgrade_requested.emit()
     elif selected_building == "market":
         var offer := _first_available_offer()
@@ -238,6 +310,7 @@ func _persist_village_state() -> void:
     var state := meta_store.load_state()
     state["v04_progression"] = progression_service.state.duplicate(true)
     state["black_market"] = black_market.to_dict()
+    state["monster_roster"] = monster_roster.to_dict()
     meta_store.save_state(state)
 
 func _building_data(building_id: String) -> VillageBuildingData:
