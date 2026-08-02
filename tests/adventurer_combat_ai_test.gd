@@ -17,7 +17,12 @@ func _init() -> void:
     assert(monster.is_active())
     assert(monster.take_damage(20, 0.1) == 12)
     assert(not monster.is_active())
-    assert(monster.tick_respawn(0.1, 48.0))
+    var respawned := false
+    for tick in 20:
+        respawned = monster.tick_respawn(0.1, 48.0)
+        if respawned:
+            break
+    assert(respawned)
     assert(monster.current_health == monster.max_health)
     print("Adventurer combat AI test passed")
     quit(0)

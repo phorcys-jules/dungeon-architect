@@ -26,18 +26,18 @@ jobs:
       - name: Test v0.6 content wiring
         run: timeout 45s ./godot --headless --path . --script tests/v06_content_wiring_test.gd
       - name: Test adventurer combat AI
-        run: ./godot --headless --path . --script tests/adventurer_combat_ai_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/adventurer_combat_ai_test.gd
       - name: Test forge trap unlocks
-        run: ./godot --headless --path . --script tests/trap_unlock_catalog_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/trap_unlock_catalog_test.gd
       - name: Test monster progression, families and traits
-        run: ./godot --headless --path . --script tests/monster_progression_family_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/monster_progression_family_test.gd
       - name: Test v0.6 balance guardrails
-        run: ./godot --headless --path . --script tests/v06_balance_guardrails_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/v06_balance_guardrails_test.gd
       - name: Test between-wave run choices
-        run: ./godot --headless --path . --script tests/run_choice_integration_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/run_choice_integration_test.gd
       - name: Test selected monster team runtime
-        run: ./godot --headless --path . --script tests/monster_team_runtime_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/monster_team_runtime_test.gd
       - name: Test selectable labyrinth modules
-        run: ./godot --headless --path . --script tests/labyrinth_module_loadout_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/labyrinth_module_loadout_test.gd
       - name: Test adventurer intelligence reports
-        run: ./godot --headless --path . --script tests/adventurer_intelligence_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/adventurer_intelligence_test.gd
