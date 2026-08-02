@@ -173,6 +173,15 @@ func _show_progression_building(building_id: String) -> void:
         roundi(effect_value * 100.0),
         roundi(building.bonus_per_level * 100.0),
     ]
+    if building_id == "forge":
+        var unlocked := TrapCatalog.unlocked_for_forge_level(level)
+        var names: Array[String] = []
+        for trap_id in unlocked:
+            names.append(String(TrapCatalog.definition(trap_id).name))
+        status_label.text += "\n\nPièges débloqués : %s" % ", ".join(names)
+        var next := TrapCatalog.next_unlock(level)
+        if not next.is_empty():
+            status_label.text += "\nNiveau %d : %s" % [int(next.level), String(next.name)]
     if level >= building.max_level:
         upgrade_button.text = "Niveau maximum"
         upgrade_button.disabled = true

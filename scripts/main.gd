@@ -2,6 +2,7 @@ extends Node2D
 
 const HealthComponentScript := preload("res://scripts/components/health_component.gd")
 const SpikeTrapScript := preload("res://scripts/traps/spike_trap.gd")
+const TrapCatalogScript := preload("res://scripts/traps/trap_catalog.gd")
 const DefenderScript := preload("res://scripts/monsters/defender.gd")
 const RunStatsScript := preload("res://scripts/core/run_stats.gd")
 const EconomyScript := preload("res://scripts/core/economy.gd")
@@ -49,6 +50,10 @@ var adventurer_attack_flash := 0.0
 var adventurer_attack_direction := Vector2.RIGHT
 var defender_attack_flashes: Dictionary = {}
 var combat_effects: Array[Dictionary] = []
+var unlocked_trap_ids: Array[StringName] = [&"spikes"]
+var selected_trap_id: StringName = &"spikes"
+var trap_slow_multiplier := 1.0
+var active_trap_slows: Array[Dictionary] = []
 var path: Array[Vector2] = []
 var path_index := 0
 var game_state := GameState.PREPARATION
@@ -122,7 +127,7 @@ func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
         match event.keycode:
             KEY_1:
-                _set_build_mode(BuildMode.SPIKE_TRAP)
+                _cycle_trap_type()
             KEY_2:
                 _set_build_mode(BuildMode.DEFENDER)
             KEY_SPACE, KEY_ENTER:
@@ -255,7 +260,7 @@ func _build_interface() -> void:
     trap_button.position = Vector2(772, 444)
     trap_button.size = Vector2(152, 34)
     _style_action_button(trap_button, Color("6f4b8b"))
-    trap_button.pressed.connect(func(): _set_build_mode(BuildMode.SPIKE_TRAP))
+    trap_button.pressed.connect(_cycle_trap_type)
     add_child(trap_button)
 
     defender_button = Button.new()
@@ -353,6 +358,8 @@ func _prepare_current_wave() -> void:
     defender_attack_flashes.clear()
     combat_effects.clear()
     adventurer_attack_flash = 0.0
+    active_trap_slows.clear()
+    trap_slow_multiplier = 1.0
     status_label.text = "Préparez les défenses pour %s." % waves.get_label()
     _refresh_all_ui()
     queue_redraw()
@@ -386,17 +393,21 @@ func _place_spike_trap(cell: Vector2i) -> void:
     if not _is_valid_build_cell(cell):
         status_label.text = "Placement impossible sur cette case."
         return
-    if not economy.spend(SPIKE_TRAP_COST):
+    var definition := _selected_trap_definition()
+    var cost := int(definition.cost)
+    if not economy.spend(cost):
         status_label.text = "Or insuffisant pour ce piège."
         return
     var trap: SpikeTrap = SpikeTrapScript.new()
     trap.setup(cell)
+    trap.configure(definition)
     _configure_trap(trap)
-    trap.triggered.connect(func(damage: int): run_stats.record_trap(damage); status_label.text = "Piège déclenché : %d dégâts." % damage)
+    trap.triggered.connect(func(damage: int): run_stats.record_trap(damage); status_label.text = "%s déclenché : %d dégâts." % [trap.display_name, damage])
+    trap.status_applied.connect(_on_trap_status_applied)
     add_child(trap)
     traps[cell] = trap
     _on_trap_placed()
-    status_label.text = "Piège placé pour %d or." % SPIKE_TRAP_COST
+    status_label.text = "%s placé pour %d or." % [trap.display_name, cost]
     _refresh_build_ui()
     queue_redraw()
 
@@ -523,17 +534,18 @@ func _refresh_phase_ui() -> void:
             phase_label.text = "Phase : TERMINÉE"
             countdown_label.text = ""
             start_button.text = "Nouvelle campagne"
-    trap_button.disabled = game_state != GameState.PREPARATION or not economy.can_afford(SPIKE_TRAP_COST)
+    trap_button.disabled = game_state != GameState.PREPARATION
     defender_button.disabled = game_state != GameState.PREPARATION or not economy.can_afford(DEFENDER_COST)
     door_button.disabled = game_state != GameState.PREPARATION
 
 func _refresh_build_ui() -> void:
     if not build_label or not trap_button or not defender_button:
         return
-    var cost := SPIKE_TRAP_COST if build_mode == BuildMode.SPIKE_TRAP else DEFENDER_COST
-    var mode_name := "Piège" if build_mode == BuildMode.SPIKE_TRAP else "Défenseur"
+    var trap_definition := _selected_trap_definition()
+    var cost := int(trap_definition.cost) if build_mode == BuildMode.SPIKE_TRAP else DEFENDER_COST
+    var mode_name := String(trap_definition.name) if build_mode == BuildMode.SPIKE_TRAP else "Défenseur"
     build_label.text = "Mode : %s (%d or) | Pièges : %d | Défenseurs : %d" % [mode_name, cost, traps.size(), defenders.size()]
-    trap_button.text = "Piège (%d or)" % SPIKE_TRAP_COST
+    trap_button.text = "%s (%d)" % [String(trap_definition.name), int(trap_definition.cost)]
     defender_button.text = "Défenseur (%d or)" % DEFENDER_COST
 
 func _refresh_door_ui() -> void:
@@ -562,9 +574,8 @@ func _draw_traps() -> void:
     for cell: Vector2i in traps:
         var trap: SpikeTrap = traps[cell]
         var center := _world_from_cell(cell)
-        var color := Color("ed6a5a") if trap.is_ready else Color("77515a")
-        for offset in [-12.0, 0.0, 12.0]:
-            draw_colored_polygon(PackedVector2Array([center + Vector2(offset - 5, 10), center + Vector2(offset, -12), center + Vector2(offset + 5, 10)]), color)
+        var color := trap.visual_color if trap.is_ready else trap.visual_color.darkened(0.55)
+        _draw_trap_symbol(trap.trap_id, center, color)
 
 func _draw_defenders() -> void:
     for cell: Vector2i in defenders:
@@ -617,6 +628,13 @@ func _tick_combat_presentation(delta: float) -> void:
     character_animation_time += delta
     adventurer_damage_flash = maxf(adventurer_damage_flash - delta, 0.0)
     adventurer_attack_flash = maxf(adventurer_attack_flash - delta, 0.0)
+    trap_slow_multiplier = 1.0
+    for index in range(active_trap_slows.size() - 1, -1, -1):
+        active_trap_slows[index].remaining = maxf(float(active_trap_slows[index].remaining) - delta, 0.0)
+        if float(active_trap_slows[index].remaining) <= 0.0:
+            active_trap_slows.remove_at(index)
+        else:
+            trap_slow_multiplier = minf(trap_slow_multiplier, float(active_trap_slows[index].strength))
     for cell in defender_attack_flashes.keys():
         var remaining := maxf(float(defender_attack_flashes[cell]) - delta, 0.0)
         if remaining <= 0.0:
@@ -721,7 +739,61 @@ func _is_inside_grid(cell: Vector2i) -> bool:
 
 func _current_adventurer_speed_multiplier() -> float:
     var attack_brake := 0.2 if adventurer_attack_flash > 0.0 else 1.0
-    return waves.get_speed_multiplier() * attack_brake
+    return waves.get_speed_multiplier() * attack_brake * trap_slow_multiplier
+
+func set_unlocked_traps(trap_ids: Array[StringName]) -> void:
+    unlocked_trap_ids.assign(trap_ids if not trap_ids.is_empty() else [&"spikes"])
+    if not unlocked_trap_ids.has(selected_trap_id):
+        selected_trap_id = unlocked_trap_ids[0]
+    _refresh_build_ui()
+
+func _cycle_trap_type() -> void:
+    if game_state != GameState.PREPARATION:
+        return
+    var current_index := unlocked_trap_ids.find(selected_trap_id)
+    selected_trap_id = unlocked_trap_ids[(current_index + 1) % unlocked_trap_ids.size()]
+    build_mode = BuildMode.SPIKE_TRAP
+    status_label.text = "%s sélectionné. Cliquez sur une case libre." % String(_selected_trap_definition().name)
+    _refresh_build_ui()
+
+func _selected_trap_definition() -> Dictionary:
+    return TrapCatalogScript.definition(selected_trap_id)
+
+func _selected_trap_cost() -> int:
+    return int(_selected_trap_definition().cost)
+
+func _on_trap_status_applied(effect_id: StringName, duration: float, strength: float) -> void:
+    if String(effect_id).ends_with("slow"):
+        var safe_strength := clampf(strength, 0.1, 1.0)
+        active_trap_slows.append({"remaining": maxf(duration, 0.0), "strength": safe_strength})
+        trap_slow_multiplier = minf(trap_slow_multiplier, safe_strength)
+        var effect_color := Color("59435f") if effect_id == &"tar_slow" else (Color("6d28a8") if effect_id == &"void_slow" else Color("72d7ff"))
+        _spawn_combat_effect(&"splash", adventurer_position, adventurer_position, effect_color, 0.35)
+
+func _draw_trap_symbol(trap_id: StringName, center: Vector2, color: Color) -> void:
+    match trap_id:
+        &"tar_pit":
+            draw_circle(center, 15.0, Color(color, 0.65))
+            draw_circle(center + Vector2(-6, -3), 5.0, color)
+            draw_circle(center + Vector2(7, 4), 4.0, color.lightened(0.2))
+        &"fire_rune":
+            draw_colored_polygon(PackedVector2Array([center + Vector2(0, -17), center + Vector2(13, 8), center, center + Vector2(-13, 8)]), color)
+            draw_circle(center, 5.0, Color("ffd166"))
+        &"frost_sigil":
+            for direction in [Vector2.RIGHT, Vector2.DOWN, Vector2(1, 1).normalized(), Vector2(-1, 1).normalized()]:
+                draw_line(center - direction * 16.0, center + direction * 16.0, color, 3.0)
+            draw_circle(center, 5.0, Color("dff7ff"))
+        &"soul_mine":
+            draw_circle(center, 16.0, Color(color, 0.35))
+            draw_arc(center, 13.0, 0.0, TAU, 12, color, 3.0)
+            draw_circle(center, 6.0, color.lightened(0.25))
+        &"void_snare":
+            draw_circle(center, 17.0, Color("140c24", 0.85))
+            draw_arc(center, 14.0, character_animation_time, character_animation_time + PI * 1.45, 14, color, 4.0)
+            draw_arc(center, 8.0, -character_animation_time * 1.4, -character_animation_time * 1.4 + PI * 1.2, 12, color.lightened(0.3), 3.0)
+        _:
+            for offset in [-12.0, 0.0, 12.0]:
+                draw_colored_polygon(PackedVector2Array([center + Vector2(offset - 5, 10), center + Vector2(offset, -12), center + Vector2(offset + 5, 10)]), color)
 
 func _on_trap_placed() -> void:
     pass

@@ -27,6 +27,8 @@ jobs:
         run: ./godot --headless --path . --script tests/v06_content_wiring_test.gd
       - name: Test adventurer combat AI
         run: ./godot --headless --path . --script tests/adventurer_combat_ai_test.gd
+      - name: Test forge trap unlocks
+        run: ./godot --headless --path . --script tests/trap_unlock_catalog_test.gd
       - name: Test monster progression, families and traits
         run: ./godot --headless --path . --script tests/monster_progression_family_test.gd
       - name: Test v0.6 balance guardrails

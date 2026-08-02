@@ -62,6 +62,8 @@ func _begin_tracked_run() -> void:
     relics_protected_this_run = 0
     run_end.begin_run(current_run_id)
     _load_village_progression()
+    var forge_level := int(village_progression.state.buildings.get("forge", 0))
+    set_unlocked_traps(TrapCatalogScript.unlocked_for_forge_level(forge_level))
     var tags := get_run_tags()
     for building_id in village_progression.state.buildings:
         if int(village_progression.state.buildings[building_id]) > 0:

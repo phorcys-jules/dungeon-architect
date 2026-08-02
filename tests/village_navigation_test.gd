@@ -60,6 +60,9 @@ func _init() -> void:
     if den_store.load_den().soul_shards != 140:
         quit(1)
         return
+    if not String(screen.status_label.text).contains("Fosse de poix"):
+        quit(1)
+        return
     den_store.delete_save()
     meta_store.delete_save()
     print("Village navigation test passed")

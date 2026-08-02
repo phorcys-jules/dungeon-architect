@@ -83,6 +83,14 @@ le feu de camp central pulse et projette neuf braises, les douze torches vacille
 phases différentes, et cinq volutes de fumée s'échappent de la cheminée de la forge en dérivant
 vers la droite. Cette couche ignore la souris et ne modifie donc aucune zone cliquable.
 
+## Pièges de la forge
+
+Chaque niveau de forge ouvre un nouveau piège dans la run : pointes, fosse de poix, rune
+incendiaire, sceau de givre, mine d'âme puis faille du Néant. La fiche du bâtiment affiche les modèles possédés
+et le prochain palier. Le bouton de construction fait défiler uniquement les pièges débloqués ;
+chacun possède son coût, ses dégâts, sa recharge, sa couleur et, pour la poix et le givre, un
+ralentissement distinct appliqué à l'aventurier.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;
