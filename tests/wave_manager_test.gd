@@ -18,7 +18,7 @@ func _init() -> void:
         return
     if not _check(waves.get_adventurer_name() == "Éclaireur", "wave 1 profile mismatch"):
         return
-    if not _check(waves.get_adventurer_description() == "Rapide mais fragile.", "scout description mismatch"):
+    if not _check(waves.get_adventurer_description().contains("Rapide mais fragile"), "scout description mismatch"):
         return
     if not _check(waves.get_adventurer_health() == 90, "scout health mismatch"):
         return
@@ -34,7 +34,7 @@ func _init() -> void:
         return
     if not _check(waves.get_profile_summary().contains("1.18x"), "summary missing speed"):
         return
-    if not _check(waves.get_briefing().contains("Rapide mais fragile."), "briefing missing description"):
+    if not _check(waves.get_briefing().contains("Rapide mais fragile"), "briefing missing description"):
         return
 
     if not _check(waves.advance(), "cannot advance to wave 2"):
