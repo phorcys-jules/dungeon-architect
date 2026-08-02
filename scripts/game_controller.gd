@@ -25,14 +25,14 @@ func _ready() -> void:
 func _build_interface() -> void:
     super._build_interface()
     objectives_label = Label.new()
-    objectives_label.position = Vector2(775, 105)
-    objectives_label.size = Vector2(175, 180)
+    objectives_label.position = Vector2(772, 110)
+    objectives_label.size = Vector2(152, 130)
     objectives_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     objectives_label.add_theme_font_size_override("font_size", 12)
     add_child(objectives_label)
     modifiers_label = Label.new()
-    modifiers_label.position = Vector2(775, 300)
-    modifiers_label.size = Vector2(175, 170)
+    modifiers_label.position = Vector2(772, 252)
+    modifiers_label.size = Vector2(152, 178)
     modifiers_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     modifiers_label.add_theme_font_size_override("font_size", 12)
     add_child(modifiers_label)
@@ -40,16 +40,18 @@ func _build_interface() -> void:
 func _build_run_end_actions() -> void:
     village_button = Button.new()
     village_button.text = "Village"
-    village_button.position = Vector2(30, 202)
-    village_button.size = Vector2(175, 36)
+    village_button.position = Vector2(32, 414)
+    village_button.size = Vector2(228, 38)
+    _style_action_button(village_button, Color("526d82"))
     village_button.visible = false
     village_button.pressed.connect(run_end.request_village)
     result_panel.add_child(village_button)
 
     restart_button = Button.new()
     restart_button.text = "Nouvelle run"
-    restart_button.position = Vector2(235, 202)
-    restart_button.size = Vector2(175, 36)
+    restart_button.position = Vector2(280, 414)
+    restart_button.size = Vector2(228, 38)
+    _style_action_button(restart_button, Color("7a526d"))
     restart_button.visible = false
     restart_button.pressed.connect(run_end.request_restart)
     result_panel.add_child(restart_button)

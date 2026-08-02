@@ -65,7 +65,7 @@ var trap_button: Button
 var defender_button: Button
 var result_panel: Panel
 var result_title: Label
-var result_summary: Label
+var result_summary: RichTextLabel
 
 func _ready() -> void:
     _build_level()
@@ -167,89 +167,151 @@ func _build_health_component() -> void:
     add_child(adventurer_health)
 
 func _build_interface() -> void:
+    var header_panel := Panel.new()
+    header_panel.position = Vector2(24, 14)
+    header_panel.size = Vector2(912, 72)
+    header_panel.add_theme_stylebox_override("panel", _panel_style(Color("111621e8"), Color("37445d"), 10))
+    add_child(header_panel)
+
     var title := Label.new()
-    title.text = "DUNGEON ARCHITECT — Alpha"
-    title.position = Vector2(48, 24)
-    title.add_theme_font_size_override("font_size", 26)
+    title.text = "DUNGEON ARCHITECT  •  v0.6 ALPHA"
+    title.position = Vector2(42, 22)
+    title.size = Vector2(520, 32)
+    title.add_theme_font_size_override("font_size", 24)
+    title.add_theme_color_override("font_color", Color("f3e9d2"))
     add_child(title)
 
     phase_label = Label.new()
-    phase_label.position = Vector2(48, 60)
-    phase_label.add_theme_font_size_override("font_size", 18)
+    phase_label.position = Vector2(42, 56)
+    phase_label.size = Vector2(205, 24)
+    phase_label.add_theme_font_size_override("font_size", 14)
+    phase_label.add_theme_color_override("font_color", Color("a9bdd6"))
     add_child(phase_label)
 
     countdown_label = Label.new()
-    countdown_label.position = Vector2(260, 60)
-    countdown_label.add_theme_font_size_override("font_size", 18)
+    countdown_label.position = Vector2(250, 56)
+    countdown_label.size = Vector2(170, 24)
+    countdown_label.add_theme_font_size_override("font_size", 14)
+    countdown_label.add_theme_color_override("font_color", Color("f6c177"))
     add_child(countdown_label)
 
     wave_label = Label.new()
-    wave_label.position = Vector2(445, 60)
-    wave_label.add_theme_font_size_override("font_size", 18)
+    wave_label.position = Vector2(425, 56)
+    wave_label.size = Vector2(205, 24)
+    wave_label.add_theme_font_size_override("font_size", 14)
+    wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
     add_child(wave_label)
 
     gold_label = Label.new()
-    gold_label.position = Vector2(610, 60)
-    gold_label.add_theme_font_size_override("font_size", 18)
+    gold_label.position = Vector2(638, 56)
+    gold_label.size = Vector2(100, 24)
+    gold_label.add_theme_font_size_override("font_size", 14)
+    gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    gold_label.add_theme_color_override("font_color", Color("ffd166"))
     add_child(gold_label)
 
+    var sidebar_panel := Panel.new()
+    sidebar_panel.position = Vector2(760, 96)
+    sidebar_panel.size = Vector2(176, 480)
+    sidebar_panel.add_theme_stylebox_override("panel", _panel_style(Color("111621ee"), Color("37445d"), 10))
+    add_child(sidebar_panel)
+
+    var footer_panel := Panel.new()
+    footer_panel.position = Vector2(24, 584)
+    footer_panel.size = Vector2(912, 48)
+    footer_panel.add_theme_stylebox_override("panel", _panel_style(Color("111621f2"), Color("37445d"), 8))
+    add_child(footer_panel)
+
     status_label = Label.new()
-    status_label.position = Vector2(48, 590)
-    status_label.size = Vector2(650, 32)
+    status_label.position = Vector2(38, 588)
+    status_label.size = Vector2(884, 20)
+    status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    status_label.add_theme_font_size_override("font_size", 13)
+    status_label.add_theme_color_override("font_color", Color("d8dee9"))
     add_child(status_label)
 
     health_label = Label.new()
-    health_label.position = Vector2(48, 620)
-    health_label.size = Vector2(260, 30)
+    health_label.position = Vector2(38, 608)
+    health_label.size = Vector2(230, 20)
+    health_label.add_theme_font_size_override("font_size", 12)
+    health_label.add_theme_color_override("font_color", Color("7bd389"))
     add_child(health_label)
 
     build_label = Label.new()
-    build_label.position = Vector2(320, 620)
-    build_label.size = Vector2(600, 30)
+    build_label.position = Vector2(276, 608)
+    build_label.size = Vector2(646, 20)
+    build_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    build_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    build_label.add_theme_font_size_override("font_size", 12)
     add_child(build_label)
 
     trap_button = Button.new()
-    trap_button.position = Vector2(470, 574)
-    trap_button.size = Vector2(165, 42)
+    trap_button.position = Vector2(772, 444)
+    trap_button.size = Vector2(152, 34)
+    _style_action_button(trap_button, Color("6f4b8b"))
     trap_button.pressed.connect(func(): _set_build_mode(BuildMode.SPIKE_TRAP))
     add_child(trap_button)
 
     defender_button = Button.new()
-    defender_button.position = Vector2(640, 574)
-    defender_button.size = Vector2(135, 42)
+    defender_button.position = Vector2(772, 486)
+    defender_button.size = Vector2(152, 34)
+    _style_action_button(defender_button, Color("456990"))
     defender_button.pressed.connect(func(): _set_build_mode(BuildMode.DEFENDER))
     add_child(defender_button)
 
     door_button = Button.new()
-    door_button.position = Vector2(780, 574)
-    door_button.size = Vector2(150, 42)
+    door_button.position = Vector2(772, 528)
+    door_button.size = Vector2(152, 34)
+    _style_action_button(door_button, Color("8d5b4c"))
     door_button.pressed.connect(_toggle_door)
     add_child(door_button)
 
     start_button = Button.new()
-    start_button.position = Vector2(710, 24)
-    start_button.size = Vector2(200, 42)
+    start_button.position = Vector2(752, 28)
+    start_button.size = Vector2(170, 44)
+    _style_action_button(start_button, Color("3d6b66"))
     start_button.pressed.connect(_on_primary_button_pressed)
     add_child(start_button)
 
     result_panel = Panel.new()
-    result_panel.position = Vector2(290, 205)
-    result_panel.size = Vector2(440, 250)
+    result_panel.position = Vector2(210, 104)
+    result_panel.size = Vector2(540, 472)
+    result_panel.add_theme_stylebox_override("panel", _panel_style(Color("10141af7"), Color("7180a4"), 14, 2))
     result_panel.visible = false
     add_child(result_panel)
 
     result_title = Label.new()
-    result_title.position = Vector2(30, 24)
-    result_title.size = Vector2(380, 45)
+    result_title.position = Vector2(28, 22)
+    result_title.size = Vector2(484, 42)
     result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    result_title.add_theme_font_size_override("font_size", 30)
+    result_title.add_theme_font_size_override("font_size", 28)
     result_panel.add_child(result_title)
 
-    result_summary = Label.new()
-    result_summary.position = Vector2(55, 85)
-    result_summary.size = Vector2(330, 130)
-    result_summary.add_theme_font_size_override("font_size", 18)
+    result_summary = RichTextLabel.new()
+    result_summary.position = Vector2(32, 76)
+    result_summary.size = Vector2(476, 318)
+    result_summary.fit_content = false
+    result_summary.scroll_active = true
+    result_summary.add_theme_font_size_override("normal_font_size", 16)
+    result_summary.add_theme_color_override("default_color", Color("e5e9f0"))
     result_panel.add_child(result_summary)
+
+func _panel_style(color: Color, border_color: Color, radius: int, border_width: int = 1) -> StyleBoxFlat:
+    var style := StyleBoxFlat.new()
+    style.bg_color = color
+    style.border_color = border_color
+    style.set_border_width_all(border_width)
+    style.set_corner_radius_all(radius)
+    return style
+
+func _style_action_button(button: Button, accent: Color) -> void:
+    var normal := _panel_style(accent.darkened(0.35), accent, 7)
+    var hover := _panel_style(accent.darkened(0.15), accent.lightened(0.2), 7, 2)
+    var pressed := _panel_style(accent.darkened(0.5), accent.lightened(0.1), 7, 2)
+    button.add_theme_stylebox_override("normal", normal)
+    button.add_theme_stylebox_override("hover", hover)
+    button.add_theme_stylebox_override("pressed", pressed)
+    button.add_theme_font_size_override("font_size", 13)
 
 func _start_new_campaign() -> void:
     waves.reset()

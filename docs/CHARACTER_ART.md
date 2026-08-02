@@ -30,6 +30,13 @@ archétypes de monstres et le diablotin défenseur utilisent tous ce système da
 
 Ces PNG RGBA de 160 × 112 pixels sont affichés directement sur les cinq zones cliquables. La sélection d'un bâtiment ouvre son état, ses effets et son amélioration.
 
+## Interface de partie
+
+L'interface utilise trois surfaces sombres bordées : l'en-tête pour l'état de la run, la barre
+latérale pour les objectifs, effets et actions, puis le pied de page pour les messages et
+statistiques. La fenêtre de résultat possède une zone de résumé défilable afin que les
+récompenses, défis et succès ne puissent plus recouvrir les boutons de navigation.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;
