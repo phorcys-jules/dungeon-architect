@@ -34,7 +34,7 @@ func choose_goal(origin: Vector2i, goals: Array[Dictionary], risk: Dictionary = 
     for goal in goals:
         var position: Vector2i = goal.get("position", origin)
         var priority := float(goal.get("priority", 0.0))
-        var distance := abs(position.x - origin.x) + abs(position.y - origin.y)
+        var distance: int = absi(position.x - origin.x) + absi(position.y - origin.y)
         var score := float(distance) + float(risk.get(position, 0.0)) - priority
         if score < best_score:
             best_score = score
