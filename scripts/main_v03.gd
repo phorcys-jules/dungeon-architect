@@ -67,7 +67,7 @@ func _set_run_end_actions_visible(value: bool) -> void:
         restart_button.visible = value
 
 func _open_village() -> void:
-    get_tree().change_scene_to_file("res://scenes/village_den_screen.tscn")
+    get_tree().change_scene_to_file("res://scenes/village_v03_screen.tscn")
 
 func _restart_from_results() -> void:
     _start_new_campaign()
