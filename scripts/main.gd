@@ -6,11 +6,12 @@ const DefenderScript := preload("res://scripts/monsters/defender.gd")
 const RunStatsScript := preload("res://scripts/core/run_stats.gd")
 const EconomyScript := preload("res://scripts/core/economy.gd")
 const WaveManagerScript := preload("res://scripts/core/wave_manager.gd")
-const MonsterSprite := preload("res://assets/sprites/characters/monster_imp.png")
+const CharacterAnimationRuntimeScript := preload("res://scripts/presentation/character_animation_runtime.gd")
+const MonsterSprite := preload("res://assets/sprites/characters/animations/monster_imp_walk.png")
 const ADVENTURER_TEXTURES := {
-    "scout": preload("res://assets/sprites/characters/adventurer_scout.png"),
-    "warrior": preload("res://assets/sprites/characters/adventurer_warrior.png"),
-    "champion": preload("res://assets/sprites/characters/adventurer_knight.png"),
+    "scout": preload("res://assets/sprites/characters/animations/adventurer_scout_walk.png"),
+    "warrior": preload("res://assets/sprites/characters/animations/adventurer_warrior_walk.png"),
+    "champion": preload("res://assets/sprites/characters/animations/adventurer_knight_walk.png"),
 }
 
 const GRID_SIZE := Vector2i(15, 10)
@@ -26,6 +27,7 @@ const SPIKE_TRAP_COST := 25
 const DEFENDER_COST := 40
 const DOOR_COST := 10
 const CHARACTER_DRAW_SIZE := Vector2(48, 48)
+const CHARACTER_FRAME_SIZE := Vector2(128, 128)
 
 enum GameState { PREPARATION, INVASION, WAVE_RESULT, CAMPAIGN_FINISHED }
 enum BuildMode { SPIKE_TRAP, DEFENDER }
@@ -38,6 +40,9 @@ var build_mode := BuildMode.SPIKE_TRAP
 var door_closed := false
 var door_purchased := false
 var adventurer_position := Vector2.ZERO
+var character_animation_time := 0.0
+var adventurer_facing := 1.0
+var adventurer_damage_flash := 0.0
 var path: Array[Vector2] = []
 var path_index := 0
 var game_state := GameState.PREPARATION
@@ -73,6 +78,8 @@ func _ready() -> void:
     queue_redraw()
 
 func _process(delta: float) -> void:
+    character_animation_time += delta
+    adventurer_damage_flash = maxf(adventurer_damage_flash - delta, 0.0)
     for trap: SpikeTrap in traps.values():
         trap.tick(delta)
     for defender: Defender in defenders.values():
@@ -96,6 +103,7 @@ func _process(delta: float) -> void:
         return
 
     var target := path[path_index]
+    adventurer_facing = CharacterAnimationRuntimeScript.facing_sign(target.x - adventurer_position.x, adventurer_facing)
     adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * _current_adventurer_speed_multiplier() * delta)
     if adventurer_position.distance_to(target) < 1.0:
         adventurer_position = target
@@ -154,6 +162,7 @@ func _configure_pathfinding() -> void:
 func _build_health_component() -> void:
     adventurer_health = HealthComponentScript.new()
     adventurer_health.health_changed.connect(_on_adventurer_health_changed)
+    adventurer_health.damaged.connect(_on_adventurer_damaged)
     adventurer_health.died.connect(_on_adventurer_died)
     add_child(adventurer_health)
 
@@ -491,17 +500,33 @@ func _draw_defenders() -> void:
         var defender: Defender = defenders[cell]
         var center := _world_from_cell(cell)
         var tint := Color("c9a7ff") if defender.is_ready else Color("766484")
-        draw_texture_rect(MonsterSprite, Rect2(center - CHARACTER_DRAW_SIZE / 2.0, CHARACTER_DRAW_SIZE), false, tint)
+        _draw_character_frame(MonsterSprite, center, tint, not defender.is_ready)
 
 func _draw_adventurer() -> void:
     if adventurer_health.is_dead:
         return
     var adventurer_id := waves.get_adventurer_data().id
     var texture: Texture2D = ADVENTURER_TEXTURES.get(adventurer_id, ADVENTURER_TEXTURES.champion)
-    draw_texture_rect(texture, Rect2(adventurer_position - CHARACTER_DRAW_SIZE / 2.0, CHARACTER_DRAW_SIZE), false)
+    var moving := game_state == GameState.INVASION and path_index < path.size()
+    var tint := CharacterAnimationRuntimeScript.damage_tint(adventurer_damage_flash)
+    _draw_character_frame(texture, adventurer_position, tint, moving, adventurer_facing, _current_adventurer_speed_multiplier())
     var bar_position := adventurer_position + Vector2(-18, -25)
     draw_rect(Rect2(bar_position, Vector2(36, 5)), Color("2a2d36"))
     draw_rect(Rect2(bar_position, Vector2(36.0 * adventurer_health.get_health_ratio(), 5)), Color("63d471"))
+
+func _draw_character_frame(texture: Texture2D, center: Vector2, tint: Color = Color.WHITE, moving: bool = true, facing: float = 1.0, speed_multiplier: float = 1.0, scale_multiplier: float = 1.0, phase: float = 0.0) -> void:
+    var frame := CharacterAnimationRuntimeScript.frame_index(character_animation_time, moving, speed_multiplier, phase)
+    var source := Rect2(Vector2(frame * CHARACTER_FRAME_SIZE.x, 0), CHARACTER_FRAME_SIZE)
+    var size := CHARACTER_DRAW_SIZE * scale_multiplier
+    var destination := Rect2(center - size / 2.0, size)
+    if facing < 0.0:
+        destination.position.x += destination.size.x
+        destination.size.x *= -1.0
+    draw_texture_rect_region(texture, destination, source, tint)
+
+func _on_adventurer_damaged(_amount: int, _current_health: int) -> void:
+    adventurer_damage_flash = 0.28
+    queue_redraw()
 
 func _world_from_cell(cell: Vector2i) -> Vector2:
     return GRID_ORIGIN + Vector2(cell) * CELL_SIZE + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)

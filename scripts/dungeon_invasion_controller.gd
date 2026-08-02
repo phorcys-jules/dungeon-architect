@@ -11,10 +11,10 @@ const MONSTER_ARCHETYPES: Array[MonsterArchetypeData] = [
     preload("res://resources/monsters/spider.tres"),
 ]
 const MONSTER_TEXTURES := {
-    "ghost": preload("res://assets/sprites/characters/monster_ghost.png"),
-    "slime": preload("res://assets/sprites/characters/monster_slime.png"),
-    "mimic": preload("res://assets/sprites/characters/monster_mimic.png"),
-    "spider": preload("res://assets/sprites/characters/monster_spider.png"),
+    "ghost": preload("res://assets/sprites/characters/animations/monster_ghost_walk.png"),
+    "slime": preload("res://assets/sprites/characters/animations/monster_slime_walk.png"),
+    "mimic": preload("res://assets/sprites/characters/animations/monster_mimic_walk.png"),
+    "spider": preload("res://assets/sprites/characters/animations/monster_spider_walk.png"),
 }
 const ROOM_RESOURCES: Array[RoomData] = [
     preload("res://resources/rooms/corridor.tres"),
@@ -44,6 +44,8 @@ var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [
 var loop_rules: PacmanLoopRules = PacmanLoopRulesScript.new()
 var labyrinth_generator: LabyrinthGenerator = LabyrinthGeneratorScript.new()
 var monster_ai: MonsterAiCoordinator = MonsterAiCoordinatorScript.new()
+var monster_facings: Array[float] = []
+var monster_attack_flashes: Array[float] = []
 var campaign_seed := int(Time.get_unix_time_from_system())
 var blessing_available := true
 var last_adventurer_cell := ENTRANCE
@@ -88,6 +90,8 @@ func _prepare_current_wave() -> void:
 
 func _process(delta: float) -> void:
     loop_rules.tick(delta)
+    for index in monster_attack_flashes.size():
+        monster_attack_flashes[index] = maxf(monster_attack_flashes[index] - delta, 0.0)
     super._process(delta)
     if game_state != GameState.INVASION or adventurer_health.is_dead:
         return
@@ -109,12 +113,16 @@ func _process(delta: float) -> void:
 
 func _spawn_mobile_monsters() -> void:
     mobile_monsters.clear()
+    monster_facings.clear()
+    monster_attack_flashes.clear()
     for index in MONSTER_HOME_CELLS.size():
         var monster: MobileMonster = MobileMonsterScript.new()
         var archetype := MONSTER_ARCHETYPES[index]
         monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed)
         monster.world_position = _world_from_cell(MONSTER_HOME_CELLS[index])
         mobile_monsters.append(monster)
+        monster_facings.append(1.0)
+        monster_attack_flashes.append(0.0)
 
 func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     var occupied: Array[Vector2i] = []
@@ -141,7 +149,9 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                     cells.append(point_cell)
             monster.set_path(cells)
 
+        var previous_position := monster.world_position
         monster.tick_grid(delta, CELL_SIZE)
+        monster_facings[index] = CharacterAnimationRuntimeScript.facing_sign(monster.world_position.x - previous_position.x, monster_facings[index])
         monster.world_position = GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
         var monster_cell := monster.cell
         monster.world_position = _world_from_cell(monster_cell) if not monster.has_path() else monster.world_position
@@ -154,6 +164,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             else:
                 var archetype := MONSTER_ARCHETYPES[index]
                 adventurer_health.take_damage(archetype.base_damage)
+                monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
                 monster.world_position = _world_from_cell(monster.home_cell)
 
@@ -190,11 +201,12 @@ func _draw() -> void:
         draw_circle(blessing_center, 5.0, Color("ffffff"))
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
-        var center := _world_from_cell(monster.cell)
+        var center := monster.world_position
         var archetype := MONSTER_ARCHETYPES[index]
         var texture: Texture2D = MONSTER_TEXTURES[archetype.archetype_id]
         var tint := Color("9eeeff") if loop_rules.is_panicking() else Color.WHITE
-        draw_texture_rect(texture, Rect2(center - CHARACTER_DRAW_SIZE / 2.0, CHARACTER_DRAW_SIZE), false, tint)
+        var scale := CharacterAnimationRuntimeScript.attack_scale(monster_attack_flashes[index])
+        _draw_character_frame(texture, center, tint, monster.has_path(), monster_facings[index], archetype.base_speed / 120.0, scale, index * 0.07)
 
 func get_run_tags() -> Array[String]:
     var tags: Array[String] = ["biome:%s" % active_biome.active_biome_id]

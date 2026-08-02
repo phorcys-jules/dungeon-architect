@@ -15,6 +15,11 @@ La première identité graphique utilise un pixel art sombre et coloré, des con
 
 Les fichiers sources sont des PNG RGBA de 96 × 96 pixels, affichés en 48 × 48 avec filtrage nearest-neighbor. Ils ont été générés avec ImageGen sur fond chroma-key, puis détourés localement.
 
+Chaque personnage possède aussi une planche horizontale dans
+`assets/sprites/characters/animations/`. Ses quatre cellules de 128 × 128 pixels forment une
+boucle de déplacement jouée à 8 images par seconde. Les trois aventuriers, les quatre
+archétypes de monstres et le diablotin défenseur utilisent tous ce système dans la partie.
+
 ## Bâtiments du village
 
 - `assets/sprites/buildings/den.png` : tanière des monstres ;
@@ -29,4 +34,4 @@ Ces PNG RGBA de 160 × 112 pixels sont affichés directement sur les cinq zones 
 
 - ajouter des variantes visuelles liées aux traits et familles ;
 - créer les salles, pièges et reliques dans la même palette ;
-- ajouter des animations courtes sans réduire la lisibilité.
+- ajouter des animations d'attaque et de dégâts sans réduire la lisibilité.

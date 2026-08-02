@@ -16,7 +16,13 @@ func _init() -> void:
     assert(tags.any(func(tag: String) -> bool: return tag.begins_with("biome:")))
     for texture in game.MONSTER_TEXTURES.values():
         assert(texture != null)
+        assert(texture.get_width() == 512)
+        assert(texture.get_height() == 128)
     for texture in game.ADVENTURER_TEXTURES.values():
         assert(texture != null)
+        assert(texture.get_width() == 512)
+        assert(texture.get_height() == 128)
+    assert(game.MonsterSprite.get_width() == 512)
+    assert(game.MonsterSprite.get_height() == 128)
     print("V0.6 content wiring test passed")
     quit(0)
