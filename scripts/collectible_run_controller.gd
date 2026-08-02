@@ -73,12 +73,7 @@ func _recalculate_path() -> void:
     if not _is_inside_grid(start_cell):
         start_cell = ENTRANCE
 
-    active_route_target = (
-        collectible_route.get_next_target(start_cell)
-        if collectible_route.has_remaining()
-        else TREASURE
-    )
-
+    active_route_target = collectible_route.get_next_target(start_cell) if collectible_route.has_remaining() else TREASURE
     var cell_path := astar.get_id_path(start_cell, active_route_target)
     path.clear()
     path_index = 0
@@ -90,10 +85,7 @@ func _recalculate_path() -> void:
     if path.is_empty():
         _on_adventurer_died()
     elif collectible_route.has_remaining():
-        status_label.text = "%s : l'aventurier cherche une relique (%d restante(s))." % [
-            waves.get_label(),
-            collectible_route.get_remaining_count(),
-        ]
+        status_label.text = "%s : l'aventurier cherche une relique (%d restante(s))." % [waves.get_label(), collectible_route.get_remaining_count()]
     else:
         status_label.text = "%s : toutes les reliques sont collectées, direction le trésor." % waves.get_label()
 

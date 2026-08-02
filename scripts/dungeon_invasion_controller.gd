@@ -1,4 +1,4 @@
-extends "res://scripts/main_pacman.gd"
+extends "res://scripts/collectible_run_controller.gd"
 
 const MobileMonsterScript := preload("res://scripts/monsters/mobile_monster.gd")
 const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd")
@@ -9,10 +9,7 @@ const MONSTER_HOME_CELLS: Array[Vector2i] = [Vector2i(6, 5), Vector2i(8, 5)]
 const MONSTER_HIT_DAMAGE := 20
 
 var mobile_monsters: Array[MobileMonster] = []
-var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [
-    PacmanLoopRules.Behaviour.CHASER,
-    PacmanLoopRules.Behaviour.AMBUSHER,
-]
+var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [PacmanLoopRules.Behaviour.CHASER, PacmanLoopRules.Behaviour.AMBUSHER]
 var loop_rules: PacmanLoopRules = PacmanLoopRulesScript.new()
 var labyrinth_generator: LabyrinthGenerator = LabyrinthGeneratorScript.new()
 var campaign_seed := int(Time.get_unix_time_from_system())
@@ -39,9 +36,8 @@ func _ready() -> void:
 func _prepare_current_wave() -> void:
     blessing_available = true
     super._prepare_current_wave()
-    if not mobile_monsters.is_empty():
-        for monster in mobile_monsters:
-            monster.reset_to_home(CELL_SIZE)
+    for monster in mobile_monsters:
+        monster.reset_to_home(CELL_SIZE)
 
 func _process(delta: float) -> void:
     loop_rules.tick(delta)
@@ -80,13 +76,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         if not monster.has_path():
-            var target := monster.home_cell if loop_rules.is_panicking() else loop_rules.get_target(
-                monster_behaviours[index],
-                adventurer_cell,
-                adventurer_direction,
-                TREASURE,
-                active_route_target
-            )
+            var target := monster.home_cell if loop_rules.is_panicking() else loop_rules.get_target(monster_behaviours[index], adventurer_cell, adventurer_direction, TREASURE, active_route_target)
             target.x = clampi(target.x, 0, GRID_SIZE.x - 1)
             target.y = clampi(target.y, 0, GRID_SIZE.y - 1)
             if walls.has(target):

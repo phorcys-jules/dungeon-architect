@@ -1,8 +1,8 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource path="res://scripts/village/village_v03_screen.gd" type="Script" id="1_screen"]
+[ext_resource path="res://scripts/village/village_screen.gd" type="Script" id="1_screen"]
 
-[node name="VillageV03Screen" type="Control"]
+[node name="VillageScreen" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

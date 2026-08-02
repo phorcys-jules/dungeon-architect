@@ -16,7 +16,7 @@ func _on_start_run_pressed() -> void:
     transition_in_progress = true
     _refresh_navigation()
     run_requested.emit()
-    get_tree().change_scene_to_file("res://scenes/main_v03.tscn")
+    get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _refresh_navigation() -> void:
     if start_run_button:

@@ -1,4 +1,4 @@
-extends "res://scripts/main_v02.gd"
+extends "res://scripts/dungeon_invasion_controller.gd"
 
 const RunEndControllerScript := preload("res://scripts/core/run_end_controller.gd")
 
@@ -67,7 +67,7 @@ func _set_run_end_actions_visible(value: bool) -> void:
         restart_button.visible = value
 
 func _open_village() -> void:
-    get_tree().change_scene_to_file("res://scenes/village_v03_screen.tscn")
+    get_tree().change_scene_to_file("res://scenes/village_screen.tscn")
 
 func _restart_from_results() -> void:
     _start_new_campaign()
