@@ -21,6 +21,12 @@ func _init() -> void:
     if screen.start_run_button == null:
         quit(1)
         return
+    if screen.music_player == null or screen.music_player.stream == null or not screen.music_player.playing:
+        quit(1)
+        return
+    if (screen.music_player.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_FORWARD:
+        quit(1)
+        return
     screen.transition_in_progress = true
     screen._refresh_navigation()
     if not screen.start_run_button.disabled:

@@ -71,6 +71,13 @@ chercher le coin praticable le plus éloigné. Un contact pendant cette phase ne
 monstre jusqu'à la fin du pouvoir. Un halo pulsant indique la durée active et les deux camps
 recalculent leurs objectifs lorsque la chasse reprend.
 
+## Ambiance sonore du village
+
+Le village joue `assets/audio/music/village_night.wav`, une boucle originale de 16 secondes
+en ré mineur mêlant bourdon grave, nappes et cloches discrètes. La lecture démarre avec un
+fondu de 1,8 seconde à −19 dB et disparaît en 0,45 seconde avant le lancement d'une run afin
+d'éviter une coupure sèche ou la superposition de plusieurs pistes.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;

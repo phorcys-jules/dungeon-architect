@@ -3,6 +3,7 @@ extends "res://scripts/village/village_den_screen.gd"
 signal run_requested
 
 const VillageBackground := preload("res://assets/backgrounds/monster_village.png")
+const VillageMusic := preload("res://assets/audio/music/village_night.wav")
 const BUILDING_TEXTURES := {
     "den": preload("res://assets/sprites/buildings/den.png"),
     "forge": preload("res://assets/sprites/buildings/forge.png"),
@@ -27,11 +28,13 @@ var meta_store := V06ProgressionStore.new()
 var progression_service := V04ProgressionService.new()
 var selected_building := "den"
 var building_buttons: Dictionary = {}
+var music_player: AudioStreamPlayer
 
 func _ready() -> void:
     super._ready()
     _load_village_state()
     _build_village_map()
+    _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
     _select_building("den")
     _refresh_navigation()
@@ -113,6 +116,17 @@ func _building_style(color: Color, alpha: float) -> StyleBoxFlat:
     style.content_margin_top = 8
     style.content_margin_bottom = 8
     return style
+
+func _start_village_music() -> void:
+    music_player = AudioStreamPlayer.new()
+    music_player.name = "VillageAmbience"
+    var looped_stream := VillageMusic.duplicate() as AudioStreamWAV
+    looped_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+    music_player.stream = looped_stream
+    music_player.volume_db = -36.0
+    add_child(music_player)
+    music_player.play()
+    create_tween().tween_property(music_player, "volume_db", -19.0, 1.8)
 
 func _select_building(building_id: String) -> void:
     selected_building = building_id
@@ -221,6 +235,10 @@ func _on_start_run_pressed() -> void:
         return
     transition_in_progress = true
     _refresh_navigation()
+    if music_player and music_player.playing:
+        var fade := create_tween()
+        fade.tween_property(music_player, "volume_db", -40.0, 0.45)
+        await fade.finished
     run_requested.emit()
     get_tree().change_scene_to_file("res://scenes/main.tscn")
 
