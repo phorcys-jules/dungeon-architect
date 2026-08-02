@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="RoomData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/room_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+room_id = "ice_gallery"
+display_name = "Galerie de glace"
+rarity = 1
+build_cost = 16
+tags = Array[StringName]([&"ice", &"slippery"])
+connections = Array[Vector2i]([Vector2i(-1, 0), Vector2i(1, 0)])
+max_copies = 2
