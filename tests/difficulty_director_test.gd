@@ -3,7 +3,7 @@ extends SceneTree
 func _init() -> void:
     var director := DifficultyDirector.new()
     var hard := director.scaled_stats({"max_health": 100.0, "attack": 10.0, "speed": 80.0}, DifficultyDirector.Level.HARD, 5)
-    if float(hard.max_health) <= 150.0 or float(hard.attack) <= 14.0:
+    if not is_equal_approx(float(hard.max_health), 161.2) or not is_equal_approx(float(hard.attack), 14.88):
         quit(1)
         return
     if director.should_spawn_elite(DifficultyDirector.Level.STORY, 5, 0.0):
