@@ -35,6 +35,10 @@ var monster_roster := MonsterRoster.new()
 var roster_buttons: Dictionary = {}
 var labyrinth_modules := LabyrinthModuleLoadout.new()
 var module_buttons: Dictionary = {}
+var room_deck_selection := RoomDeckSelection.new()
+var biome_selector: OptionButton
+var room_selector: OptionButton
+var room_deck_label: Label
 
 func _ready() -> void:
     super._ready()
@@ -42,6 +46,7 @@ func _ready() -> void:
     _build_village_map()
     _build_roster_controls()
     _build_module_controls()
+    _build_room_deck_controls()
     _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
@@ -62,6 +67,7 @@ func _load_village_state() -> void:
     if monster_roster.selected_team.size() > monster_roster.capacity:
         monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
     labyrinth_modules.from_dict(state.get("labyrinth_modules", {}), progression_service.state.buildings)
+    room_deck_selection.from_dict(state.get("room_deck_selection", {}))
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
 
@@ -77,6 +83,7 @@ func _build_village_map() -> void:
     move_child(background, 0)
 
     var panel := get_node("Panel") as PanelContainer
+    (get_node("Panel/Margin/Content") as VBoxContainer).add_theme_constant_override("separation", 8)
     panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
     panel.offset_left = -305.0
     panel.offset_top = -270.0
@@ -244,6 +251,87 @@ func _refresh_module_controls() -> void:
     if heading != null:
         heading.text = "MODULES DU LABYRINTHE — %d/%d" % [labyrinth_modules.complexity_used(), LabyrinthModuleLoadout.MAX_COMPLEXITY]
 
+func _build_room_deck_controls() -> void:
+    var content := get_node("Panel/Margin/Content") as VBoxContainer
+    biome_selector = OptionButton.new()
+    biome_selector.name = "BiomeSelector"
+    biome_selector.add_theme_font_size_override("font_size", 9)
+    var catalog := BiomeCatalog.new()
+    for biome_id in catalog.all_ids():
+        var definition := catalog.get_biome(biome_id)
+        biome_selector.add_item("Biome : %s" % String(definition.name))
+        biome_selector.set_item_metadata(biome_selector.item_count - 1, biome_id)
+        if biome_id == room_deck_selection.biome_id:
+            biome_selector.select(biome_selector.item_count - 1)
+    biome_selector.item_selected.connect(_select_biome)
+    content.add_child(biome_selector)
+    room_deck_label = Label.new()
+    room_deck_label.name = "RoomDeckLabel"
+    room_deck_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    room_deck_label.add_theme_font_size_override("font_size", 9)
+    room_deck_label.tooltip_text = "Le générateur place exactement ces pièces, dans un ordre déterminé par la seed."
+    content.add_child(room_deck_label)
+    var row := HBoxContainer.new()
+    row.add_theme_constant_override("separation", 4)
+    content.add_child(row)
+    room_selector = OptionButton.new()
+    room_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    room_selector.add_theme_font_size_override("font_size", 9)
+    for room_id in room_deck_selection.room_ids():
+        var definition := room_deck_selection.room(room_id)
+        room_selector.add_item("%s · %d or · R%d" % [definition.display_name, definition.build_cost, definition.rarity])
+        room_selector.set_item_metadata(room_selector.item_count - 1, room_id)
+        room_selector.set_item_tooltip(room_selector.item_count - 1, "Tags : %s · connexions : %d · copies max : %d" % [", ".join(definition.tags), definition.connections.size(), definition.max_copies])
+    row.add_child(room_selector)
+    var add_button := Button.new()
+    add_button.text = "+"
+    add_button.tooltip_text = "Ajouter la pièce sélectionnée au deck."
+    add_button.pressed.connect(_add_selected_room)
+    row.add_child(add_button)
+    var remove_button := Button.new()
+    remove_button.text = "−"
+    remove_button.tooltip_text = "Retirer la dernière pièce du deck."
+    remove_button.pressed.connect(_remove_last_room)
+    row.add_child(remove_button)
+    _refresh_room_deck_controls()
+
+func _add_selected_room() -> void:
+    if room_selector.selected < 0:
+        return
+    var room_id := String(room_selector.get_item_metadata(room_selector.selected))
+    var result := room_deck_selection.add(room_id)
+    if not bool(result.ok):
+        status_label.text = room_deck_selection.rejection_message(result)
+    else:
+        _persist_village_state()
+        status_label.text = "%s ajoutée au deck." % room_deck_selection.room(room_id).display_name
+    _refresh_room_deck_controls()
+
+func _remove_last_room() -> void:
+    var result := room_deck_selection.remove_last()
+    if not bool(result.ok):
+        status_label.text = room_deck_selection.rejection_message(result)
+    else:
+        _persist_village_state()
+    _refresh_room_deck_controls()
+
+func _refresh_room_deck_controls() -> void:
+    if room_deck_label != null:
+        room_deck_label.text = "DECK DE PIÈCES %d/%d\n%s" % [room_deck_selection.selected.size(), RoomDeckSelection.MAX_ROOMS, room_deck_selection.display_summary()]
+        var validation := room_deck_selection.validate_for_biome()
+        room_deck_label.modulate = Color.WHITE if bool(validation.ok) else Color("ff9f80")
+        room_deck_label.tooltip_text = "Deck valide pour ce biome." if bool(validation.ok) else room_deck_selection.rejection_message(validation)
+
+func _select_biome(index: int) -> void:
+    var result := room_deck_selection.set_biome(String(biome_selector.get_item_metadata(index)))
+    if not bool(result.ok):
+        status_label.text = room_deck_selection.rejection_message(result)
+    else:
+        _persist_village_state()
+        var validation := room_deck_selection.validate_for_biome()
+        status_label.text = "Biome sélectionné." if bool(validation.ok) else room_deck_selection.rejection_message(validation)
+    _refresh_room_deck_controls()
+
 func _start_village_music() -> void:
     music_player = AudioStreamPlayer.new()
     music_player.name = "VillageAmbience"
@@ -367,6 +455,7 @@ func _persist_village_state() -> void:
     state["black_market"] = black_market.to_dict()
     state["monster_roster"] = monster_roster.to_dict()
     state["labyrinth_modules"] = labyrinth_modules.to_dict()
+    state["room_deck_selection"] = room_deck_selection.to_dict()
     meta_store.save_state(state)
 
 func _building_data(building_id: String) -> VillageBuildingData:
@@ -409,6 +498,11 @@ func _first_available_offer() -> Dictionary:
 
 func _on_start_run_pressed() -> void:
     if transition_in_progress:
+        return
+    var deck_validation := room_deck_selection.validate_for_biome()
+    if not bool(deck_validation.ok):
+        status_label.text = room_deck_selection.rejection_message(deck_validation)
+        _refresh_room_deck_controls()
         return
     transition_in_progress = true
     _refresh_navigation()

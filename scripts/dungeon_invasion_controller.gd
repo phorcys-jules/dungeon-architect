@@ -72,6 +72,8 @@ var blessing_available := true
 var last_adventurer_cell := ENTRANCE
 var adventurer_direction := Vector2i.RIGHT
 var room_deck := RoomDeck.new()
+var configured_room_deck: Array[StringName] = DEFAULT_ROOM_DECK.duplicate()
+var configured_biome_id := ""
 var placed_rooms: Dictionary = {}
 var active_biome := BiomeRuntime.new()
 var adventurer_attack_cooldown := 0.0
@@ -91,9 +93,11 @@ func _build_interface() -> void:
     add_child(round_state_label)
 
 func _build_level() -> void:
-    active_biome.select_for_zone(campaign_seed, 0)
+    if configured_biome_id.is_empty() or not active_biome.set_active(configured_biome_id):
+        active_biome.select_for_zone(campaign_seed, 0)
     room_deck.configure(ROOM_RESOURCES)
-    room_deck.select(DEFAULT_ROOM_DECK)
+    if not room_deck.select(configured_room_deck):
+        room_deck.select(DEFAULT_ROOM_DECK)
     room_deck.shuffle(campaign_seed)
     placed_rooms.clear()
     var room_cells: Array[Vector2i] = []
@@ -526,6 +530,23 @@ func set_monster_team(monster_ids: Array[String]) -> void:
         if selected.size() >= MONSTER_HOME_CELLS.size():
             break
     active_monster_archetypes = selected if not selected.is_empty() else MONSTER_ARCHETYPES.duplicate()
+
+func set_room_deck(room_ids: Array[String]) -> bool:
+    var typed_ids: Array[StringName] = []
+    for room_id in room_ids:
+        typed_ids.append(StringName(room_id))
+    var validator := RoomDeck.new()
+    validator.configure(ROOM_RESOURCES)
+    if typed_ids.is_empty() or typed_ids.size() > ROOM_ANCHORS.size() or not validator.select(typed_ids):
+        return false
+    configured_room_deck = typed_ids
+    return true
+
+func set_biome(biome_id: String) -> bool:
+    if not active_biome.set_active(biome_id):
+        return false
+    configured_biome_id = biome_id
+    return true
 
 func _monster_respawn_delay(base_delay: float) -> float:
     return base_delay

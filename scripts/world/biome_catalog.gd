@@ -18,7 +18,7 @@ var definitions: Dictionary = {
         "construction": {
             "wall_cost_multiplier": 1.0,
             "blocked_room_tags": ["fountain"],
-            "required_room_tags": ["grave"],
+            "required_room_tags": ["curse"],
         },
     },
     MINE: {
@@ -32,7 +32,7 @@ var definitions: Dictionary = {
         "construction": {
             "wall_cost_multiplier": 0.8,
             "blocked_room_tags": ["large"],
-            "required_room_tags": ["ore"],
+            "required_room_tags": ["corridor"],
         },
     },
     CASTLE: {
@@ -46,7 +46,7 @@ var definitions: Dictionary = {
         "construction": {
             "wall_cost_multiplier": 1.2,
             "blocked_room_tags": [],
-            "required_room_tags": ["guard_post"],
+            "required_room_tags": ["control"],
         },
     },
     SEWERS: {
@@ -60,7 +60,7 @@ var definitions: Dictionary = {
         "construction": {
             "wall_cost_multiplier": 0.9,
             "blocked_room_tags": ["fire"],
-            "required_room_tags": ["drain"],
+            "required_room_tags": ["slime"],
         },
     },
 }

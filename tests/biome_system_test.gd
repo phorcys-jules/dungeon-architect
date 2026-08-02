@@ -6,14 +6,14 @@ func _init() -> void:
     assert(not catalog.get_biome(BiomeCatalog.CRYPT).is_empty())
     assert(catalog.validate_room_tags(BiomeCatalog.SEWERS, ["slime"]).ok)
     assert(not catalog.validate_room_tags(BiomeCatalog.SEWERS, ["fire"]).ok)
-    assert(catalog.has_required_room(BiomeCatalog.MINE, ["ore"]))
-    assert(not catalog.has_required_room(BiomeCatalog.MINE, ["grave"]))
+    assert(catalog.has_required_room(BiomeCatalog.MINE, ["corridor"]))
+    assert(not catalog.has_required_room(BiomeCatalog.MINE, ["curse"]))
 
     var runtime := BiomeRuntime.new()
     assert(runtime.set_active(BiomeCatalog.CASTLE))
     assert(runtime.wall_cost(10) == 12)
     assert(is_equal_approx(runtime.rule_value("door_health_multiplier"), 1.4))
-    assert(runtime.can_start_run(["guard_post"]))
+    assert(runtime.can_start_run(["control"]))
 
     var selected_a := runtime.select_for_zone(1234, 2)
     var runtime_b := BiomeRuntime.new()
