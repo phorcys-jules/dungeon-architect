@@ -4,6 +4,7 @@ const StoreScript := preload("res://scripts/village/village_save_store.gd")
 const ServiceScript := preload("res://scripts/core/run_reward_service.gd")
 const ControllerScript := preload("res://scripts/core/run_end_controller.gd")
 
+# Covers idempotent rewards and two consecutive runs in one process.
 func _init() -> void:
     var path := "user://run_end_controller_test.json"
     var store: VillageSaveStore = StoreScript.new(path)
