@@ -1,4 +1,5 @@
 extends "res://scripts/dungeon_invasion_controller.gd"
+class_name GameController
 
 const RunEndControllerScript := preload("res://scripts/core/run_end_controller.gd")
 
