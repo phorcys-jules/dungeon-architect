@@ -6,9 +6,11 @@ signal upgrade_requested
 @onready var status_label: Label = %StatusLabel
 @onready var upgrade_button: Button = %UpgradeButton
 
+var save_store := VillageSaveStore.new()
 var view_model := DenViewModel.new()
 
 func _ready() -> void:
+    view_model = DenViewModel.new(save_store.load_den())
     upgrade_button.pressed.connect(_on_upgrade_pressed)
     refresh()
 
@@ -16,6 +18,10 @@ func set_progression(den: DenProgression) -> void:
     view_model = DenViewModel.new(den)
     if is_node_ready():
         refresh()
+
+func set_save_store(store: VillageSaveStore) -> void:
+    if store != null:
+        save_store = store
 
 func refresh() -> void:
     title_label.text = view_model.get_title()
@@ -25,5 +31,6 @@ func refresh() -> void:
 
 func _on_upgrade_pressed() -> void:
     if view_model.upgrade():
+        save_store.save_den(view_model.den)
         refresh()
         upgrade_requested.emit()
