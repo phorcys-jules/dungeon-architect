@@ -3,15 +3,22 @@ extends "res://scripts/collectible_run_controller.gd"
 const MobileMonsterScript := preload("res://scripts/monsters/mobile_monster.gd")
 const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd")
 const LabyrinthGeneratorScript := preload("res://scripts/core/labyrinth_generator.gd")
+const MonsterAiCoordinatorScript := preload("res://scripts/monsters/monster_ai_coordinator.gd")
 
 const BLESSING_CELL := Vector2i(7, 8)
-const MONSTER_HOME_CELLS: Array[Vector2i] = [Vector2i(6, 5), Vector2i(8, 5)]
+const MONSTER_HOME_CELLS: Array[Vector2i] = [Vector2i(6, 5), Vector2i(8, 5), Vector2i(7, 4), Vector2i(7, 6)]
 const MONSTER_HIT_DAMAGE := 20
 
 var mobile_monsters: Array[MobileMonster] = []
-var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [PacmanLoopRules.Behaviour.CHASER, PacmanLoopRules.Behaviour.AMBUSHER]
+var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [
+    PacmanLoopRules.Behaviour.CHASER,
+    PacmanLoopRules.Behaviour.AMBUSHER,
+    PacmanLoopRules.Behaviour.GUARDIAN,
+    PacmanLoopRules.Behaviour.HERDER,
+]
 var loop_rules: PacmanLoopRules = PacmanLoopRulesScript.new()
 var labyrinth_generator: LabyrinthGenerator = LabyrinthGeneratorScript.new()
+var monster_ai: MonsterAiCoordinator = MonsterAiCoordinatorScript.new()
 var campaign_seed := int(Time.get_unix_time_from_system())
 var blessing_available := true
 var last_adventurer_cell := ENTRANCE
@@ -64,7 +71,7 @@ func _spawn_mobile_monsters() -> void:
     mobile_monsters.clear()
     for index in MONSTER_HOME_CELLS.size():
         var monster: MobileMonster = MobileMonsterScript.new()
-        monster.setup(MONSTER_HOME_CELLS[index], 105.0 + index * 12.0)
+        monster.setup(MONSTER_HOME_CELLS[index], 105.0 + index * 10.0)
         monster.world_position = _world_from_cell(MONSTER_HOME_CELLS[index])
         mobile_monsters.append(monster)
 
@@ -73,10 +80,15 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     for monster in mobile_monsters:
         occupied.append(monster.cell)
 
+    var blocked: Array[Vector2i] = walls.duplicate()
+    if door_closed:
+        blocked.append(DOOR)
+    var targets := monster_ai.assign_targets(occupied, monster_behaviours, adventurer_cell, adventurer_direction, TREASURE, active_route_target, blocked)
+
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         if not monster.has_path():
-            var target := monster.home_cell if loop_rules.is_panicking() else loop_rules.get_target(monster_behaviours[index], adventurer_cell, adventurer_direction, TREASURE, active_route_target)
+            var target := monster.home_cell if loop_rules.is_panicking() else targets[index]
             target.x = clampi(target.x, 0, GRID_SIZE.x - 1)
             target.y = clampi(target.y, 0, GRID_SIZE.y - 1)
             if walls.has(target):
@@ -137,7 +149,8 @@ func _draw() -> void:
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         var center := _world_from_cell(monster.cell)
-        var color := Color("7bdff2") if loop_rules.is_panicking() else (Color("ff5d8f") if index == 0 else Color("ff9f1c"))
+        var role_colors := [Color("ff5d8f"), Color("ff9f1c"), Color("9b5de5"), Color("00bbf9")]
+        var color := Color("7bdff2") if loop_rules.is_panicking() else role_colors[index % role_colors.size()]
         draw_circle(center, 14.0, color)
         draw_circle(center + Vector2(-5, -4), 2.0, Color.WHITE)
         draw_circle(center + Vector2(5, -4), 2.0, Color.WHITE)
