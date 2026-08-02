@@ -13,6 +13,7 @@ var entrance := Vector2i(0, 5)
 var treasure := Vector2i(14, 5)
 var minimum_loops := 4
 var wall_density := 0.34
+var route_gate_count := 3
 
 func generate(seed_value: int, required_cells: Array[Vector2i] = []) -> Dictionary:
     var rng := RandomNumberGenerator.new()
@@ -169,7 +170,7 @@ func _add_route_gates(open_cells: Dictionary, protected: Dictionary, rng: Random
         if open_cells.has(cell + Vector2i.LEFT) and open_cells.has(cell + Vector2i.RIGHT):
             candidates.append(cell)
     _shuffle_with_rng(candidates, rng)
-    var desired_gates := mini(3, candidates.size())
+    var desired_gates := mini(route_gate_count, candidates.size())
     var placed := 0
     for cell: Vector2i in candidates:
         if placed >= desired_gates:

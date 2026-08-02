@@ -22,6 +22,7 @@ var village_den_store := VillageSaveStore.new()
 var village_den := DenProgression.new()
 var monster_roster := MonsterRoster.new()
 var monster_progression := MonsterProgression.new()
+var labyrinth_modules := LabyrinthModuleLoadout.new()
 var choice_engine := RogueliteChoiceEngine.new()
 var choice_buttons: Array[Button] = []
 var current_choice_offer: Array[Dictionary] = []
@@ -179,6 +180,7 @@ func _finish_campaign(victory: bool, message: String) -> void:
     var persisted_state := v06_integration.store.load_state()
     persisted_state["monster_roster"] = monster_roster.to_dict()
     persisted_state["monster_progression"] = monster_progression.to_dict()
+    persisted_state["labyrinth_modules"] = labyrinth_modules.to_dict()
     v06_integration.store.save_state(persisted_state)
     result_summary.text += "\nÉquipe de monstres : +%d XP" % experience_gain
     _set_run_end_actions_visible(true)
@@ -214,6 +216,11 @@ func _load_village_progression() -> void:
     if monster_roster.selected_team.size() > monster_roster.capacity:
         monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
     monster_progression.from_dict(state.get("monster_progression", {}))
+    labyrinth_modules.from_dict(state.get("labyrinth_modules", {}), village_progression.state.buildings)
+    var labyrinth_modifiers := labyrinth_modules.generator_modifiers()
+    labyrinth_generator.wall_density = clampf(0.34 + float(labyrinth_modifiers.density), 0.18, 0.48)
+    labyrinth_generator.minimum_loops = 4 + int(labyrinth_modifiers.loops)
+    labyrinth_generator.route_gate_count = 3 + int(labyrinth_modifiers.gates)
     var families := {"ghost": "spectral", "slime": "ooze", "mimic": "construct", "spider": "beast"}
     for monster_id in monster_roster.recruited:
         monster_progression.ensure_monster(monster_id, String(families.get(monster_id, "beast")))

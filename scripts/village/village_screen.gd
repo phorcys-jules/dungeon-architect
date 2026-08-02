@@ -33,12 +33,15 @@ var music_player: AudioStreamPlayer
 var ambient_animator: VillageAmbientAnimator
 var monster_roster := MonsterRoster.new()
 var roster_buttons: Dictionary = {}
+var labyrinth_modules := LabyrinthModuleLoadout.new()
+var module_buttons: Dictionary = {}
 
 func _ready() -> void:
     super._ready()
     _load_village_state()
     _build_village_map()
     _build_roster_controls()
+    _build_module_controls()
     _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
@@ -58,6 +61,7 @@ func _load_village_state() -> void:
     monster_roster.capacity = mini(den.get_capacity(), 4)
     if monster_roster.selected_team.size() > monster_roster.capacity:
         monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
+    labyrinth_modules.from_dict(state.get("labyrinth_modules", {}), progression_service.state.buildings)
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
 
@@ -190,6 +194,56 @@ func _refresh_roster_controls() -> void:
         button.button_pressed = monster_roster.selected_team.has(String(monster_id))
         button.modulate = Color.WHITE if monster_roster.recruited.has(String(monster_id)) else Color("8b8b9b")
 
+func _build_module_controls() -> void:
+    var content := get_node("Panel/Margin/Content") as VBoxContainer
+    var heading := Label.new()
+    heading.text = "MODULES DU LABYRINTHE — %d/%d" % [labyrinth_modules.complexity_used(), LabyrinthModuleLoadout.MAX_COMPLEXITY]
+    heading.name = "LabyrinthModulesHeading"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    content.add_child(heading)
+    content.move_child(heading, 4)
+    var row := HBoxContainer.new()
+    row.alignment = BoxContainer.ALIGNMENT_CENTER
+    row.add_theme_constant_override("separation", 3)
+    content.add_child(row)
+    content.move_child(row, 5)
+    for module_id in LabyrinthModuleLoadout.DEFINITIONS:
+        var definition: Dictionary = LabyrinthModuleLoadout.DEFINITIONS[module_id]
+        var button := Button.new()
+        button.text = String(definition.name)
+        button.toggle_mode = true
+        button.custom_minimum_size = Vector2(56, 30)
+        button.add_theme_font_size_override("font_size", 9)
+        button.tooltip_text = "%s — complexité %d" % [String(definition.name), int(definition.cost)]
+        button.pressed.connect(_toggle_labyrinth_module.bind(String(module_id)))
+        row.add_child(button)
+        module_buttons[module_id] = button
+    _refresh_module_controls()
+
+func _toggle_labyrinth_module(module_id: String) -> void:
+    var selection: Array[String] = labyrinth_modules.selected.duplicate()
+    if selection.has(module_id):
+        selection.erase(module_id)
+    else:
+        selection.append(module_id)
+    var result := labyrinth_modules.select(selection, progression_service.state.buildings)
+    if not bool(result.ok):
+        status_label.text = "Module refusé : déblocage requis, sélection vide ou budget de complexité dépassé."
+    else:
+        _persist_village_state()
+        status_label.text = "Modules actifs : %s (%d/%d)." % [", ".join(labyrinth_modules.selected), labyrinth_modules.complexity_used(), LabyrinthModuleLoadout.MAX_COMPLEXITY]
+    _refresh_module_controls()
+
+func _refresh_module_controls() -> void:
+    var unlocked := labyrinth_modules.unlocked_ids(progression_service.state.buildings)
+    for module_id in module_buttons:
+        var button := module_buttons[module_id] as Button
+        button.button_pressed = labyrinth_modules.selected.has(String(module_id))
+        button.disabled = not unlocked.has(String(module_id))
+    var heading := get_node_or_null("Panel/Margin/Content/LabyrinthModulesHeading") as Label
+    if heading != null:
+        heading.text = "MODULES DU LABYRINTHE — %d/%d" % [labyrinth_modules.complexity_used(), LabyrinthModuleLoadout.MAX_COMPLEXITY]
+
 func _start_village_music() -> void:
     music_player = AudioStreamPlayer.new()
     music_player.name = "VillageAmbience"
@@ -311,6 +365,7 @@ func _persist_village_state() -> void:
     state["v04_progression"] = progression_service.state.duplicate(true)
     state["black_market"] = black_market.to_dict()
     state["monster_roster"] = monster_roster.to_dict()
+    state["labyrinth_modules"] = labyrinth_modules.to_dict()
     meta_store.save_state(state)
 
 func _building_data(building_id: String) -> VillageBuildingData:
