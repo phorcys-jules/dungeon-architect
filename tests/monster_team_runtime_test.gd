@@ -17,10 +17,11 @@ func _init() -> void:
     assert(game.mobile_monsters[1].home_cell == game.MONSTER_HOME_CELLS[1])
 
     game.monster_progression.ensure_monster("ghost", "spectral")
+    var base_progression: Dictionary = game._monster_progression_multipliers("ghost")
     game.monster_progression.grant_experience("ghost", 200)
-    var progression := game._monster_progression_multipliers("ghost")
-    assert(float(progression.health) > 1.0)
-    assert(float(progression.damage) > 1.0)
+    var progression: Dictionary = game._monster_progression_multipliers("ghost")
+    assert(float(progression.health) > float(base_progression.health))
+    assert(float(progression.damage) > float(base_progression.damage))
 
     print("Monster team runtime test passed")
     quit(0)

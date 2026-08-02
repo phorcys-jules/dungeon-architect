@@ -26,20 +26,8 @@ func _build_level() -> void:
 
 func _build_interface() -> void:
     super._build_interface()
-
-    wall_button = Button.new()
-    wall_button.text = "Placer un mur"
-    wall_button.position = Vector2(48, 665)
-    wall_button.size = Vector2(155, 38)
-    wall_button.pressed.connect(func(): _set_construction_mode(ConstructionMode.PLACE_WALL))
-    add_child(wall_button)
-
-    remove_wall_button = Button.new()
-    remove_wall_button.text = "Retirer un mur"
-    remove_wall_button.position = Vector2(210, 665)
-    remove_wall_button.size = Vector2(155, 38)
-    remove_wall_button.pressed.connect(func(): _set_construction_mode(ConstructionMode.REMOVE_WALL))
-    add_child(remove_wall_button)
+    wall_button = shortcut_buttons.get(8) as Button
+    remove_wall_button = shortcut_buttons.get(9) as Button
 
 func _start_new_campaign() -> void:
     if not base_walls.is_empty():
@@ -234,9 +222,10 @@ func _refresh_build_ui() -> void:
     super._refresh_build_ui()
     if wall_button:
         wall_button.disabled = game_state != GameState.PREPARATION
-        wall_button.text = "Mur (%d/%d or)" % [dungeon_build.remaining_wall_budget(), DungeonBuildRuntime.WALL_COST]
+        wall_button.tooltip_text = "8 — Placer un mur (%d restant(s), %d or)" % [dungeon_build.remaining_wall_budget(), DungeonBuildRuntime.WALL_COST]
     if remove_wall_button:
         remove_wall_button.disabled = game_state != GameState.PREPARATION
+        remove_wall_button.tooltip_text = "9 — Retirer un mur construit (%d or remboursés)" % DungeonBuildRuntime.WALL_REFUND
 
 func _construction_reserved_cells() -> Array[Vector2i]:
     var reserved: Array[Vector2i] = [DOOR, BLESSING_CELL]

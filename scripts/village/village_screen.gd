@@ -277,7 +277,7 @@ func _select_building(building_id: String) -> void:
 func _show_den() -> void:
     var den := save_store.load_den()
     title_label.text = "Tanière — niveau %d/%d" % [den.level, DenProgression.MAX_LEVEL]
-    status_label.text = "Équipe : %s\nCapacité : %d monstres\n%s : %s\n\nEffet : +2 places par niveau." % [", ".join(monster_roster.selected_team), den.get_capacity(), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
+    status_label.text = "Équipe : %s (%d/%d)\nDéfenseurs en run : %d\n%s : %s\n\nEffet : équipe jusqu'à 4 monstres, puis +2 défenseurs par niveau." % [", ".join(monster_roster.selected_team), monster_roster.selected_team.size(), monster_roster.capacity, den.get_capacity(), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
     upgrade_button.text = "Améliorer (%s)" % den.currency.formatted(den.get_upgrade_cost()) if den.level < DenProgression.MAX_LEVEL else "Niveau maximum"
     upgrade_button.disabled = not den.can_upgrade()
     _refresh_roster_controls()
@@ -358,6 +358,7 @@ func _on_upgrade_pressed() -> void:
             den.soul_shards = int(purchase.remaining)
             save_store.save_den(den)
     _persist_village_state()
+    _refresh_module_controls()
     _select_building(selected_building)
 
 func _persist_village_state() -> void:

@@ -45,27 +45,28 @@ func _ready() -> void:
 func _build_interface() -> void:
     super._build_interface()
     intelligence_label = Label.new()
-    intelligence_label.position = Vector2(772, 438)
-    intelligence_label.size = Vector2(152, 112)
+    intelligence_label.position = Vector2(772, 104)
+    intelligence_label.size = Vector2(152, 98)
     intelligence_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    intelligence_label.add_theme_font_size_override("font_size", 10)
+    intelligence_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    intelligence_label.add_theme_font_size_override("font_size", 9)
     intelligence_label.add_theme_color_override("font_color", Color("b8d8ff"))
     add_child(intelligence_label)
     objectives_label = Label.new()
-    objectives_label.position = Vector2(772, 110)
-    objectives_label.size = Vector2(152, 130)
+    objectives_label.position = Vector2(772, 206)
+    objectives_label.size = Vector2(152, 92)
     objectives_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     objectives_label.add_theme_font_size_override("font_size", 12)
     add_child(objectives_label)
     modifiers_label = Label.new()
-    modifiers_label.position = Vector2(772, 252)
+    modifiers_label.position = Vector2(772, 302)
     modifiers_label.size = Vector2(152, 20)
     modifiers_label.text = "EFFETS ACTIFS"
     modifiers_label.add_theme_font_size_override("font_size", 12)
     add_child(modifiers_label)
     modifiers_scroll = ScrollContainer.new()
-    modifiers_scroll.position = Vector2(768, 274)
-    modifiers_scroll.size = Vector2(160, 154)
+    modifiers_scroll.position = Vector2(768, 324)
+    modifiers_scroll.size = Vector2(160, 102)
     modifiers_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     add_child(modifiers_scroll)
     modifiers_list = VBoxContainer.new()
@@ -255,7 +256,7 @@ func _refresh_adventurer_intelligence() -> void:
         lines.append("• %s" % String(fact))
     lines.append("? %d donnée(s) inconnue(s)" % int(report.hidden_count))
     intelligence_label.text = "\n".join(lines)
-    intelligence_label.tooltip_text = "Le laboratoire révèle une information fiable supplémentaire par niveau."
+    intelligence_label.tooltip_text = "%s\n\nLe laboratoire révèle une information fiable supplémentaire par niveau." % intelligence_label.text
 
 func _max_defenders() -> int:
     return village_den.get_capacity()

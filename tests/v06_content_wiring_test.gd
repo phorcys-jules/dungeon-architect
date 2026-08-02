@@ -104,19 +104,21 @@ func _init() -> void:
     assert(game.spider_webs.has(crossroads_cell))
     game.village_den.level = 2
     assert(game._max_defenders() == 6)
-    var previous_synergies: Array = game.v06_integration.synergies.active.duplicate(true)
-    game.v06_integration.events.active_events = [{
+    var previous_synergies: Array[Dictionary] = game.v06_integration.synergies.active.duplicate(true)
+    var runtime_events: Array[Dictionary] = [{
         "id": "runtime_test",
         "name": "Modificateurs actifs",
         "description": "Vérifie le branchement au gameplay.",
         "remaining": 2,
         "effects": {"monster_damage_multiplier": 1.25, "monster_speed_multiplier": 0.8, "trap_cooldown_multiplier": 0.65},
     }]
-    game.v06_integration.synergies.active = [
+    game.v06_integration.events.active_events = runtime_events
+    var runtime_synergies: Array[Dictionary] = [
         game.v06_integration.synergies.catalog.get_entry("ghost_fog"),
         game.v06_integration.synergies.catalog.get_entry("slime_ice"),
         game.v06_integration.synergies.catalog.get_entry("mimic_treasure"),
     ]
+    game.v06_integration.synergies.active = runtime_synergies
     assert(is_equal_approx(game._monster_speed_multiplier(), 0.8))
     assert(is_equal_approx(game._monster_evasion(&"ghost"), 0.2))
     assert(is_equal_approx(game._monster_ambush_multiplier(&"mimic", true), 1.35))
