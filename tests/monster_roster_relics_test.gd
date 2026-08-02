@@ -7,7 +7,7 @@ func _init() -> void:
     assert(roster.select_team(["ghost", "slime"]))
     assert(not roster.select_team(["ghost", "unknown"]))
 
-    var saved_roster := roster.to_dict()
+    var saved_roster: Dictionary = roster.to_dict()
     var restored_roster = load("res://scripts/meta/monster_roster.gd").new()
     restored_roster.from_dict(saved_roster)
     assert(restored_roster.selected_team == ["ghost", "slime"])
@@ -16,7 +16,7 @@ func _init() -> void:
     assert(relics.grant("blood_crown"))
     assert(relics.grant("thorn_heart"))
     assert(relics.equip(["blood_crown", "thorn_heart"]))
-    var effects := relics.combined_effects()
+    var effects: Dictionary = relics.combined_effects()
     assert(is_equal_approx(float(effects.monster_damage_multiplier), 1.15))
     assert(is_equal_approx(float(effects.trap_damage_multiplier), 1.25))
 
