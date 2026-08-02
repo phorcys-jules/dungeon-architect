@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MonsterArchetypeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/monster_archetype_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+archetype_id = "spider"
+display_name = "Araignée"
+base_speed = 96.0
+base_damage = 10
+tags = Array[StringName]([&"spider", &"web", &"control"])
+abilities = Array[StringName]([&"web_crossroads"])
+effect_values = {"web_slow_multiplier": 0.58, "web_duration": 4.0}
