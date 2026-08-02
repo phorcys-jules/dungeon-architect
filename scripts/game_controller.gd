@@ -205,7 +205,8 @@ func _starting_gold_adjustment() -> int:
 
 func _monster_respawn_delay(base_delay: float) -> float:
     var speed_bonus := float(village_modifiers.get("monster_respawn_speed_multiplier", 0.0))
-    return maxf(0.5, base_delay / (1.0 + speed_bonus))
+    var lair_bonus := float(village_den.level) * 0.08
+    return maxf(0.5, base_delay / (1.0 + speed_bonus + lair_bonus))
 
 func _monster_damage_multiplier() -> float:
     return (1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))) * v06_integration.event_multiplier("monster_damage_multiplier")

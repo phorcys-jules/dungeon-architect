@@ -142,7 +142,7 @@ func _init() -> void:
     game._configure_trap(linked_trap)
     assert(linked_trap.damage > 15)
     assert(is_equal_approx(linked_trap.effect_duration, 2.4 * 1.4))
-    assert(is_equal_approx(game._monster_respawn_delay(3.0), 2.0))
+    assert(is_equal_approx(game._monster_respawn_delay(3.0), 3.0 / 1.66))
     assert(is_equal_approx(game._monster_damage_multiplier(), 1.25))
     assert(is_equal_approx(game._monster_health_multiplier(), 1.2))
     game.village_modifiers = previous_modifiers

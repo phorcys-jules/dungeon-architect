@@ -36,5 +36,24 @@ func _init() -> void:
     if not _check(not monster.has_path(), "path remains after reset"):
         return
 
+    monster.world_position = Vector2(4, 1) * 48.0
+    monster.cell = Vector2i(4, 1)
+    monster.take_damage(monster.current_health, 0.2)
+    if not _check(monster.returning_home, "defeated monster is not returning to the lair"):
+        return
+    safety = 0
+    while not monster.is_active() and safety < 100:
+        monster.tick_respawn(0.1, 48.0)
+        safety += 1
+    if not _check(monster.is_active() and monster.cell == monster.home_cell, "monster did not revive from its lair"):
+        return
+
+    monster.hold_at_home(0.5, 48.0)
+    if not _check(not monster.is_active(), "release order delay is not respected"):
+        return
+    monster.tick_respawn(0.5, 48.0)
+    if not _check(monster.is_active(), "monster was not released from its lair"):
+        return
+
     print("MobileMonster test passed")
     quit(0)

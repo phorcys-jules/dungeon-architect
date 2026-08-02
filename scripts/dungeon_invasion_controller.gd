@@ -123,7 +123,7 @@ func _prepare_current_wave() -> void:
     _refresh_round_state()
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
-        monster.revive_at_home(CELL_SIZE)
+        monster.hold_at_home(MONSTER_ARCHETYPES[index].get_effect(&"release_delay", float(index) * 0.8), CELL_SIZE)
         monster_burst_available[index] = true
         monster_ability_cooldowns[index] = 0.0
 
@@ -190,7 +190,8 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     _try_adventurer_attack()
     var occupied: Array[Vector2i] = []
     for monster in mobile_monsters:
-        occupied.append(monster.cell)
+        if monster.is_active():
+            occupied.append(monster.cell)
 
     var blocked: Array[Vector2i] = walls.duplicate()
     if door_closed:
@@ -284,7 +285,8 @@ func _try_adventurer_attack() -> bool:
     var target := mobile_monsters[target_index]
     var target_center := GRID_ORIGIN + target.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
     var damage := roundi(float(profile.damage) * (1.8 if empowered else 1.0) * (1.0 - _monster_evasion(MONSTER_ARCHETYPES[target_index].archetype_id)))
-    var respawn_delay := _monster_respawn_delay(loop_rules.panic_time_left + 0.5 if empowered else 3.0)
+    var respawn_base := MONSTER_ARCHETYPES[target_index].get_effect(&"respawn_delay", 3.0)
+    var respawn_delay := _monster_respawn_delay(maxf(respawn_base, loop_rules.panic_time_left + 0.5) if empowered else respawn_base)
     var applied_damage := target.take_damage(damage, respawn_delay)
     if applied_damage <= 0:
         return false
@@ -312,7 +314,8 @@ func _activate_power_pellet() -> void:
 
 func _consume_panicked_monster(index: int, monster: MobileMonster, archetype: MonsterArchetypeData) -> void:
     var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-    monster.take_damage(monster.current_health, _monster_respawn_delay(loop_rules.panic_time_left + 0.5))
+    var respawn_base := archetype.get_effect(&"respawn_delay", 3.0)
+    monster.take_damage(monster.current_health, _monster_respawn_delay(maxf(respawn_base, loop_rules.panic_time_left + 0.5)))
     monster.reset_to_home(CELL_SIZE)
     monster_ability_flashes[index] = 0.35
     _play_adventurer_attack(center, false, true)
@@ -413,6 +416,10 @@ func _room_effect_description(room_id: String) -> String:
 
 func _draw() -> void:
     super._draw()
+    var lair_rect := Rect2(_cell_top_left(Vector2i(6, 4)) + Vector2(4, 4), Vector2(CELL_SIZE * 3 - 8, CELL_SIZE * 3 - 8))
+    draw_rect(lair_rect, Color("20152f", 0.52), true)
+    draw_rect(lair_rect, Color("b995d6", 0.8), false, 2.0)
+    draw_string(ThemeDB.fallback_font, lair_rect.position + Vector2(12, 17), "REPAIRE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("dec9f5"))
     for cell: Vector2i in slime_trails:
         var trail_center := _world_from_cell(cell)
         draw_circle(trail_center, 13.0, Color("7145c7", 0.48))
@@ -427,6 +434,11 @@ func _draw() -> void:
         draw_arc(adventurer_position, pulse, 0.0, TAU, 24, Color("fff36b", 0.8), 2.0)
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
+        if monster.returning_home:
+            var spirit_center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+            draw_circle(spirit_center, 11.0, Color("a8ecff", 0.28))
+            draw_arc(spirit_center, 13.0, 0.0, TAU, 16, Color("d8f7ff", 0.85), 2.0)
+            continue
         if not monster.is_active():
             continue
         var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
