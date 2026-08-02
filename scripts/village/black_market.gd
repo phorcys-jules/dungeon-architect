@@ -102,3 +102,29 @@ func from_dict(data: Dictionary) -> void:
     stock.assign(data.get("stock", []))
     purchased_ids.assign(data.get("purchased_ids", []))
     active_curses.assign(data.get("active_curses", []))
+
+func combined_modifiers() -> Dictionary:
+    var result := {
+        "trap_damage_multiplier": 0.0,
+        "defender_damage_multiplier": 0.0,
+        "monster_damage_multiplier": 0.0,
+        "monster_health_multiplier": 0.0,
+        "adventurer_health_multiplier": 0.0,
+        "adventurer_speed_multiplier": 0.0,
+        "starting_gold_adjustment": 0,
+    }
+    for purchase_id in purchased_ids:
+        match purchase_id:
+            "wraith_recruit": result.monster_health_multiplier += 0.25
+            "mimic_room": result.monster_damage_multiplier += 0.15
+            "void_crown": result.monster_damage_multiplier += 0.25
+            "bone_foundry": result.trap_damage_multiplier += 0.25
+            "blood_contract": result.defender_damage_multiplier += 0.30
+    for curse in active_curses:
+        match String(curse.get("id", "")):
+            "fragile_walls": result.starting_gold_adjustment -= 10
+            "greedy_chest": result.adventurer_speed_multiplier += 0.10
+            "elite_hunters": result.adventurer_health_multiplier += 0.12
+            "taxed_essence": result.starting_gold_adjustment -= 15
+            "monster_upkeep": result.starting_gold_adjustment -= 10 * int(curse.get("monster_upkeep_bonus", 1))
+    return result

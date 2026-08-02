@@ -24,5 +24,15 @@ func _init() -> void:
     assert(restored.purchased_ids == market.purchased_ids)
     assert(restored.active_curses.size() == 1)
 
+    var linked_market := VillageBlackMarket.new()
+    linked_market.purchased_ids = ["wraith_recruit", "bone_foundry", "blood_contract"]
+    linked_market.active_curses = [{"id": "elite_hunters"}, {"id": "monster_upkeep", "monster_upkeep_bonus": 1}]
+    var modifiers := linked_market.combined_modifiers()
+    assert(is_equal_approx(float(modifiers.monster_health_multiplier), 0.25))
+    assert(is_equal_approx(float(modifiers.trap_damage_multiplier), 0.25))
+    assert(is_equal_approx(float(modifiers.defender_damage_multiplier), 0.30))
+    assert(is_equal_approx(float(modifiers.adventurer_health_multiplier), 0.12))
+    assert(int(modifiers.starting_gold_adjustment) == -10)
+
     print("village black market test passed")
     quit()

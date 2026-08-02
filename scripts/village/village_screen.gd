@@ -173,6 +173,10 @@ func _show_progression_building(building_id: String) -> void:
         roundi(effect_value * 100.0),
         roundi(building.bonus_per_level * 100.0),
     ]
+    match building_id:
+        "forge": status_label.text += "\nRenforce les dégâts et ouvre un piège par niveau."
+        "laboratory": status_label.text += "\nProlonge poix, givre, flaques et toiles ; accélère les défenseurs."
+        "graveyard": status_label.text += "\nRéduit le temps de retour des monstres neutralisés."
     if building_id == "forge":
         var unlocked := TrapCatalog.unlocked_for_forge_level(level)
         var names: Array[String] = []
@@ -199,7 +203,14 @@ func _show_market() -> void:
         upgrade_button.text = "Stock épuisé"
         upgrade_button.disabled = true
         return
-    status_label.text = "%s\nRareté : %s\n\nMalédiction : %s\n%s : %s" % [String(offer.name), String(offer.rarity).capitalize(), String(offer.curse.id), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
+    status_label.text = "%s\nRareté : %s\nEffet : %s\nContrepartie : %s\n\n%s : %s" % [
+        String(offer.name),
+        String(offer.rarity).capitalize(),
+        _market_effect_description(String(offer.id)),
+        _curse_effect_description(String(offer.curse.id)),
+        VillageCurrency.DISPLAY_NAME,
+        den.currency.formatted(),
+    ]
     upgrade_button.text = "Acheter (%s)" % den.currency.formatted(int(offer.price))
     upgrade_button.disabled = not den.currency.can_afford(int(offer.price))
 
@@ -242,6 +253,24 @@ func _effect_label(key: String) -> String:
         "monster_respawn_speed_multiplier": return "vitesse de retour des monstres"
         _:
             return key.replace("_", " ")
+
+func _market_effect_description(offer_id: String) -> String:
+    match offer_id:
+        "wraith_recruit": return "+25 % de santé aux monstres"
+        "mimic_room": return "+15 % de dégâts aux monstres"
+        "void_crown": return "+25 % de dégâts aux monstres"
+        "bone_foundry": return "+25 % de dégâts aux pièges"
+        "blood_contract": return "+30 % de dégâts aux défenseurs"
+        _: return "pouvoir inconnu"
+
+func _curse_effect_description(curse_id: String) -> String:
+    match curse_id:
+        "fragile_walls": return "−10 or initial"
+        "greedy_chest": return "+10 % de vitesse aux aventuriers"
+        "elite_hunters": return "+12 % de santé aux aventuriers"
+        "taxed_essence": return "−15 or initial"
+        "monster_upkeep": return "−10 or initial"
+        _: return curse_id.replace("_", " ")
 
 func _first_available_offer() -> Dictionary:
     for offer in black_market.stock:

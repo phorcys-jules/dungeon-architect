@@ -58,11 +58,12 @@ func _adventurer(id: StringName, name: String, speed: float, health: float, beha
     value.parameters = parameters
     return value
 
-func _building(id: StringName, name: String, bonus: StringName, value: float, cost: int) -> VillageBuildingData:
+func _building(id: StringName, name: String, bonus: StringName, value: float, cost: int, max_level: int = 5) -> VillageBuildingData:
     var building := VillageBuildingData.new()
     building.building_id = id
     building.display_name = name
     building.bonus_key = bonus
     building.bonus_per_level = value
     building.base_cost = cost
+    building.max_level = max_level
     return building

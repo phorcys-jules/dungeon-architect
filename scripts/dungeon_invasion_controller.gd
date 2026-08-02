@@ -152,7 +152,7 @@ func _spawn_mobile_monsters() -> void:
     for index in MONSTER_HOME_CELLS.size():
         var monster: MobileMonster = MobileMonsterScript.new()
         var archetype := MONSTER_ARCHETYPES[index]
-        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed, 42 + archetype.base_damage * 2)
+        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed, roundi(float(42 + archetype.base_damage * 2) * _monster_health_multiplier()))
         monster.world_position = Vector2(MONSTER_HOME_CELLS[index]) * CELL_SIZE
         mobile_monsters.append(monster)
         monster_facings.append(1.0)
@@ -224,7 +224,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             if loop_rules.is_panicking():
                 _consume_panicked_monster(index, monster, archetype)
             else:
-                var damage := MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])
+                var damage := roundi(float(MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])) * _monster_damage_multiplier())
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
                 _play_monster_attack(archetype.archetype_id, attack_origin)
                 adventurer_health.take_damage(damage)
@@ -261,7 +261,7 @@ func _try_adventurer_attack() -> bool:
     var target := mobile_monsters[target_index]
     var target_center := GRID_ORIGIN + target.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
     var damage := roundi(float(profile.damage) * (1.8 if empowered else 1.0))
-    var respawn_delay := loop_rules.panic_time_left + 0.5 if empowered else 3.0
+    var respawn_delay := _monster_respawn_delay(loop_rules.panic_time_left + 0.5 if empowered else 3.0)
     var applied_damage := target.take_damage(damage, respawn_delay)
     if applied_damage <= 0:
         return false
@@ -289,7 +289,7 @@ func _activate_power_pellet() -> void:
 
 func _consume_panicked_monster(index: int, monster: MobileMonster, archetype: MonsterArchetypeData) -> void:
     var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-    monster.take_damage(monster.current_health, loop_rules.panic_time_left + 0.5)
+    monster.take_damage(monster.current_health, _monster_respawn_delay(loop_rules.panic_time_left + 0.5))
     monster.reset_to_home(CELL_SIZE)
     monster_ability_flashes[index] = 0.35
     _play_adventurer_attack(center, false, true)
@@ -318,10 +318,10 @@ func _play_monster_attack(archetype_id: StringName, attack_origin: Vector2) -> v
 
 func _apply_monster_zone_ability(index: int, archetype: MonsterArchetypeData, previous_cell: Vector2i, current_cell: Vector2i) -> void:
     if archetype.has_ability(&"slow_trail"):
-        slime_trails[previous_cell] = archetype.get_effect(&"trail_duration", 3.5)
+        slime_trails[previous_cell] = archetype.get_effect(&"trail_duration", 3.5) * _effect_duration_multiplier()
         monster_ability_flashes[index] = 0.12
     if archetype.has_ability(&"web_crossroads") and _is_crossroads(current_cell):
-        spider_webs[current_cell] = archetype.get_effect(&"web_duration", 4.0)
+        spider_webs[current_cell] = archetype.get_effect(&"web_duration", 4.0) * _effect_duration_multiplier()
         monster_ability_flashes[index] = 0.3
         status_label.text = "L'araignée tisse une toile au carrefour."
 
@@ -457,6 +457,18 @@ func get_monster_ids() -> Array[String]:
     for archetype in MONSTER_ARCHETYPES:
         ids.append(archetype.archetype_id)
     return ids
+
+func _monster_respawn_delay(base_delay: float) -> float:
+    return base_delay
+
+func _monster_damage_multiplier() -> float:
+    return 1.0
+
+func _monster_health_multiplier() -> float:
+    return 1.0
+
+func _effect_duration_multiplier() -> float:
+    return 1.0
 
 func _draw_level_objects() -> void:
     super._draw_level_objects()

@@ -327,6 +327,11 @@ func _style_action_button(button: Button, accent: Color) -> void:
 func _start_new_campaign() -> void:
     waves.reset()
     economy.reset()
+    var gold_adjustment := _starting_gold_adjustment()
+    if gold_adjustment > 0:
+        economy.add_gold(gold_adjustment)
+    elif gold_adjustment < 0:
+        economy.spend(mini(-gold_adjustment, economy.current_gold))
     for trap: SpikeTrap in traps.values():
         trap.queue_free()
     for defender: Defender in defenders.values():
@@ -412,6 +417,9 @@ func _place_spike_trap(cell: Vector2i) -> void:
     queue_redraw()
 
 func _place_defender(cell: Vector2i) -> void:
+    if defenders.size() >= _max_defenders():
+        status_label.text = "Capacité de la tanière atteinte : %d défenseurs." % _max_defenders()
+        return
     if not _is_valid_build_cell(cell):
         status_label.text = "Placement impossible sur cette case."
         return
@@ -803,3 +811,9 @@ func _configure_trap(_trap: SpikeTrap) -> void:
 
 func _configure_defender(_defender: Defender) -> void:
     pass
+
+func _max_defenders() -> int:
+    return 99
+
+func _starting_gold_adjustment() -> int:
+    return 0

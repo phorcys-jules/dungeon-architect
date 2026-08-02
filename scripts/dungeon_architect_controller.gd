@@ -159,9 +159,12 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             monster.set_path(cells)
 
         var previous_position := monster.world_position
-        monster.tick_grid(delta, CELL_SIZE)
+        var previous_cell := monster.cell
+        var reached_cell := monster.tick_grid(delta, CELL_SIZE)
         monster_facings[index] = CharacterAnimationRuntimeScript.facing_sign(monster.world_position.x - previous_position.x, monster_facings[index])
         var monster_cell := monster.cell
+        if reached_cell:
+            _apply_monster_zone_ability(index, MONSTER_ARCHETYPES[index], previous_cell, monster_cell)
         if float(passage_cooldowns[index]) <= 0.0:
             var passage_destination := dungeon_build.resolve_monster_passage(monster_cell, _monster_passage_tags(index))
             if passage_destination != monster_cell:
@@ -179,7 +182,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             else:
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
                 _play_monster_attack(MONSTER_ARCHETYPES[index].archetype_id, attack_origin)
-                adventurer_health.take_damage(MONSTER_HIT_DAMAGE)
+                adventurer_health.take_damage(roundi(float(MONSTER_HIT_DAMAGE) * _monster_damage_multiplier()))
                 monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
 

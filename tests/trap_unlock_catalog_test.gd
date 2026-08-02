@@ -1,6 +1,11 @@
 extends SceneTree
 
 func _init() -> void:
+    var forge_level_cap := 0
+    for building in V04ContentCatalog.new().buildings():
+        if building.building_id == &"forge":
+            forge_level_cap = building.max_level
+    assert(forge_level_cap == 5)
     assert(TrapCatalog.unlocked_for_forge_level(0) == [&"spikes"])
     assert(TrapCatalog.unlocked_for_forge_level(1) == [&"spikes", &"tar_pit"])
     assert(TrapCatalog.unlocked_for_forge_level(4).size() == 5)

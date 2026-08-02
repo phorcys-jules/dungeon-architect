@@ -83,5 +83,24 @@ func _init() -> void:
     assert(crossroads_cell != Vector2i(-1, -1))
     game._apply_monster_zone_ability(3, game.MONSTER_ARCHETYPES[3], crossroads_cell, crossroads_cell)
     assert(game.spider_webs.has(crossroads_cell))
+    game.village_den.level = 2
+    assert(game._max_defenders() == 6)
+    var previous_modifiers := game.village_modifiers.duplicate(true)
+    game.village_modifiers = {
+        "trap_damage_multiplier": 0.2,
+        "effect_duration_multiplier": 0.4,
+        "monster_respawn_speed_multiplier": 0.5,
+        "monster_damage_multiplier": 0.25,
+        "monster_health_multiplier": 0.2,
+    }
+    var linked_trap := SpikeTrap.new()
+    linked_trap.configure(TrapCatalog.definition(&"frost_sigil"))
+    game._configure_trap(linked_trap)
+    assert(linked_trap.damage > 15)
+    assert(is_equal_approx(linked_trap.effect_duration, 2.4 * 1.4))
+    assert(is_equal_approx(game._monster_respawn_delay(3.0), 2.0))
+    assert(is_equal_approx(game._monster_damage_multiplier(), 1.25))
+    assert(is_equal_approx(game._monster_health_multiplier(), 1.2))
+    game.village_modifiers = previous_modifiers
     print("V0.6 content wiring test passed")
     quit(0)

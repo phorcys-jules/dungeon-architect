@@ -91,6 +91,17 @@ et le prochain palier. Le bouton de construction fait défiler uniquement les pi
 chacun possède son coût, ses dégâts, sa recharge, sa couleur et, pour la poix et le givre, un
 ralentissement distinct appliqué à l'aventurier.
 
+## Effets persistants du village
+
+- la tanière fixe le nombre maximal de défenseurs plaçables pendant une run ;
+- la forge augmente réellement les dégâts de tous les pièges et alimente leur catalogue ;
+- le laboratoire prolonge poix, givre, flaques de slime et toiles, tout en réduisant la recharge des défenseurs ;
+- le cimetière réduit le délai de réapparition des monstres neutralisés ;
+- les achats du marché noir accordent désormais santé ou dégâts aux monstres, dégâts aux pièges ou défenseurs, selon l'offre. Leurs malédictions renforcent en contrepartie la santé ou la vitesse des aventuriers, ou réduisent l'or initial.
+
+Ces valeurs sont rechargées avant la création du niveau, appliquées aux nouvelles entités et
+récapitulées dans « EFFETS ACTIFS » pendant la run.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;

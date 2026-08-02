@@ -15,8 +15,12 @@ var modifiers_label: Label
 var village_progression := V04ProgressionService.new()
 var black_market := VillageBlackMarket.new()
 var village_modifiers: Dictionary = {}
+var village_den_store := VillageSaveStore.new()
+var village_den := DenProgression.new()
 
 func _ready() -> void:
+    _load_village_progression()
+    village_den = village_den_store.load_den()
     super._ready()
     run_end.go_to_village.connect(_open_village)
     run_end.restart_run.connect(_restart_from_results)
@@ -62,6 +66,7 @@ func _begin_tracked_run() -> void:
     relics_protected_this_run = 0
     run_end.begin_run(current_run_id)
     _load_village_progression()
+    village_den = village_den_store.load_den()
     var forge_level := int(village_progression.state.buildings.get("forge", 0))
     set_unlocked_traps(TrapCatalogScript.unlocked_for_forge_level(forge_level))
     var tags := get_run_tags()
@@ -77,7 +82,8 @@ func _begin_tracked_run() -> void:
 func _prepare_current_wave() -> void:
     var announcement := v06_integration.start_wave(waves.current_wave, active_biome.active_biome_id)
     super._prepare_current_wave()
-    adventurer_health.max_health = maxi(1, roundi(float(waves.get_adventurer_health()) * v06_integration.adventurer_health_multiplier()))
+    var village_health := 1.0 + float(village_modifiers.get("adventurer_health_multiplier", 0.0))
+    adventurer_health.max_health = maxi(1, roundi(float(waves.get_adventurer_health()) * v06_integration.adventurer_health_multiplier() * village_health))
     adventurer_health.reset()
     if not announcement.is_empty():
         status_label.text += "\nÉvénement : %s — %s" % [String(announcement.title), String(announcement.body)]
@@ -124,19 +130,44 @@ func _start_new_campaign() -> void:
     super._start_new_campaign()
 
 func _current_adventurer_speed_multiplier() -> float:
-    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0)
+    var market_speed := 1.0 + float(village_modifiers.get("adventurer_speed_multiplier", 0.0))
+    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed
 
 func _configure_trap(trap: SpikeTrap) -> void:
     trap.damage = roundi(trap.damage * (1.0 + float(village_modifiers.get("trap_damage_multiplier", 0.0))) * active_biome.rule_value("trap_damage_multiplier", 1.0))
+    trap.effect_duration *= _effect_duration_multiplier()
 
 func _configure_defender(defender: Defender) -> void:
     defender.cooldown = maxf(0.2, defender.cooldown / (1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))))
+    defender.damage = roundi(float(defender.damage) * (1.0 + float(village_modifiers.get("defender_damage_multiplier", 0.0))))
 
 func _load_village_progression() -> void:
     var state := v06_integration.store.load_state()
     village_progression = V04ProgressionService.new(state.get("v04_progression", {}))
     black_market.from_dict(state.get("black_market", {}))
     village_modifiers = village_progression.combined_modifiers()
+    var market_modifiers := black_market.combined_modifiers()
+    for key in market_modifiers:
+        village_modifiers[key] = float(village_modifiers.get(key, 0.0)) + float(market_modifiers[key])
+
+func _max_defenders() -> int:
+    return village_den.get_capacity()
+
+func _starting_gold_adjustment() -> int:
+    return int(village_modifiers.get("starting_gold_adjustment", 0))
+
+func _monster_respawn_delay(base_delay: float) -> float:
+    var speed_bonus := float(village_modifiers.get("monster_respawn_speed_multiplier", 0.0))
+    return maxf(0.5, base_delay / (1.0 + speed_bonus))
+
+func _monster_damage_multiplier() -> float:
+    return 1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))
+
+func _monster_health_multiplier() -> float:
+    return 1.0 + float(village_modifiers.get("monster_health_multiplier", 0.0))
+
+func _effect_duration_multiplier() -> float:
+    return 1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))
 
 func _on_trap_placed() -> void:
     v06_integration.record_trap_placed()
@@ -152,9 +183,25 @@ func _refresh_v06_hud() -> void:
     var snapshot := v06_integration.hud_snapshot()
     objectives_label.text = "OBJECTIFS\n%s" % ("\n".join(snapshot.challenges) if not snapshot.challenges.is_empty() else "Aucun")
     var active_lines: Array[String] = []
+    active_lines.append_array(_village_effect_lines())
     active_lines.append_array(snapshot.events)
     active_lines.append_array(snapshot.synergies)
     modifiers_label.text = "EFFETS ACTIFS\n%s" % ("\n".join(active_lines) if not active_lines.is_empty() else "Aucun")
+
+func _village_effect_lines() -> Array[String]:
+    var lines: Array[String] = ["Tanière : %d défenseurs" % _max_defenders()]
+    var forge_level := int(village_progression.state.buildings.get("forge", 0))
+    var laboratory_level := int(village_progression.state.buildings.get("laboratory", 0))
+    var graveyard_level := int(village_progression.state.buildings.get("graveyard", 0))
+    if forge_level > 0:
+        lines.append("Forge : +%d%% pièges, %d modèles" % [roundi(float(village_modifiers.get("trap_damage_multiplier", 0.0)) * 100.0), unlocked_trap_ids.size()])
+    if laboratory_level > 0:
+        lines.append("Labo : +%d%% effets" % roundi(float(village_modifiers.get("effect_duration_multiplier", 0.0)) * 100.0))
+    if graveyard_level > 0:
+        lines.append("Cimetière : +%d%% retour" % roundi(float(village_modifiers.get("monster_respawn_speed_multiplier", 0.0)) * 100.0))
+    if not black_market.purchased_ids.is_empty():
+        lines.append("Marché noir : %d pacte(s)" % black_market.purchased_ids.size())
+    return lines
 
 func _set_run_end_actions_visible(value: bool) -> void:
     if village_button:
