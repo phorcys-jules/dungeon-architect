@@ -26,7 +26,7 @@ func calculate(waves_completed: int, captures: int, relics_protected: int, victo
     }
 
 func summary(reward: Dictionary) -> String:
-    return "Vagues : %d (+%d)\nCaptures : %d (+%d)\nReliques protégées : %d (+%d)\nBonus victoire : +%d\nRessources permanentes : +%d" % [
+    return "Vagues : %d (+%d)\nCaptures : %d (+%d)\nReliques protégées : %d (+%d)\nBonus victoire : +%d\nÉclats d'âme gagnés : %s +%d" % [
         int(reward.get("waves_completed", 0)),
         int(reward.get("wave_reward", 0)),
         int(reward.get("captures", 0)),
@@ -34,5 +34,6 @@ func summary(reward: Dictionary) -> String:
         int(reward.get("relics_protected", 0)),
         int(reward.get("relic_reward", 0)),
         int(reward.get("victory_reward", 0)),
+        VillageCurrency.SYMBOL,
         int(reward.get("total", 0)),
     ]

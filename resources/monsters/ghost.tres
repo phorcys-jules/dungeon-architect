@@ -10,4 +10,4 @@ base_speed = 118.0
 base_damage = 12
 tags = Array[StringName]([&"ghost", &"ethereal"])
 abilities = Array[StringName]([&"phase"])
-effect_values = {"phase_cooldown": 5.0}
+effect_values = {"phase_cooldown": 5.0, "release_delay": 0.0, "respawn_delay": 2.4}

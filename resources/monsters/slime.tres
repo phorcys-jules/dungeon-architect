@@ -10,4 +10,4 @@ base_speed = 82.0
 base_damage = 8
 tags = Array[StringName]([&"slime", &"slow"])
 abilities = Array[StringName]([&"slow_trail"])
-effect_values = {"slow_multiplier": 0.72, "trail_duration": 3.5}
+effect_values = {"slow_multiplier": 0.72, "trail_duration": 3.5, "release_delay": 0.8, "respawn_delay": 2.8}

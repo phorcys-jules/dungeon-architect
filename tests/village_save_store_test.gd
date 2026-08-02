@@ -9,18 +9,18 @@ func _init() -> void:
     store.delete_save()
 
     var den: DenProgression = DenProgressionScript.new()
-    den.add_resources(150)
+    den.add_soul_shards(150)
     if not den.upgrade():
         quit(1)
         return
-    den.add_resources(25)
+    den.add_soul_shards(25)
 
     if not store.save_den(den):
         quit(1)
         return
 
     var restored := store.load_den()
-    if restored.level != den.level or restored.stored_resources != den.stored_resources:
+    if restored.level != den.level or restored.soul_shards != den.soul_shards:
         quit(1)
         return
 

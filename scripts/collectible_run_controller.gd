@@ -1,6 +1,7 @@
 extends "res://scripts/main.gd"
 
 const CollectibleRouteScript := preload("res://scripts/core/collectible_route.gd")
+const RELIC_TEXTURE := preload("res://assets/sprites/collectibles/soul_relic.png")
 
 const COLLECTIBLE_CELLS: Array[Vector2i] = [
     Vector2i(2, 2),
@@ -23,6 +24,7 @@ func _prepare_current_wave() -> void:
     ]
 
 func _process(delta: float) -> void:
+    _tick_combat_presentation(delta)
     for trap: SpikeTrap in traps.values():
         trap.tick(delta)
     for defender: Defender in defenders.values():
@@ -46,7 +48,7 @@ func _process(delta: float) -> void:
         return
 
     var target := path[path_index]
-    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * waves.get_speed_multiplier() * delta)
+    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * _current_adventurer_speed_multiplier() * delta)
     if adventurer_position.distance_to(target) < 1.0:
         adventurer_position = target
         var reached_cell := _cell_from_world(adventurer_position)
@@ -58,6 +60,7 @@ func _process(delta: float) -> void:
 
 func _on_route_target_reached(cell: Vector2i) -> void:
     if collectible_route.collect_at(cell):
+        _on_collectible_loot_collected(cell)
         status_label.text = "Relique collectée. Il en reste %d." % collectible_route.get_remaining_count()
         _recalculate_path()
         return
@@ -92,9 +95,10 @@ func _recalculate_path() -> void:
 func _draw() -> void:
     super._draw()
     for cell in collectible_route.remaining:
-        var center := _world_from_cell(cell)
-        draw_circle(center, 8.0, Color("f4d35e"))
-        draw_circle(center, 3.0, Color("fff4c2"))
+        _draw_collectible(RELIC_TEXTURE, _world_from_cell(cell), Vector2(38, 38))
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
     return super._is_valid_build_cell(cell) and not COLLECTIBLE_CELLS.has(cell)
+
+func _on_collectible_loot_collected(_cell: Vector2i) -> void:
+    pass

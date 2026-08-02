@@ -31,6 +31,12 @@ func _init() -> void:
     assert(key_decision.action == "use_item")
     assert(key_decision.item == "key")
 
+    var combat_decision := decision_engine.choose_action("warrior", perception, inventory, {"health_ratio": 0.8, "nearby_threats": 2})
+    assert(combat_decision.action == "fight")
+    assert(combat_decision.style == "nearest")
+    var powered_decision := decision_engine.choose_action("scout", perception, inventory, {"health_ratio": 0.8, "nearby_threats": 1, "empowered": true})
+    assert(powered_decision.action == "hunt_monster")
+
     var restored_perception := AdventurerPerception.new()
     restored_perception.from_dict(perception.to_dict())
     assert(restored_perception.vision_range == perception.vision_range)

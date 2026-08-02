@@ -2,9 +2,9 @@ class_name SynergyCatalog
 extends RefCounted
 
 var entries: Array[Dictionary] = [
-    {"id":"ghost_fog","name":"Voile spectral","requires":["monster:ghost","room:fog"],"effect":{"evasion":0.20}},
-    {"id":"slime_ice","name":"Patinoire visqueuse","requires":["monster:slime","room:ice"],"effect":{"enemy_slow":0.25}},
-    {"id":"mimic_treasure","name":"Trésor piégé","requires":["monster:mimic","room:treasure"],"effect":{"ambush_damage":0.35}},
+    {"id":"ghost_fog","name":"Voile spectral","description":"Dans le brouillard, le fantôme subit 20 % de dégâts en moins.","requires":["monster:ghost","room:fog"],"effect":{"evasion":0.20}},
+    {"id":"slime_ice","name":"Patinoire visqueuse","description":"Les zones de slime ralentissent les aventuriers 25 % plus fortement.","requires":["monster:slime","room:ice"],"effect":{"enemy_slow":0.25}},
+    {"id":"mimic_treasure","name":"Trésor piégé","description":"La première embuscade du mimic inflige 35 % de dégâts supplémentaires.","requires":["monster:mimic","room:treasure"],"effect":{"ambush_damage":0.35}},
     {"id":"spider_web","name":"Nid de soie","requires":["monster:spider","trap:web"],"effect":{"root_duration":1.5}},
     {"id":"goblin_forge","name":"Armement gobelin","requires":["monster:goblin","building:forge"],"effect":{"monster_damage":0.15}},
     {"id":"skeleton_crypt","name":"Légion des cryptes","requires":["monster:skeleton","biome:crypt"],"effect":{"respawn_chance":0.18}},

@@ -14,9 +14,11 @@ func claim(run_id: String, waves_completed: int, captures: int, relics_protected
         return {"claimed": false, "total": 0}
     var reward := calculator.calculate(waves_completed, captures, relics_protected, victory)
     var den := save_store.load_den()
-    den.add_resources(int(reward.get("total", 0)))
+    den.add_soul_shards(int(reward.get("total", 0)))
     if not save_store.save_den(den):
         return {"claimed": false, "total": 0}
     claimed_run_ids[run_id] = true
     reward["claimed"] = true
+    reward["currency_id"] = VillageCurrency.ID
+    reward["currency_name"] = VillageCurrency.DISPLAY_NAME
     return reward

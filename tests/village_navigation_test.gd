@@ -11,7 +11,7 @@ func _init() -> void:
     den_store.delete_save()
     meta_store.delete_save()
     var den := DenProgression.new()
-    den.add_resources(200)
+    den.add_soul_shards(200)
     assert(den_store.save_den(den))
     var screen := VillageScene.instantiate()
     screen.set_save_store(den_store)
@@ -19,6 +19,20 @@ func _init() -> void:
     root.add_child(screen)
     await process_frame
     if screen.start_run_button == null:
+        quit(1)
+        return
+    if screen.music_player == null or screen.music_player.stream == null or not screen.music_player.playing:
+        quit(1)
+        return
+    if (screen.music_player.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_FORWARD:
+        quit(1)
+        return
+    if screen.ambient_animator == null or screen.ambient_animator.TORCH_POSITIONS.size() != 12:
+        quit(1)
+        return
+    var animation_time: float = screen.ambient_animator.elapsed
+    screen.ambient_animator._process(0.1)
+    if screen.ambient_animator.elapsed <= animation_time:
         quit(1)
         return
     screen.transition_in_progress = true
@@ -43,7 +57,10 @@ func _init() -> void:
     if int(screen.progression_service.state.buildings.forge) != 1:
         quit(1)
         return
-    if den_store.load_den().stored_resources != 140:
+    if den_store.load_den().soul_shards != 140:
+        quit(1)
+        return
+    if not String(screen.status_label.text).contains("Fosse de poix"):
         quit(1)
         return
     den_store.delete_save()

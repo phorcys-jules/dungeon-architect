@@ -16,6 +16,11 @@ func _init() -> void:
     rules.activate_panic()
     if not _check(rules.is_panicking(), "panic activation"):
         return
+    if not _check(rules.get_power_ratio() > 0.9, "power ratio"):
+        return
+    var flee_target := rules.get_flee_target(Vector2i(4, 4), Vector2i.ZERO, Vector2i(10, 10), [], [])
+    if not _check(flee_target == Vector2i(9, 9), "flee target"):
+        return
     rules.tick(7.0)
     if not _check(not rules.is_panicking(), "panic expiry"):
         return

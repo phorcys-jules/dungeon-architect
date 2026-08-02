@@ -45,7 +45,7 @@ horizontal_alignment = 1
 [node name="StatusLabel" type="Label" parent="Panel/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Capacité : 2 monstres\nRessources : 0"
+text = "Capacité : 2 monstres\nÉclats d'âme : ◆ 0"
 horizontal_alignment = 1
 
 [node name="UpgradeButton" type="Button" parent="Panel/Margin/Content"]

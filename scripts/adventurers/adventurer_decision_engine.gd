@@ -9,6 +9,7 @@ func choose_action(class_id: String, perception: AdventurerPerception, inventory
     var darkness := bool(context.get("darkness", false))
     var relic_visible := bool(context.get("relic_visible", false))
     var exit_visible := bool(context.get("exit_visible", false))
+    var empowered := bool(context.get("empowered", false))
 
     if state == "flee":
         var escape_item := inventory.best_item_for("escape", health_ratio, perception.fear)
@@ -22,8 +23,19 @@ func choose_action(class_id: String, perception: AdventurerPerception, inventory
         return {"action": "use_item", "item": "key"}
     if darkness and inventory.has("torch"):
         return {"action": "use_item", "item": "torch"}
+    if empowered and nearby_threats > 0:
+        return {"action": "hunt_monster", "style": "aggressive"}
 
     match class_id:
+        "scout":
+            if nearby_threats > 0 and health_ratio > 0.35:
+                return {"action": "fight", "style": "ranged"}
+        "warrior":
+            if nearby_threats > 0:
+                return {"action": "fight", "style": "nearest"}
+        "champion":
+            if nearby_threats > 0:
+                return {"action": "fight", "style": "dangerous"}
         "thief":
             if relic_visible and nearby_threats <= 1:
                 return {"action": "collect_relic"}

@@ -7,6 +7,8 @@ var total_score := 0
 var best_score := 0
 var best_wave := 0
 var total_captures := 0
+var total_captured_loot := 0
+var total_ectoplasm := 0
 var total_resources := {"gold": 0, "essence": 0, "stone": 0, "bones": 0}
 var favorite_monsters: Dictionary = {}
 var favorite_synergies: Dictionary = {}
@@ -20,6 +22,9 @@ func record_run(result: Dictionary) -> void:
     best_score = maxi(best_score, score)
     best_wave = maxi(best_wave, int(result.get("wave", 0)))
     total_captures += int(result.get("captures", 0))
+    var loot: Dictionary = result.get("loot", {})
+    total_captured_loot += int(loot.get("captured_loot", 0))
+    total_ectoplasm += int(loot.get("ectoplasm", 0))
     var resources: Dictionary = result.get("resources", {})
     for key in total_resources.keys():
         total_resources[key] = int(total_resources[key]) + int(resources.get(key, 0))
@@ -54,6 +59,8 @@ func to_dict() -> Dictionary:
         "best_score": best_score,
         "best_wave": best_wave,
         "total_captures": total_captures,
+        "total_captured_loot": total_captured_loot,
+        "total_ectoplasm": total_ectoplasm,
         "total_resources": total_resources.duplicate(true),
         "favorite_monsters": favorite_monsters.duplicate(true),
         "favorite_synergies": favorite_synergies.duplicate(true),
@@ -66,6 +73,8 @@ func from_dict(data: Dictionary) -> void:
     best_score = int(data.get("best_score", 0))
     best_wave = int(data.get("best_wave", 0))
     total_captures = int(data.get("total_captures", 0))
+    total_captured_loot = int(data.get("total_captured_loot", 0))
+    total_ectoplasm = int(data.get("total_ectoplasm", 0))
     total_resources = data.get("total_resources", total_resources).duplicate(true)
     favorite_monsters = data.get("favorite_monsters", {}).duplicate(true)
     favorite_synergies = data.get("favorite_synergies", {}).duplicate(true)

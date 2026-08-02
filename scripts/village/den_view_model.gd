@@ -10,12 +10,12 @@ func get_title() -> String:
     return "Tanière — niveau %d/%d" % [den.level, DenProgression.MAX_LEVEL]
 
 func get_status() -> String:
-    return "Capacité : %d monstres\nRessources : %d" % [den.get_capacity(), den.stored_resources]
+    return "Capacité : %d monstres\n%s : %s" % [den.get_capacity(), VillageCurrency.DISPLAY_NAME, den.currency.formatted()]
 
 func get_upgrade_label() -> String:
     if den.level >= DenProgression.MAX_LEVEL:
         return "Niveau maximum"
-    return "Améliorer (%d ressources)" % den.get_upgrade_cost()
+    return "Améliorer (%s)" % den.currency.formatted(den.get_upgrade_cost())
 
 func can_upgrade() -> bool:
     return den.can_upgrade()

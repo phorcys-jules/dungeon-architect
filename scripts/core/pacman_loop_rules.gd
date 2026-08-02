@@ -18,6 +18,25 @@ func activate_panic() -> void:
 func is_panicking() -> bool:
     return panic_time_left > 0.0
 
+func get_power_ratio() -> float:
+    if panic_duration <= 0.0:
+        return 0.0
+    return clampf(panic_time_left / panic_duration, 0.0, 1.0)
+
+func get_flee_target(monster: Vector2i, adventurer: Vector2i, grid_size: Vector2i, blocked_cells: Array[Vector2i], reserved: Array[Vector2i] = []) -> Vector2i:
+    var best_target := monster
+    var best_distance := -1.0
+    for y in grid_size.y:
+        for x in grid_size.x:
+            var candidate := Vector2i(x, y)
+            if blocked_cells.has(candidate) or reserved.has(candidate):
+                continue
+            var distance := candidate.distance_squared_to(adventurer)
+            if distance > best_distance:
+                best_distance = distance
+                best_target = candidate
+    return best_target
+
 func can_toggle_door() -> bool:
     return door_cooldown_left <= 0.0
 

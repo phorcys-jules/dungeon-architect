@@ -26,20 +26,8 @@ func _build_level() -> void:
 
 func _build_interface() -> void:
     super._build_interface()
-
-    wall_button = Button.new()
-    wall_button.text = "Placer un mur"
-    wall_button.position = Vector2(48, 665)
-    wall_button.size = Vector2(155, 38)
-    wall_button.pressed.connect(func(): _set_construction_mode(ConstructionMode.PLACE_WALL))
-    add_child(wall_button)
-
-    remove_wall_button = Button.new()
-    remove_wall_button.text = "Retirer un mur"
-    remove_wall_button.position = Vector2(210, 665)
-    remove_wall_button.size = Vector2(155, 38)
-    remove_wall_button.pressed.connect(func(): _set_construction_mode(ConstructionMode.REMOVE_WALL))
-    add_child(remove_wall_button)
+    wall_button = shortcut_buttons.get(8) as Button
+    remove_wall_button = shortcut_buttons.get(9) as Button
 
 func _start_new_campaign() -> void:
     if not base_walls.is_empty():
@@ -89,6 +77,27 @@ func _set_construction_mode(mode: ConstructionMode) -> void:
     status_label.text = "Cliquez sur une case libre pour placer un mur." if mode == ConstructionMode.PLACE_WALL else "Cliquez sur un mur construit pour le retirer."
     _refresh_build_ui()
 
+func _activate_extended_build_shortcut(slot: int) -> void:
+    match slot:
+        8:
+            _set_construction_mode(ConstructionMode.PLACE_WALL)
+            status_label.text = "[8] Placement de mur sélectionné."
+        9:
+            _set_construction_mode(ConstructionMode.REMOVE_WALL)
+            status_label.text = "[9] Retrait de mur sélectionné."
+
+func _active_build_shortcut() -> int:
+    match construction_mode:
+        ConstructionMode.PLACE_WALL: return 8
+        ConstructionMode.REMOVE_WALL: return 9
+        _: return super._active_build_shortcut()
+
+func _refresh_shortcut_bar() -> void:
+    super._refresh_shortcut_bar()
+    if shortcut_buttons.has(8):
+        (shortcut_buttons[8] as Button).tooltip_text = "8 — Placer un mur"
+        (shortcut_buttons[9] as Button).tooltip_text = "9 — Retirer un mur construit"
+
 func _try_place_free_wall(cell: Vector2i) -> void:
     if not _is_valid_build_cell(cell):
         status_label.text = "Cette case ne peut pas recevoir de mur."
@@ -128,9 +137,13 @@ func _synchronize_wall_pathfinding() -> void:
     astar.set_point_solid(DOOR, door_closed)
 
 func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
+    for monster in mobile_monsters:
+        monster.tick_respawn(delta, CELL_SIZE)
+    _try_adventurer_attack()
     var occupied: Array[Vector2i] = []
     for monster in mobile_monsters:
-        occupied.append(monster.cell)
+        if monster.is_active():
+            occupied.append(monster.cell)
 
     var blocked: Array[Vector2i] = walls.duplicate()
     if door_closed:
@@ -140,8 +153,10 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     for index in mobile_monsters.size():
         passage_cooldowns[index] = maxf(float(passage_cooldowns.get(index, 0.0)) - delta, 0.0)
         var monster := mobile_monsters[index]
+        if not monster.is_active():
+            continue
         if not monster.has_path():
-            var target := monster.home_cell if loop_rules.is_panicking() else targets[index]
+            var target := loop_rules.get_flee_target(monster.cell, adventurer_cell, GRID_SIZE, blocked, occupied) if loop_rules.is_panicking() else targets[index]
             target.x = clampi(target.x, 0, GRID_SIZE.x - 1)
             target.y = clampi(target.y, 0, GRID_SIZE.y - 1)
             if walls.has(target):
@@ -153,8 +168,13 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                     cells.append(point_cell)
             monster.set_path(cells)
 
-        monster.tick_grid(delta, CELL_SIZE)
+        var previous_position := monster.world_position
+        var previous_cell := monster.cell
+        var reached_cell := monster.tick_grid(delta, CELL_SIZE)
+        monster_facings[index] = CharacterAnimationRuntimeScript.facing_sign(monster.world_position.x - previous_position.x, monster_facings[index])
         var monster_cell := monster.cell
+        if reached_cell:
+            _apply_monster_zone_ability(index, active_monster_archetypes[index], previous_cell, monster_cell)
         if float(passage_cooldowns[index]) <= 0.0:
             var passage_destination := dungeon_build.resolve_monster_passage(monster_cell, _monster_passage_tags(index))
             if passage_destination != monster_cell:
@@ -166,27 +186,30 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 passage_cooldowns[index] = 1.0
                 status_label.text = "Un monstre emprunte un passage secret."
 
-        monster.world_position = GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-        monster.world_position = _world_from_cell(monster_cell) if not monster.has_path() else monster.world_position
-
         if monster_cell == adventurer_cell:
             if loop_rules.is_panicking():
-                monster.reset_to_home(CELL_SIZE)
-                monster.world_position = _world_from_cell(monster.home_cell)
-                status_label.text = "Un monstre paniqué retourne dans son repaire."
+                _consume_panicked_monster(index, monster, active_monster_archetypes[index])
             else:
-                adventurer_health.take_damage(MONSTER_HIT_DAMAGE)
+                var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+                _play_monster_attack(active_monster_archetypes[index].archetype_id, attack_origin)
+                var monster_damage := float(MONSTER_HIT_DAMAGE) * _monster_damage_multiplier()
+                monster_damage *= _monster_specific_damage_multiplier(active_monster_archetypes[index].archetype_id)
+                adventurer_health.take_damage(roundi(monster_damage))
+                monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
-                monster.world_position = _world_from_cell(monster.home_cell)
 
 func _monster_passage_tags(index: int) -> Array[String]:
+    var tags: Array[String] = []
+    for tag in active_monster_archetypes[index].tags:
+        tags.append(String(tag))
     match monster_behaviours[index]:
         PacmanLoopRules.Behaviour.CHASER:
-            return ["ghost"]
+            tags.append("chaser")
         PacmanLoopRules.Behaviour.AMBUSHER, PacmanLoopRules.Behaviour.HERDER:
-            return ["ambusher"]
+            tags.append("ambusher")
         _:
-            return ["guardian"]
+            tags.append("guardian")
+    return tags
 
 func _draw() -> void:
     super._draw()
@@ -199,9 +222,10 @@ func _refresh_build_ui() -> void:
     super._refresh_build_ui()
     if wall_button:
         wall_button.disabled = game_state != GameState.PREPARATION
-        wall_button.text = "Mur (%d/%d or)" % [dungeon_build.remaining_wall_budget(), DungeonBuildRuntime.WALL_COST]
+        wall_button.tooltip_text = "8 — Placer un mur (%d restant(s), %d or)" % [dungeon_build.remaining_wall_budget(), DungeonBuildRuntime.WALL_COST]
     if remove_wall_button:
         remove_wall_button.disabled = game_state != GameState.PREPARATION
+        remove_wall_button.tooltip_text = "9 — Retirer un mur construit (%d or remboursés)" % DungeonBuildRuntime.WALL_REFUND
 
 func _construction_reserved_cells() -> Array[Vector2i]:
     var reserved: Array[Vector2i] = [DOOR, BLESSING_CELL]

@@ -9,6 +9,20 @@ func _init() -> void:
     assert(integration.challenges.active.size() == 3)
     assert(integration.synergies.discovered.has("ghost_fog"))
     assert(not integration.start_wave(1, "crypt").is_empty())
+    integration.events.active_events = [{
+        "id": "effects_test",
+        "name": "Effets test",
+        "description": "Description test",
+        "remaining": 2,
+        "effects": {"monster_damage_multiplier": 1.25, "monster_speed_multiplier": 0.8, "trap_cooldown_multiplier": 0.65},
+    }]
+    assert(is_equal_approx(integration.event_multiplier("monster_damage_multiplier"), 1.25))
+    assert(is_equal_approx(integration.event_multiplier("monster_speed_multiplier"), 0.8))
+    assert(is_equal_approx(integration.event_multiplier("trap_cooldown_multiplier"), 0.65))
+    assert(not String(integration.hud_snapshot().effect_entries[0].description).is_empty())
+    integration.synergies.active = [integration.synergies.catalog.get_entry("ghost_fog"), integration.synergies.catalog.get_entry("mimic_treasure")]
+    assert(is_equal_approx(integration.synergy_bonus("evasion"), 0.20))
+    assert(is_equal_approx(integration.synergy_bonus("ambush_damage"), 0.35))
     integration.record_capture()
     var summary := integration.finish_run({"victory": true, "wave": 5, "score": 500, "captures": 1, "resources": {"gold": 20}, "monster_ids": ["ghost"]})
     assert(int(summary.result.resources.gold) >= 20)
