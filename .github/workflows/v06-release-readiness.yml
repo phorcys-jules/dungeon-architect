@@ -24,7 +24,7 @@ jobs:
       - name: Test full v0.6 run integration
         run: ./godot --headless --path . --script tests/v06_full_run_integration_test.gd
       - name: Test v0.6 content wiring
-        run: ./godot --headless --path . --script tests/v06_content_wiring_test.gd
+        run: timeout 45s ./godot --headless --path . --script tests/v06_content_wiring_test.gd
       - name: Test adventurer combat AI
         run: ./godot --headless --path . --script tests/adventurer_combat_ai_test.gd
       - name: Test forge trap unlocks

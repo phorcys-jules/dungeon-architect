@@ -148,5 +148,7 @@ func _init() -> void:
     assert(is_equal_approx(game._monster_damage_multiplier(), 1.25))
     assert(is_equal_approx(game._monster_health_multiplier(), 1.2))
     game.village_modifiers = previous_modifiers
+    root.remove_child(game)
+    game.free()
     print("V0.6 content wiring test passed")
     quit(0)
