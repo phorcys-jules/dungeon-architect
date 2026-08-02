@@ -1,0 +1,28 @@
+name: Dungeon Architect Gameplay CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/dungeon_architect_controller.gd'
+      - 'scripts/build/**'
+      - 'scenes/main.tscn'
+      - 'tests/dungeon_architect_controller_test.gd'
+      - '.github/workflows/dungeon-architect-gameplay-ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y unzip
+      - name: Download Godot
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q Godot_v4.7.1-stable_linux.x86_64.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+      - name: Import project
+        run: timeout 60s ./godot --headless --path . --import
+      - name: Run integrated construction test
+        run: timeout 45s ./godot --headless --path . --script tests/dungeon_architect_controller_test.gd
