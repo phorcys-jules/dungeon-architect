@@ -21,7 +21,7 @@ func generate(seed_value: int, required_cells: Array[Vector2i] = []) -> Dictiona
     var protected: Dictionary = {}
     protected[entrance] = true
     protected[treasure] = true
-    for cell in required_cells:
+    for cell: Vector2i in required_cells:
         protected[cell] = true
 
     var open_cells := _carve_spanning_maze(rng)
@@ -29,8 +29,8 @@ func generate(seed_value: int, required_cells: Array[Vector2i] = []) -> Dictiona
     _add_loops(open_cells, rng)
 
     var walls: Array[Vector2i] = []
-    for y in range(size.y):
-        for x in range(size.x):
+    for y: int in range(size.y):
+        for x: int in range(size.x):
             var cell := Vector2i(x, y)
             if not open_cells.has(cell) and not protected.has(cell):
                 walls.append(cell)
@@ -47,7 +47,7 @@ func is_valid(layout: Dictionary, required_cells: Array[Vector2i] = []) -> bool:
     var walls: Array[Vector2i] = []
     walls.assign(layout.get("walls", []))
     var blocked: Dictionary = {}
-    for wall in walls:
+    for wall: Vector2i in walls:
         blocked[wall] = true
 
     if blocked.has(entrance) or blocked.has(treasure):
@@ -56,7 +56,7 @@ func is_valid(layout: Dictionary, required_cells: Array[Vector2i] = []) -> bool:
     var targets: Array[Vector2i] = required_cells.duplicate()
     targets.append(treasure)
     var current := entrance
-    for target in targets:
+    for target: Vector2i in targets:
         if not _has_path(current, target, blocked):
             return false
         current = target
@@ -65,9 +65,9 @@ func is_valid(layout: Dictionary, required_cells: Array[Vector2i] = []) -> bool:
 func fingerprint(layout: Dictionary) -> String:
     var walls: Array[Vector2i] = []
     walls.assign(layout.get("walls", []))
-    walls.sort_custom(func(a: Vector2i, b: Vector2i): return a.y < b.y or (a.y == b.y and a.x < b.x))
+    walls.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or (a.y == b.y and a.x < b.x))
     var values: PackedStringArray = []
-    for wall in walls:
+    for wall: Vector2i in walls:
         values.append("%d:%d" % [wall.x, wall.y])
     return ";".join(values)
 
@@ -77,18 +77,18 @@ func _carve_spanning_maze(rng: RandomNumberGenerator) -> Dictionary:
     open_cells[entrance] = true
 
     while not stack.is_empty():
-        var current := stack.back()
+        var current: Vector2i = stack.back()
         var candidates: Array[Vector2i] = []
-        for direction in CARDINAL_DIRECTIONS:
-            var next := current + direction
-            if _inside(next) and not open_cells.has(next):
-                candidates.append(next)
+        for direction: Vector2i in CARDINAL_DIRECTIONS:
+            var next_cell: Vector2i = current + direction
+            if _inside(next_cell) and not open_cells.has(next_cell):
+                candidates.append(next_cell)
 
         if candidates.is_empty():
             stack.pop_back()
             continue
 
-        var chosen := candidates[rng.randi_range(0, candidates.size() - 1)]
+        var chosen: Vector2i = candidates[rng.randi_range(0, candidates.size() - 1)]
         open_cells[chosen] = true
         stack.append(chosen)
 
@@ -101,7 +101,7 @@ func _open_required_routes(open_cells: Dictionary, required_cells: Array[Vector2
     var current := entrance
     var targets: Array[Vector2i] = required_cells.duplicate()
     targets.append(treasure)
-    for target in targets:
+    for target: Vector2i in targets:
         var cursor := current
         while cursor.x != target.x:
             cursor.x += 1 if target.x > cursor.x else -1
@@ -113,13 +113,13 @@ func _open_required_routes(open_cells: Dictionary, required_cells: Array[Vector2
 
 func _add_loops(open_cells: Dictionary, rng: RandomNumberGenerator) -> void:
     var candidates: Array[Vector2i] = []
-    for y in range(size.y):
-        for x in range(size.x):
+    for y: int in range(size.y):
+        for x: int in range(size.x):
             var cell := Vector2i(x, y)
             if open_cells.has(cell):
                 continue
             var neighbours := 0
-            for direction in CARDINAL_DIRECTIONS:
+            for direction: Vector2i in CARDINAL_DIRECTIONS:
                 if open_cells.has(cell + direction):
                     neighbours += 1
             if neighbours >= 2:
@@ -127,13 +127,13 @@ func _add_loops(open_cells: Dictionary, rng: RandomNumberGenerator) -> void:
 
     _shuffle_with_rng(candidates, rng)
     var loops_to_add := mini(minimum_loops + rng.randi_range(0, 3), candidates.size())
-    for index in range(loops_to_add):
+    for index: int in range(loops_to_add):
         open_cells[candidates[index]] = true
 
 func _shuffle_with_rng(values: Array[Vector2i], rng: RandomNumberGenerator) -> void:
-    for index in range(values.size() - 1, 0, -1):
-        var swap_index := rng.randi_range(0, index)
-        var temporary := values[index]
+    for index: int in range(values.size() - 1, 0, -1):
+        var swap_index: int = rng.randi_range(0, index)
+        var temporary: Vector2i = values[index]
         values[index] = values[swap_index]
         values[swap_index] = temporary
 
@@ -142,14 +142,14 @@ func _has_path(start: Vector2i, target: Vector2i, blocked: Dictionary) -> bool:
     var visited: Dictionary = {}
     visited[start] = true
     while not frontier.is_empty():
-        var current := frontier.pop_front()
+        var current: Vector2i = frontier.pop_front()
         if current == target:
             return true
-        for direction in CARDINAL_DIRECTIONS:
-            var next := current + direction
-            if _inside(next) and not blocked.has(next) and not visited.has(next):
-                visited[next] = true
-                frontier.append(next)
+        for direction: Vector2i in CARDINAL_DIRECTIONS:
+            var next_cell: Vector2i = current + direction
+            if _inside(next_cell) and not blocked.has(next_cell) and not visited.has(next_cell):
+                visited[next_cell] = true
+                frontier.append(next_cell)
     return false
 
 func _inside(cell: Vector2i) -> bool:
