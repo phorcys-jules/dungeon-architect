@@ -44,8 +44,15 @@ Les cinq salles du deck actif possèdent une tuile pixel-art dédiée dans
 salle de brume. Elles remplacent les anciennes abréviations de debug tout en conservant les
 tags, connexions et synergies de chaque ressource `RoomData`.
 
+## Collectables
+
+Les objets interactifs de la run utilisent maintenant trois sprites RGBA de 128 × 128 pixels
+dans `assets/sprites/collectibles/` : la relique d'âme à collecter, la flamme de bénédiction
+et le coffre final. Ils sont affichés entre 38 et 44 pixels pour rester lisibles sans masquer
+les cases voisines. Leur disparition et leurs effets restent pilotés par les contrôleurs de jeu.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;
-- créer les salles, pièges et reliques dans la même palette ;
+- créer les pièges dans la même palette ;
 - ajouter des animations d'attaque et de dégâts sans réduire la lisibilité.

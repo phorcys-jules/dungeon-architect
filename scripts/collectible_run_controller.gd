@@ -1,6 +1,7 @@
 extends "res://scripts/main.gd"
 
 const CollectibleRouteScript := preload("res://scripts/core/collectible_route.gd")
+const RELIC_TEXTURE := preload("res://assets/sprites/collectibles/soul_relic.png")
 
 const COLLECTIBLE_CELLS: Array[Vector2i] = [
     Vector2i(2, 2),
@@ -92,9 +93,7 @@ func _recalculate_path() -> void:
 func _draw() -> void:
     super._draw()
     for cell in collectible_route.remaining:
-        var center := _world_from_cell(cell)
-        draw_circle(center, 8.0, Color("f4d35e"))
-        draw_circle(center, 3.0, Color("fff4c2"))
+        _draw_collectible(RELIC_TEXTURE, _world_from_cell(cell), Vector2(38, 38))
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
     return super._is_valid_build_cell(cell) and not COLLECTIBLE_CELLS.has(cell)

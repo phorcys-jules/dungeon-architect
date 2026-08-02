@@ -29,6 +29,10 @@ func _init() -> void:
         assert(texture.get_height() == 128)
     assert(game.MonsterSprite.get_width() == 512)
     assert(game.MonsterSprite.get_height() == 128)
+    for texture in [game.RELIC_TEXTURE, game.BLESSING_TEXTURE, game.TREASURE_TEXTURE]:
+        assert(texture != null)
+        assert(texture.get_width() == 128)
+        assert(texture.get_height() == 128)
     assert(game.ROOM_TEXTURES.size() == 5)
     for room_id in ["slime_pool", "crossroads", "false_treasure", "monster_portal", "fog_chamber"]:
         var room_texture: Texture2D = game.ROOM_TEXTURES.get(room_id)

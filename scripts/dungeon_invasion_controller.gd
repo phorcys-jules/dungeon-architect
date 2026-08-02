@@ -1,5 +1,7 @@
 extends "res://scripts/collectible_run_controller.gd"
 
+const BLESSING_TEXTURE := preload("res://assets/sprites/collectibles/blessing_flame.png")
+
 const MobileMonsterScript := preload("res://scripts/monsters/mobile_monster.gd")
 const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd")
 const LabyrinthGeneratorScript := preload("res://scripts/core/labyrinth_generator.gd")
@@ -300,9 +302,7 @@ func _draw() -> void:
     for cell: Vector2i in spider_webs:
         _draw_web(_world_from_cell(cell))
     if blessing_available:
-        var blessing_center := _world_from_cell(BLESSING_CELL)
-        draw_circle(blessing_center, 11.0, Color("fff3b0"))
-        draw_circle(blessing_center, 5.0, Color("ffffff"))
+        _draw_collectible(BLESSING_TEXTURE, _world_from_cell(BLESSING_CELL), Vector2(40, 40))
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)

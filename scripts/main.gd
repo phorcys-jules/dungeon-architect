@@ -8,6 +8,7 @@ const EconomyScript := preload("res://scripts/core/economy.gd")
 const WaveManagerScript := preload("res://scripts/core/wave_manager.gd")
 const CharacterAnimationRuntimeScript := preload("res://scripts/presentation/character_animation_runtime.gd")
 const MonsterSprite := preload("res://assets/sprites/characters/animations/monster_imp_walk.png")
+const TREASURE_TEXTURE := preload("res://assets/sprites/collectibles/treasure_chest.png")
 const ADVENTURER_TEXTURES := {
     "scout": preload("res://assets/sprites/characters/animations/adventurer_scout_walk.png"),
     "warrior": preload("res://assets/sprites/characters/animations/adventurer_warrior_walk.png"),
@@ -28,6 +29,7 @@ const DEFENDER_COST := 40
 const DOOR_COST := 10
 const CHARACTER_DRAW_SIZE := Vector2(48, 48)
 const CHARACTER_FRAME_SIZE := Vector2(128, 128)
+const COLLECTIBLE_DRAW_SIZE := Vector2(44, 44)
 
 enum GameState { PREPARATION, INVASION, WAVE_RESULT, CAMPAIGN_FINISHED }
 enum BuildMode { SPIKE_TRAP, DEFENDER }
@@ -542,9 +544,7 @@ func _draw_level_objects() -> void:
         draw_rect(rect, Color("59627a"))
         draw_rect(rect, Color("78839e"), false, 2.0)
     draw_circle(_world_from_cell(ENTRANCE), 15.0, Color("4fd1a5"))
-    var treasure_center := _world_from_cell(TREASURE)
-    draw_circle(treasure_center, 17.0, Color("f5c451"))
-    draw_circle(treasure_center, 8.0, Color("fff0a6"))
+    _draw_collectible(TREASURE_TEXTURE, _world_from_cell(TREASURE))
     var door_rect := Rect2(_cell_top_left(DOOR) + Vector2(8, 2), Vector2(CELL_SIZE - 16, CELL_SIZE - 4))
     draw_rect(door_rect, Color("b64d55") if door_closed else Color("5fbf82"))
     draw_rect(door_rect, Color.WHITE, false, 2.0)
@@ -585,6 +585,9 @@ func _draw_character_frame(texture: Texture2D, center: Vector2, tint: Color = Co
         destination.position.x += destination.size.x
         destination.size.x *= -1.0
     draw_texture_rect_region(texture, destination, source, tint)
+
+func _draw_collectible(texture: Texture2D, center: Vector2, size: Vector2 = COLLECTIBLE_DRAW_SIZE) -> void:
+    draw_texture_rect(texture, Rect2(center - size / 2.0, size), false)
 
 func _on_adventurer_damaged(_amount: int, _current_health: int) -> void:
     adventurer_damage_flash = 0.28
