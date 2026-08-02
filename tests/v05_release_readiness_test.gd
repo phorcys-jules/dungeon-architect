@@ -5,8 +5,8 @@ func _fail(message: String) -> void:
     quit(1)
 
 func _init() -> void:
-    if GameVersion.VALUE != "v0.5.0-alpha" or GameVersion.SAVE_VERSION != 3:
-        _fail("Invalid v0.5 version metadata")
+    if GameVersion.SAVE_VERSION < 3:
+        _fail("Current save format no longer supports v0.5 saves")
         return
 
     var settings := GameFeedbackSettings.new()
@@ -26,7 +26,7 @@ func _init() -> void:
         return
 
     var migrated := SaveMigrator.new().migrate({"version": 2, "resources": {"gold": 42}, "unlocks": ["ghost"]})
-    if int(migrated.version) != 3 or int(migrated.resources.gold) != 42 or not migrated.has("run_history"):
+    if int(migrated.version) != GameVersion.SAVE_VERSION or int(migrated.resources.gold) != 42 or not migrated.has("run_history"):
         _fail("v0.4 save migration lost data")
         return
 
