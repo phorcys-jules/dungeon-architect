@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MonsterArchetypeData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/monster_archetype_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+archetype_id = "slime"
+display_name = "Slime"
+base_speed = 82.0
+base_damage = 8
+tags = Array[StringName]([&"slime", &"slow"])
+abilities = Array[StringName]([&"slow_trail"])
+effect_values = {"slow_multiplier": 0.72, "trail_duration": 3.5}
