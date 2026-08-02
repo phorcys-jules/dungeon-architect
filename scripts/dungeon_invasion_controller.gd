@@ -16,6 +16,13 @@ const MONSTER_TEXTURES := {
     "mimic": preload("res://assets/sprites/characters/animations/monster_mimic_walk.png"),
     "spider": preload("res://assets/sprites/characters/animations/monster_spider_walk.png"),
 }
+const ROOM_TEXTURES := {
+    "slime_pool": preload("res://assets/sprites/rooms/slime_pool.png"),
+    "crossroads": preload("res://assets/sprites/rooms/crossroads.png"),
+    "false_treasure": preload("res://assets/sprites/rooms/false_treasure.png"),
+    "monster_portal": preload("res://assets/sprites/rooms/monster_portal.png"),
+    "fog_chamber": preload("res://assets/sprites/rooms/fog_chamber.png"),
+}
 const ROOM_RESOURCES: Array[RoomData] = [
     preload("res://resources/rooms/corridor.tres"),
     preload("res://resources/rooms/crossroads.tres"),
@@ -193,6 +200,25 @@ func _toggle_door() -> void:
         return
     super._toggle_door()
 
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+        var cell := _cell_from_world(event.position)
+        if placed_rooms.has(cell):
+            var room: RoomData = placed_rooms[cell]
+            status_label.text = "%s — %s" % [room.display_name, _room_effect_description(room.room_id)]
+            return
+    super._unhandled_input(event)
+
+func _room_effect_description(room_id: String) -> String:
+    match room_id:
+        "slime_pool": return "ralentit les aventuriers et renforce les synergies de slime."
+        "crossroads": return "crée quatre connexions et améliore le contrôle des passages."
+        "false_treasure": return "sert d'appât et prépare les embuscades du mimic."
+        "monster_portal": return "offre une route de mobilité rapide aux monstres."
+        "fog_chamber": return "dissimule les défenseurs et renforce les fantômes."
+        _:
+            return "salle spéciale du deck de donjon."
+
 func _draw() -> void:
     super._draw()
     if blessing_available:
@@ -229,10 +255,13 @@ func _draw_level_objects() -> void:
     super._draw_level_objects()
     for cell: Vector2i in placed_rooms:
         var room: RoomData = placed_rooms[cell]
-        var rect := Rect2(_cell_top_left(cell) + Vector2(5, 5), Vector2(CELL_SIZE - 10, CELL_SIZE - 10))
-        draw_rect(rect, Color("58446f"), true)
-        draw_rect(rect, Color("d8b4ff"), false, 2.0)
-        draw_string(ThemeDB.fallback_font, _cell_top_left(cell) + Vector2(8, 28), room.display_name.left(3), HORIZONTAL_ALIGNMENT_LEFT, 34, 10, Color("fff0c2"))
+        var rect := Rect2(_cell_top_left(cell) + Vector2(3, 3), Vector2(CELL_SIZE - 6, CELL_SIZE - 6))
+        var texture: Texture2D = ROOM_TEXTURES.get(room.room_id)
+        if texture != null:
+            draw_texture_rect(texture, rect, false)
+        else:
+            draw_rect(rect, Color("58446f"), true)
+        draw_rect(rect, Color("b995d6"), false, 1.5)
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
-    return super._is_valid_build_cell(cell) and cell != BLESSING_CELL and not MONSTER_HOME_CELLS.has(cell)
+    return super._is_valid_build_cell(cell) and cell != BLESSING_CELL and not MONSTER_HOME_CELLS.has(cell) and not placed_rooms.has(cell)

@@ -37,6 +37,13 @@ latérale pour les objectifs, effets et actions, puis le pied de page pour les m
 statistiques. La fenêtre de résultat possède une zone de résumé défilable afin que les
 récompenses, défis et succès ne puissent plus recouvrir les boutons de navigation.
 
+## Salles spéciales
+
+Les cinq salles du deck actif possèdent une tuile pixel-art dédiée dans
+`assets/sprites/rooms/` : bassin de slime, carrefour, faux trésor, portail de monstres et
+salle de brume. Elles remplacent les anciennes abréviations de debug tout en conservant les
+tags, connexions et synergies de chaque ressource `RoomData`.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;

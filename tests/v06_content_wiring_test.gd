@@ -24,5 +24,19 @@ func _init() -> void:
         assert(texture.get_height() == 128)
     assert(game.MonsterSprite.get_width() == 512)
     assert(game.MonsterSprite.get_height() == 128)
+    assert(game.ROOM_TEXTURES.size() == 5)
+    for room_id in ["slime_pool", "crossroads", "false_treasure", "monster_portal", "fog_chamber"]:
+        var room_texture: Texture2D = game.ROOM_TEXTURES.get(room_id)
+        assert(room_texture != null)
+        assert(room_texture.get_width() == 128)
+        assert(room_texture.get_height() == 128)
+    var first_room_cell: Vector2i = game.placed_rooms.keys()[0]
+    assert(not game._is_valid_build_cell(first_room_cell))
+    var click := InputEventMouseButton.new()
+    click.button_index = MOUSE_BUTTON_LEFT
+    click.pressed = true
+    click.position = game._world_from_cell(first_room_cell)
+    game._unhandled_input(click)
+    assert(not game.status_label.text.is_empty())
     print("V0.6 content wiring test passed")
     quit(0)
