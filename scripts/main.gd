@@ -474,7 +474,7 @@ func _on_adventurer_health_changed(current_health: int, max_health: int) -> void
 func _on_adventurer_died() -> void:
     if game_state != GameState.INVASION:
         return
-    var reward := waves.get_wave_reward()
+    var reward := roundi(float(waves.get_wave_reward()) * _wave_reward_multiplier())
     economy.add_gold(reward)
     if waves.has_next_wave():
         var completed_wave := waves.current_wave
@@ -896,3 +896,6 @@ func _max_defenders() -> int:
 
 func _starting_gold_adjustment() -> int:
     return 0
+
+func _wave_reward_multiplier() -> float:
+    return 1.0

@@ -61,6 +61,14 @@ func event_multiplier(key: String, fallback: float = 1.0) -> float:
 func synergy_bonus(key: String, fallback: float = 0.0) -> float:
     return float(synergies.combined_effects().get(key, fallback))
 
+func apply_choice_tags(tags: Array) -> void:
+    for tag: Variant in tags:
+        var run_tag := "room:%s" % String(tag)
+        if not run_tags.has(run_tag):
+            run_tags.append(run_tag)
+    synergies.evaluate(run_tags)
+    _discover_run_content()
+
 func hud_snapshot() -> Dictionary:
     var challenge_labels: Array[String] = []
     for challenge_id in challenges.active:

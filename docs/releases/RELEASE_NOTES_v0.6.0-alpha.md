@@ -33,6 +33,7 @@ Cette version transforme les systèmes roguelite développés après la v0.5 en 
 - sauvegarde des découvertes et statistiques après chaque partie ;
 - lint GDScript automatisé avec `gdtoolkit` ;
 - commandes clavier pour les principales actions de construction.
+- choix roguelite entre les vagues, avec trois améliorations proposées et des synergies activées immédiatement.
 
 ## Compatibilité
 

@@ -41,12 +41,15 @@ La scène principale est `res://scenes/main.tscn`.
 ## Contrôles
 
 - clic gauche : placer la construction sélectionnée ;
-- `1` : sélectionner le piège à pointes ;
-- `2` : sélectionner un défenseur ;
+- `1` à `6` : sélectionner les six modèles de pièges ;
+- `7` : sélectionner un défenseur ;
+- `8` : placer un mur ;
+- `9` : retirer un mur ;
 - `W` : placer un mur ;
 - `R` : retirer un mur construit ;
 - `D` : ouvrir ou fermer la porte ;
 - `Espace` ou `Entrée` : lancer la vague ou activer l’action principale ;
+- entre deux vagues : choisir une amélioration de run parmi trois propositions ;
 - boutons du résultat : retourner au village ou commencer une nouvelle run.
 
 ## Tests locaux

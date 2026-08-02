@@ -20,6 +20,12 @@ var black_market := VillageBlackMarket.new()
 var village_modifiers: Dictionary = {}
 var village_den_store := VillageSaveStore.new()
 var village_den := DenProgression.new()
+var choice_engine := RogueliteChoiceEngine.new()
+var choice_buttons: Array[Button] = []
+var current_choice_offer: Array[Dictionary] = []
+var selected_choice_ids: Array[StringName] = []
+var run_choice_modifiers: Dictionary = {}
+var pending_run_choice := false
 
 func _ready() -> void:
     _load_village_progression()
@@ -52,6 +58,16 @@ func _build_interface() -> void:
     modifiers_list.custom_minimum_size = Vector2(156, 0)
     modifiers_list.add_theme_constant_override("separation", 2)
     modifiers_scroll.add_child(modifiers_list)
+    for index in 3:
+        var choice_button := Button.new()
+        choice_button.position = Vector2(32 + index * 160, 326)
+        choice_button.size = Vector2(148, 64)
+        choice_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        choice_button.visible = false
+        choice_button.pressed.connect(_select_run_choice.bind(index))
+        _style_action_button(choice_button, Color("725b9a"))
+        result_panel.add_child(choice_button)
+        choice_buttons.append(choice_button)
 
 func _build_run_end_actions() -> void:
     village_button = Button.new()
@@ -76,6 +92,12 @@ func _begin_tracked_run() -> void:
     current_run_id = "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_msec()]
     captures_this_run = 0
     relics_protected_this_run = 0
+    selected_choice_ids.clear()
+    run_choice_modifiers.clear()
+    current_choice_offer.clear()
+    pending_run_choice = false
+    loop_rules.door_cooldown = 2.0
+    _set_choice_buttons_visible(false)
     run_end.begin_run(current_run_id)
     _load_village_progression()
     village_den = village_den_store.load_den()
@@ -92,6 +114,8 @@ func _begin_tracked_run() -> void:
     _set_run_end_actions_visible(false)
 
 func _prepare_current_wave() -> void:
+    _set_choice_buttons_visible(false)
+    result_summary.size.y = 318
     var announcement := v06_integration.start_wave(waves.current_wave, active_biome.active_biome_id)
     super._prepare_current_wave()
     var village_health := 1.0 + float(village_modifiers.get("adventurer_health_multiplier", 0.0))
@@ -108,6 +132,14 @@ func _on_adventurer_died() -> void:
     if was_invasion:
         captures_this_run += 1
         v06_integration.record_capture()
+        if game_state == GameState.WAVE_RESULT:
+            _offer_run_choices()
+
+func _on_primary_button_pressed() -> void:
+    if game_state == GameState.WAVE_RESULT and pending_run_choice:
+        status_label.text = "Choisissez une amélioration avant de préparer la prochaine vague."
+        return
+    super._on_primary_button_pressed()
 
 func _finish_campaign(victory: bool, message: String) -> void:
     if game_state == GameState.CAMPAIGN_FINISHED:
@@ -147,7 +179,8 @@ func _current_adventurer_speed_multiplier() -> float:
     return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed
 
 func _configure_trap(trap: SpikeTrap) -> void:
-    trap.damage = roundi(trap.damage * (1.0 + float(village_modifiers.get("trap_damage_multiplier", 0.0))) * active_biome.rule_value("trap_damage_multiplier", 1.0))
+    var run_bonus := float(run_choice_modifiers.get("trap_damage_multiplier", 0.0))
+    trap.damage = roundi(trap.damage * (1.0 + float(village_modifiers.get("trap_damage_multiplier", 0.0)) + run_bonus) * active_biome.rule_value("trap_damage_multiplier", 1.0))
     trap.effect_duration *= _effect_duration_multiplier()
     trap.cooldown_duration *= v06_integration.event_multiplier("trap_cooldown_multiplier")
 
@@ -178,21 +211,27 @@ func _monster_damage_multiplier() -> float:
     return (1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))) * v06_integration.event_multiplier("monster_damage_multiplier")
 
 func _monster_speed_multiplier() -> float:
-    return v06_integration.event_multiplier("monster_speed_multiplier")
+    return v06_integration.event_multiplier("monster_speed_multiplier") * (1.0 + float(run_choice_modifiers.get("monster_speed_multiplier", 0.0)))
 
 func _monster_evasion(archetype_id: StringName) -> float:
-    return v06_integration.synergy_bonus("evasion") if archetype_id == &"ghost" else 0.0
+    return v06_integration.synergy_bonus("evasion") + float(run_choice_modifiers.get("ghost_evasion", 0.0)) if archetype_id == &"ghost" else 0.0
 
 func _monster_ambush_multiplier(archetype_id: StringName, first_hit: bool) -> float:
     if archetype_id == &"mimic" and first_hit:
-        return 1.0 + v06_integration.synergy_bonus("ambush_damage")
+        return 1.0 + v06_integration.synergy_bonus("ambush_damage") + float(run_choice_modifiers.get("ambush_damage", 0.0))
     return 1.0
+
+func _slime_slow_multiplier(base_multiplier: float) -> float:
+    return base_multiplier * (1.0 - v06_integration.synergy_bonus("enemy_slow") - float(run_choice_modifiers.get("enemy_slow", 0.0)))
 
 func _monster_health_multiplier() -> float:
     return 1.0 + float(village_modifiers.get("monster_health_multiplier", 0.0))
 
 func _effect_duration_multiplier() -> float:
     return 1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))
+
+func _wave_reward_multiplier() -> float:
+    return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))
 
 func _on_trap_placed() -> void:
     v06_integration.record_trap_placed()
@@ -202,12 +241,73 @@ func record_v06_wall_placed() -> void:
     v06_integration.record_wall_placed()
     _refresh_v06_hud()
 
+func _offer_run_choices() -> void:
+    current_choice_offer.clear()
+    for choice: Dictionary in choice_engine.offer(v06_integration.run_seed, waves.current_wave, RogueliteChoiceEngine.CHOICES.size()):
+        if not selected_choice_ids.has(StringName(choice.id)):
+            current_choice_offer.append(choice)
+        if current_choice_offer.size() >= 3:
+            break
+    if current_choice_offer.is_empty():
+        pending_run_choice = false
+        return
+    pending_run_choice = true
+    result_summary.size.y = 232
+    result_summary.text += "\n\nChoisissez une amélioration pour la suite :"
+    for index in choice_buttons.size():
+        var button := choice_buttons[index]
+        var available := index < current_choice_offer.size()
+        button.visible = available
+        button.disabled = not available
+        if available:
+            var choice: Dictionary = current_choice_offer[index]
+            button.text = String(choice.label)
+            button.tooltip_text = String(choice.description)
+    start_button.disabled = true
+    status_label.text = "La victoire vous accorde une amélioration de run."
+
+func _select_run_choice(index: int) -> void:
+    if not pending_run_choice or index < 0 or index >= current_choice_offer.size():
+        return
+    var choice: Dictionary = current_choice_offer[index]
+    var choice_id := StringName(choice.id)
+    selected_choice_ids.append(choice_id)
+    for key: Variant in choice.get("modifiers", {}).keys():
+        run_choice_modifiers[key] = float(run_choice_modifiers.get(key, 0.0)) + float(choice.modifiers[key])
+    v06_integration.apply_choice_tags(choice.get("tags", []))
+    pending_run_choice = false
+    start_button.disabled = false
+    for button_index in choice_buttons.size():
+        choice_buttons[button_index].disabled = true
+        if button_index == index:
+            choice_buttons[button_index].text = "✓ %s" % String(choice.label)
+    loop_rules.door_cooldown = 2.0 * maxf(0.2, 1.0 + float(run_choice_modifiers.get("door_cooldown_multiplier", 0.0)))
+    result_summary.text += "\nAmélioration choisie : %s — %s" % [String(choice.label), String(choice.description)]
+    status_label.text = "%s activé. Vous pouvez préparer la prochaine vague." % String(choice.label)
+    _refresh_active_gameplay_modifiers()
+    _refresh_v06_hud()
+
+func _set_choice_buttons_visible(value: bool) -> void:
+    for button in choice_buttons:
+        button.visible = value
+    if not value and start_button:
+        start_button.disabled = false
+
+func _choice_effect_entries() -> Array[Dictionary]:
+    var entries: Array[Dictionary] = []
+    for choice_id in selected_choice_ids:
+        for choice: Dictionary in RogueliteChoiceEngine.CHOICES:
+            if StringName(choice.id) == choice_id:
+                entries.append({"kind": "choice", "name": String(choice.label), "description": String(choice.description)})
+                break
+    return entries
+
 func _refresh_v06_hud() -> void:
     if not objectives_label or not modifiers_label:
         return
     var snapshot := v06_integration.hud_snapshot()
     objectives_label.text = "OBJECTIFS\n%s" % ("\n".join(snapshot.challenges) if not snapshot.challenges.is_empty() else "Aucun")
-    _refresh_effect_rows(_village_effect_entries() + snapshot.effect_entries)
+    _refresh_effect_rows(_village_effect_entries() + _choice_effect_entries() + snapshot.effect_entries)
 
 func _refresh_effect_rows(entries: Array) -> void:
     for row in effect_rows:

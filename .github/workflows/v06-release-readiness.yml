@@ -33,3 +33,5 @@ jobs:
         run: ./godot --headless --path . --script tests/monster_progression_family_test.gd
       - name: Test v0.6 balance guardrails
         run: ./godot --headless --path . --script tests/v06_balance_guardrails_test.gd
+      - name: Test between-wave run choices
+        run: ./godot --headless --path . --script tests/run_choice_integration_test.gd

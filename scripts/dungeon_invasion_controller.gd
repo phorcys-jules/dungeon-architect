@@ -436,7 +436,7 @@ func _current_adventurer_speed_multiplier() -> float:
     var zone_multiplier := MonsterTacticalRuntimeScript.movement_multiplier(
         slime_trails.has(current_cell),
         spider_webs.has(current_cell),
-        slime.get_effect(&"slow_multiplier", 0.72),
+        _slime_slow_multiplier(slime.get_effect(&"slow_multiplier", 0.72)),
         spider.get_effect(&"web_slow_multiplier", 0.58)
     )
     return super._current_adventurer_speed_multiplier() * zone_multiplier
@@ -472,6 +472,9 @@ func _monster_evasion(_archetype_id: StringName) -> float:
 
 func _monster_ambush_multiplier(_archetype_id: StringName, _first_hit: bool) -> float:
     return 1.0
+
+func _slime_slow_multiplier(base_multiplier: float) -> float:
+    return base_multiplier
 
 func _monster_health_multiplier() -> float:
     return 1.0
