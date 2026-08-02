@@ -1,0 +1,23 @@
+name: v0.6 Release Readiness
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q Godot_v4.7.1-stable_linux.x86_64.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+      - name: Import project
+        run: ./godot --headless --path . --import
+      - name: Test v0.6 release metadata and migration
+        run: ./godot --headless --path . --script tests/v06_release_readiness_test.gd
