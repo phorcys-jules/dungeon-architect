@@ -4,6 +4,7 @@ const MobileMonsterScript := preload("res://scripts/monsters/mobile_monster.gd")
 const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd")
 const LabyrinthGeneratorScript := preload("res://scripts/core/labyrinth_generator.gd")
 const MonsterAiCoordinatorScript := preload("res://scripts/monsters/monster_ai_coordinator.gd")
+const MonsterTacticalRuntimeScript := preload("res://scripts/monsters/monster_tactical_runtime.gd")
 const MONSTER_ARCHETYPES: Array[MonsterArchetypeData] = [
     preload("res://resources/monsters/ghost.tres"),
     preload("res://resources/monsters/slime.tres"),
@@ -53,6 +54,11 @@ var labyrinth_generator: LabyrinthGenerator = LabyrinthGeneratorScript.new()
 var monster_ai: MonsterAiCoordinator = MonsterAiCoordinatorScript.new()
 var monster_facings: Array[float] = []
 var monster_attack_flashes: Array[float] = []
+var monster_ability_flashes: Array[float] = []
+var monster_ability_cooldowns: Array[float] = []
+var monster_burst_available: Array[bool] = []
+var slime_trails: Dictionary = {}
+var spider_webs: Dictionary = {}
 var campaign_seed := int(Time.get_unix_time_from_system())
 var blessing_available := true
 var last_adventurer_cell := ENTRANCE
@@ -91,14 +97,23 @@ func _ready() -> void:
 
 func _prepare_current_wave() -> void:
     blessing_available = true
+    slime_trails.clear()
+    spider_webs.clear()
     super._prepare_current_wave()
-    for monster in mobile_monsters:
+    for index in mobile_monsters.size():
+        var monster := mobile_monsters[index]
         monster.reset_to_home(CELL_SIZE)
+        monster_burst_available[index] = true
+        monster_ability_cooldowns[index] = 0.0
 
 func _process(delta: float) -> void:
     loop_rules.tick(delta)
     for index in monster_attack_flashes.size():
         monster_attack_flashes[index] = maxf(monster_attack_flashes[index] - delta, 0.0)
+        monster_ability_flashes[index] = maxf(monster_ability_flashes[index] - delta, 0.0)
+        monster_ability_cooldowns[index] = maxf(monster_ability_cooldowns[index] - delta, 0.0)
+    _tick_zone_durations(slime_trails, delta)
+    _tick_zone_durations(spider_webs, delta)
     super._process(delta)
     if game_state != GameState.INVASION or adventurer_health.is_dead:
         return
@@ -122,14 +137,20 @@ func _spawn_mobile_monsters() -> void:
     mobile_monsters.clear()
     monster_facings.clear()
     monster_attack_flashes.clear()
+    monster_ability_flashes.clear()
+    monster_ability_cooldowns.clear()
+    monster_burst_available.clear()
     for index in MONSTER_HOME_CELLS.size():
         var monster: MobileMonster = MobileMonsterScript.new()
         var archetype := MONSTER_ARCHETYPES[index]
         monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed)
-        monster.world_position = _world_from_cell(MONSTER_HOME_CELLS[index])
+        monster.world_position = Vector2(MONSTER_HOME_CELLS[index]) * CELL_SIZE
         mobile_monsters.append(monster)
         monster_facings.append(1.0)
         monster_attack_flashes.append(0.0)
+        monster_ability_flashes.append(0.0)
+        monster_ability_cooldowns.append(0.0)
+        monster_burst_available.append(true)
 
 func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     var occupied: Array[Vector2i] = []
@@ -143,8 +164,29 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
 
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
+        var archetype := MONSTER_ARCHETYPES[index]
+        if archetype.has_ability(&"phase") and monster_ability_cooldowns[index] <= 0.0:
+            var landing := MonsterTacticalRuntimeScript.phase_destination(monster.cell, adventurer_cell, walls, GRID_SIZE)
+            if landing != monster.cell:
+                monster.cell = landing
+                monster.world_position = Vector2(landing) * CELL_SIZE
+                monster.path.clear()
+                monster.path_index = 0
+                monster_ability_cooldowns[index] = archetype.get_effect(&"phase_cooldown", 5.0)
+                monster_ability_flashes[index] = 0.35
+                status_label.text = "Le fantôme traverse un mur pour intercepter l'aventurier."
+
         if not monster.has_path():
             var target := monster.home_cell if loop_rules.is_panicking() else targets[index]
+            if not loop_rules.is_panicking():
+                target = MonsterTacticalRuntimeScript.tactical_target(
+                    archetype.archetype_id,
+                    target,
+                    adventurer_cell,
+                    adventurer_direction,
+                    placed_rooms,
+                    spider_webs
+                )
             target.x = clampi(target.x, 0, GRID_SIZE.x - 1)
             target.y = clampi(target.y, 0, GRID_SIZE.y - 1)
             if walls.has(target):
@@ -157,23 +199,53 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             monster.set_path(cells)
 
         var previous_position := monster.world_position
-        monster.tick_grid(delta, CELL_SIZE)
+        var previous_cell := monster.cell
+        var reached_cell := monster.tick_grid(delta, CELL_SIZE)
         monster_facings[index] = CharacterAnimationRuntimeScript.facing_sign(monster.world_position.x - previous_position.x, monster_facings[index])
-        monster.world_position = GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
         var monster_cell := monster.cell
-        monster.world_position = _world_from_cell(monster_cell) if not monster.has_path() else monster.world_position
+        if reached_cell:
+            _apply_monster_zone_ability(index, archetype, previous_cell, monster_cell)
 
         if monster_cell == adventurer_cell:
             if loop_rules.is_panicking():
                 monster.reset_to_home(CELL_SIZE)
-                monster.world_position = _world_from_cell(monster.home_cell)
                 status_label.text = "Un monstre paniqué retourne dans son repaire."
             else:
-                var archetype := MONSTER_ARCHETYPES[index]
-                adventurer_health.take_damage(archetype.base_damage)
+                var damage := MonsterTacticalRuntimeScript.collision_damage(archetype, monster_burst_available[index])
+                adventurer_health.take_damage(damage)
+                if archetype.has_ability(&"first_hit_burst") and monster_burst_available[index]:
+                    monster_burst_available[index] = false
+                    monster_ability_flashes[index] = 0.35
+                    status_label.text = "Le mimic bondit hors de sa cachette : %d dégâts !" % damage
                 monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
-                monster.world_position = _world_from_cell(monster.home_cell)
+
+func _apply_monster_zone_ability(index: int, archetype: MonsterArchetypeData, previous_cell: Vector2i, current_cell: Vector2i) -> void:
+    if archetype.has_ability(&"slow_trail"):
+        slime_trails[previous_cell] = archetype.get_effect(&"trail_duration", 3.5)
+        monster_ability_flashes[index] = 0.12
+    if archetype.has_ability(&"web_crossroads") and _is_crossroads(current_cell):
+        spider_webs[current_cell] = archetype.get_effect(&"web_duration", 4.0)
+        monster_ability_flashes[index] = 0.3
+        status_label.text = "L'araignée tisse une toile au carrefour."
+
+func _is_crossroads(cell: Vector2i) -> bool:
+    if placed_rooms.has(cell):
+        return (placed_rooms[cell] as RoomData).room_id == "crossroads"
+    var exits := 0
+    for direction: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+        var neighbour: Vector2i = cell + direction
+        if _is_inside_grid(neighbour) and not walls.has(neighbour):
+            exits += 1
+    return exits >= 3
+
+func _tick_zone_durations(zones: Dictionary, delta: float) -> void:
+    for cell in zones.keys():
+        var remaining := float(zones[cell]) - delta
+        if remaining <= 0.0:
+            zones.erase(cell)
+        else:
+            zones[cell] = remaining
 
 func _check_capture(adventurer_cell: Vector2i) -> void:
     var monster_cells: Array[Vector2i] = []
@@ -221,18 +293,47 @@ func _room_effect_description(room_id: String) -> String:
 
 func _draw() -> void:
     super._draw()
+    for cell: Vector2i in slime_trails:
+        var trail_center := _world_from_cell(cell)
+        draw_circle(trail_center, 13.0, Color("7145c7", 0.48))
+        draw_circle(trail_center, 6.0, Color("9b73ee", 0.65))
+    for cell: Vector2i in spider_webs:
+        _draw_web(_world_from_cell(cell))
     if blessing_available:
         var blessing_center := _world_from_cell(BLESSING_CELL)
         draw_circle(blessing_center, 11.0, Color("fff3b0"))
         draw_circle(blessing_center, 5.0, Color("ffffff"))
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
-        var center := monster.world_position
+        var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
         var archetype := MONSTER_ARCHETYPES[index]
         var texture: Texture2D = MONSTER_TEXTURES[archetype.archetype_id]
-        var tint := Color("9eeeff") if loop_rules.is_panicking() else Color.WHITE
+        var tint := Color("f7c66f") if monster_ability_flashes[index] > 0.0 else Color.WHITE
+        if loop_rules.is_panicking():
+            tint = Color("9eeeff")
         var scale := CharacterAnimationRuntimeScript.attack_scale(monster_attack_flashes[index])
+        if monster_ability_flashes[index] > 0.0:
+            scale += 0.08
         _draw_character_frame(texture, center, tint, monster.has_path(), monster_facings[index], archetype.base_speed / 120.0, scale, index * 0.07)
+
+func _draw_web(center: Vector2) -> void:
+    var color := Color("d6c5f0", 0.7)
+    for radius in [6.0, 12.0, 18.0]:
+        draw_arc(center, radius, 0.0, TAU, 16, color, 1.0)
+    for direction in [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP]:
+        draw_line(center, center + direction * 18.0, color, 1.0)
+
+func _current_adventurer_speed_multiplier() -> float:
+    var current_cell := _cell_from_world(adventurer_position)
+    var slime := MONSTER_ARCHETYPES[1]
+    var spider := MONSTER_ARCHETYPES[3]
+    var zone_multiplier := MonsterTacticalRuntimeScript.movement_multiplier(
+        slime_trails.has(current_cell),
+        spider_webs.has(current_cell),
+        slime.get_effect(&"slow_multiplier", 0.72),
+        spider.get_effect(&"web_slow_multiplier", 0.58)
+    )
+    return super._current_adventurer_speed_multiplier() * zone_multiplier
 
 func get_run_tags() -> Array[String]:
     var tags: Array[String] = ["biome:%s" % active_biome.active_biome_id]

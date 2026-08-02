@@ -6,6 +6,14 @@
 - Les Éclats d'âme sont gagnés à la fin de chaque run et conservés dans le village.
 - Les anciennes « ressources » sont migrées automatiquement sans perte vers le nouveau portefeuille.
 
+## Intelligence des monstres
+
+- Le fantôme peut traverser un mur avec un temps de recharge pour intercepter l'aventurier.
+- Le slime laisse derrière lui une traînée qui ralentit réellement les déplacements.
+- Le mimic campe près du faux trésor et inflige une attaque surprise renforcée lors de son premier contact.
+- L'araignée recherche les carrefours, y tisse des toiles temporaires et contrôle ainsi les routes principales.
+- Les déplacements utilisent désormais une interpolation continue ; capacités, toiles et traînées disposent d'un retour visuel distinct.
+
 Cette version transforme les systèmes roguelite développés après la v0.5 en une boucle de jeu intégrée et testable de bout en bout.
 
 ## Nouveautés intégrées

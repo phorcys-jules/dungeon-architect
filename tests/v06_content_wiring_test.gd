@@ -8,6 +8,11 @@ func _init() -> void:
     await process_frame
     assert(game.MONSTER_ARCHETYPES.size() == 4)
     assert(game.mobile_monsters.size() == 4)
+    assert(game.monster_ability_cooldowns.size() == 4)
+    assert(game.monster_burst_available == [true, true, true, true])
+    for index in game.mobile_monsters.size():
+        var expected_position: Vector2 = Vector2(game.MONSTER_HOME_CELLS[index]) * game.CELL_SIZE
+        assert(game.mobile_monsters[index].world_position == expected_position)
     assert(game.placed_rooms.size() == 5)
     assert(game.get_monster_ids() == ["ghost", "slime", "mimic", "spider"])
     var tags: Array[String] = game.get_run_tags()
@@ -38,5 +43,14 @@ func _init() -> void:
     click.position = game._world_from_cell(first_room_cell)
     game._unhandled_input(click)
     assert(not game.status_label.text.is_empty())
+    game._apply_monster_zone_ability(1, game.MONSTER_ARCHETYPES[1], Vector2i(1, 1), Vector2i(2, 1))
+    assert(game.slime_trails.has(Vector2i(1, 1)))
+    var crossroads_cell := Vector2i(-1, -1)
+    for room_cell: Vector2i in game.placed_rooms:
+        if (game.placed_rooms[room_cell] as RoomData).room_id == "crossroads":
+            crossroads_cell = room_cell
+    assert(crossroads_cell != Vector2i(-1, -1))
+    game._apply_monster_zone_ability(3, game.MONSTER_ARCHETYPES[3], crossroads_cell, crossroads_cell)
+    assert(game.spider_webs.has(crossroads_cell))
     print("V0.6 content wiring test passed")
     quit(0)
