@@ -71,6 +71,18 @@ var placed_rooms: Dictionary = {}
 var active_biome := BiomeRuntime.new()
 var adventurer_attack_cooldown := 0.0
 var power_pellet_was_active := false
+var round_state := PacmanRoundState.new()
+var round_state_label: Label
+
+func _build_interface() -> void:
+    super._build_interface()
+    round_state_label = Label.new()
+    round_state_label.position = Vector2(300, 80)
+    round_state_label.size = Vector2(360, 20)
+    round_state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    round_state_label.add_theme_font_size_override("font_size", 12)
+    round_state_label.add_theme_color_override("font_color", Color("f4d35e"))
+    add_child(round_state_label)
 
 func _build_level() -> void:
     active_biome.select_for_zone(campaign_seed, 0)
@@ -104,9 +116,11 @@ func _prepare_current_wave() -> void:
     blessing_available = true
     adventurer_attack_cooldown = 0.0
     power_pellet_was_active = false
+    round_state.reset(COLLECTIBLE_CELLS.size())
     slime_trails.clear()
     spider_webs.clear()
     super._prepare_current_wave()
+    _refresh_round_state()
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         monster.revive_at_home(CELL_SIZE)
@@ -118,6 +132,7 @@ func _process(delta: float) -> void:
     loop_rules.tick(delta)
     if panic_before_tick and not loop_rules.is_panicking():
         _on_power_pellet_expired()
+    _refresh_round_state()
     adventurer_attack_cooldown = maxf(adventurer_attack_cooldown - delta, 0.0)
     for index in monster_attack_flashes.size():
         monster_attack_flashes[index] = maxf(monster_attack_flashes[index] - delta, 0.0)
@@ -141,6 +156,14 @@ func _process(delta: float) -> void:
     _update_mobile_monsters(delta, current_cell)
     _check_capture(current_cell)
     queue_redraw()
+
+func _on_adventurer_died() -> void:
+    _refresh_round_state(true)
+    super._on_adventurer_died()
+
+func _finish_campaign(victory: bool, message: String) -> void:
+    _refresh_round_state(true)
+    super._finish_campaign(victory, message)
 
 func _spawn_mobile_monsters() -> void:
     mobile_monsters.clear()
@@ -439,7 +462,12 @@ func _current_adventurer_speed_multiplier() -> float:
         _slime_slow_multiplier(slime.get_effect(&"slow_multiplier", 0.72)),
         spider.get_effect(&"web_slow_multiplier", 0.58)
     )
-    return super._current_adventurer_speed_multiplier() * zone_multiplier
+    return super._current_adventurer_speed_multiplier() * zone_multiplier * round_state.tension_speed_multiplier()
+
+func _refresh_round_state(resolved: bool = false) -> void:
+    round_state.update(collectible_route.get_remaining_count(), loop_rules.panic_time_left, resolved)
+    if round_state_label:
+        round_state_label.text = round_state.label()
 
 func get_run_tags() -> Array[String]:
     var tags: Array[String] = ["biome:%s" % active_biome.active_biome_id]
