@@ -5,14 +5,20 @@ const MAX_LEVEL := 10
 
 var monsters: Dictionary = {}
 
-func ensure_monster(monster_id: String, family: String, personality: String) -> void:
+func ensure_monster(monster_id: String, family: String, personality: String = "", seed_value: int = 0) -> void:
     if monsters.has(monster_id):
         return
+    var social := MonsterFamilyPersonality.new()
+    var generated_traits := social.generate_traits(seed_value if seed_value != 0 else monster_id.hash(), 2)
+    if not personality.is_empty():
+        generated_traits.erase(personality)
+        generated_traits.push_front(personality)
     monsters[monster_id] = {
         "level": 1,
         "experience": 0,
         "family": family,
-        "personality": personality,
+        "personality": generated_traits[0] if not generated_traits.is_empty() else "cautious",
+        "traits": generated_traits,
         "evolution": "base",
     }
 
@@ -66,6 +72,13 @@ func stat_multipliers(monster_id: String) -> Dictionary:
         "sentinel":
             result.health = float(result.health) * 1.2
             result.damage = float(result.damage) * 1.15
+    var traits: Array[String] = []
+    for trait_id in entry.get("traits", [entry.get("personality", "cautious")]):
+        traits.append(String(trait_id))
+    var trait_modifiers := MonsterFamilyPersonality.new().combined_trait_modifiers(traits)
+    result.health = float(result.health) * float(trait_modifiers.health)
+    result.damage = float(result.damage) * float(trait_modifiers.damage)
+    result.speed = float(result.speed) * float(trait_modifiers.speed)
     return result
 
 func to_dict() -> Dictionary:
@@ -73,3 +86,8 @@ func to_dict() -> Dictionary:
 
 func from_dict(data: Dictionary) -> void:
     monsters = Dictionary(data.get("monsters", {})).duplicate(true)
+    for monster_id in monsters:
+        var entry: Dictionary = monsters[monster_id]
+        if not entry.has("traits"):
+            entry["traits"] = [String(entry.get("personality", "cautious"))]
+        monsters[monster_id] = entry

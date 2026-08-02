@@ -4,6 +4,31 @@ const MobileMonsterScript := preload("res://scripts/monsters/mobile_monster.gd")
 const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd")
 const LabyrinthGeneratorScript := preload("res://scripts/core/labyrinth_generator.gd")
 const MonsterAiCoordinatorScript := preload("res://scripts/monsters/monster_ai_coordinator.gd")
+const MONSTER_ARCHETYPES: Array[MonsterArchetypeData] = [
+    preload("res://resources/monsters/ghost.tres"),
+    preload("res://resources/monsters/slime.tres"),
+    preload("res://resources/monsters/mimic.tres"),
+    preload("res://resources/monsters/spider.tres"),
+]
+const MONSTER_TEXTURES := {
+    "ghost": preload("res://assets/sprites/characters/monster_ghost.png"),
+    "slime": preload("res://assets/sprites/characters/monster_slime.png"),
+    "mimic": preload("res://assets/sprites/characters/monster_mimic.png"),
+    "spider": preload("res://assets/sprites/characters/monster_spider.png"),
+}
+const ROOM_RESOURCES: Array[RoomData] = [
+    preload("res://resources/rooms/corridor.tres"),
+    preload("res://resources/rooms/crossroads.tres"),
+    preload("res://resources/rooms/fog_chamber.tres"),
+    preload("res://resources/rooms/slime_pool.tres"),
+    preload("res://resources/rooms/false_treasure.tres"),
+    preload("res://resources/rooms/monster_portal.tres"),
+    preload("res://resources/rooms/ice_gallery.tres"),
+    preload("res://resources/rooms/cursed_shrine.tres"),
+    preload("res://resources/rooms/treasure_hall.tres"),
+]
+const DEFAULT_ROOM_DECK: Array[StringName] = [&"fog_chamber", &"slime_pool", &"false_treasure", &"crossroads", &"monster_portal"]
+const ROOM_ANCHORS: Array[Vector2i] = [Vector2i(3, 2), Vector2i(7, 2), Vector2i(11, 3), Vector2i(4, 8), Vector2i(10, 8)]
 
 const BLESSING_CELL := Vector2i(7, 8)
 const MONSTER_HOME_CELLS: Array[Vector2i] = [Vector2i(6, 5), Vector2i(8, 5), Vector2i(7, 4), Vector2i(7, 6)]
@@ -23,8 +48,22 @@ var campaign_seed := int(Time.get_unix_time_from_system())
 var blessing_available := true
 var last_adventurer_cell := ENTRANCE
 var adventurer_direction := Vector2i.RIGHT
+var room_deck := RoomDeck.new()
+var placed_rooms: Dictionary = {}
+var active_biome := BiomeRuntime.new()
 
 func _build_level() -> void:
+    active_biome.select_for_zone(campaign_seed, 0)
+    room_deck.configure(ROOM_RESOURCES)
+    room_deck.select(DEFAULT_ROOM_DECK)
+    room_deck.shuffle(campaign_seed)
+    placed_rooms.clear()
+    var room_cells: Array[Vector2i] = []
+    for anchor in ROOM_ANCHORS:
+        var room := room_deck.draw()
+        if room != null:
+            placed_rooms[anchor] = room
+            room_cells.append(anchor)
     labyrinth_generator.size = GRID_SIZE
     labyrinth_generator.entrance = ENTRANCE
     labyrinth_generator.treasure = TREASURE
@@ -32,6 +71,7 @@ func _build_level() -> void:
     required_cells.append(BLESSING_CELL)
     required_cells.append_array(MONSTER_HOME_CELLS)
     required_cells.append(DOOR)
+    required_cells.append_array(room_cells)
     var layout := labyrinth_generator.generate(campaign_seed, required_cells)
     walls.assign(layout.get("walls", []))
 
@@ -71,7 +111,8 @@ func _spawn_mobile_monsters() -> void:
     mobile_monsters.clear()
     for index in MONSTER_HOME_CELLS.size():
         var monster: MobileMonster = MobileMonsterScript.new()
-        monster.setup(MONSTER_HOME_CELLS[index], 105.0 + index * 10.0)
+        var archetype := MONSTER_ARCHETYPES[index]
+        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed)
         monster.world_position = _world_from_cell(MONSTER_HOME_CELLS[index])
         mobile_monsters.append(monster)
 
@@ -111,7 +152,8 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 monster.world_position = _world_from_cell(monster.home_cell)
                 status_label.text = "Un monstre paniqué retourne dans son repaire."
             else:
-                adventurer_health.take_damage(MONSTER_HIT_DAMAGE)
+                var archetype := MONSTER_ARCHETYPES[index]
+                adventurer_health.take_damage(archetype.base_damage)
                 monster.reset_to_home(CELL_SIZE)
                 monster.world_position = _world_from_cell(monster.home_cell)
 
@@ -149,11 +191,36 @@ func _draw() -> void:
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         var center := _world_from_cell(monster.cell)
-        var role_colors := [Color("ff5d8f"), Color("ff9f1c"), Color("9b5de5"), Color("00bbf9")]
-        var color := Color("7bdff2") if loop_rules.is_panicking() else role_colors[index % role_colors.size()]
-        draw_circle(center, 14.0, color)
-        draw_circle(center + Vector2(-5, -4), 2.0, Color.WHITE)
-        draw_circle(center + Vector2(5, -4), 2.0, Color.WHITE)
+        var archetype := MONSTER_ARCHETYPES[index]
+        var texture: Texture2D = MONSTER_TEXTURES[archetype.archetype_id]
+        var tint := Color("9eeeff") if loop_rules.is_panicking() else Color.WHITE
+        draw_texture_rect(texture, Rect2(center - CHARACTER_DRAW_SIZE / 2.0, CHARACTER_DRAW_SIZE), false, tint)
+
+func get_run_tags() -> Array[String]:
+    var tags: Array[String] = ["biome:%s" % active_biome.active_biome_id]
+    for archetype in MONSTER_ARCHETYPES:
+        tags.append("monster:%s" % archetype.archetype_id)
+    for room: RoomData in placed_rooms.values():
+        for tag in room.tags:
+            var value := "room:%s" % String(tag)
+            if not tags.has(value):
+                tags.append(value)
+    return tags
+
+func get_monster_ids() -> Array[String]:
+    var ids: Array[String] = []
+    for archetype in MONSTER_ARCHETYPES:
+        ids.append(archetype.archetype_id)
+    return ids
+
+func _draw_level_objects() -> void:
+    super._draw_level_objects()
+    for cell: Vector2i in placed_rooms:
+        var room: RoomData = placed_rooms[cell]
+        var rect := Rect2(_cell_top_left(cell) + Vector2(5, 5), Vector2(CELL_SIZE - 10, CELL_SIZE - 10))
+        draw_rect(rect, Color("58446f"), true)
+        draw_rect(rect, Color("d8b4ff"), false, 2.0)
+        draw_string(ThemeDB.fallback_font, _cell_top_left(cell) + Vector2(8, 28), room.display_name.left(3), HORIZONTAL_ALIGNMENT_LEFT, 34, 10, Color("fff0c2"))
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
     return super._is_valid_build_cell(cell) and cell != BLESSING_CELL and not MONSTER_HOME_CELLS.has(cell)

@@ -1,0 +1,7 @@
+disable:
+  - class-definitions-order
+  - max-file-lines
+  - max-line-length
+  - max-public-methods
+  - max-returns
+  - private-method-call

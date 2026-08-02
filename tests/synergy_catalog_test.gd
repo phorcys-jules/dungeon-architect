@@ -17,13 +17,12 @@ func _init() -> void:
 
     var engine := SynergyEngine.new()
     engine.configure(definitions)
-    var result := engine.evaluate([&"ghost", &"fog", &"mimic", &"treasure"])
-    var active: Array = result.get("active_synergies", [])
+    var active: Array[StringName] = engine.evaluate([&"ghost", &"fog", &"mimic", &"treasure"])
     if active.size() != 2:
         push_error("Expected two active synergies")
         quit(1)
         return
-    var modifiers: Dictionary = result.get("modifiers", {})
+    var modifiers: Dictionary = engine.combined_modifiers
     if not modifiers.has("first_hit_damage_multiplier"):
         push_error("Expected mimic treasure modifier")
         quit(1)
