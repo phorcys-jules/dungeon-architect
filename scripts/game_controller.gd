@@ -434,8 +434,7 @@ func _village_effect_lines() -> Array[String]:
         lines.append("Labo : +%d%% effets" % roundi(float(village_modifiers.get("effect_duration_multiplier", 0.0)) * 100.0))
     if graveyard_level > 0:
         lines.append("Cimetière : +%d%% retour" % roundi(float(village_modifiers.get("monster_respawn_speed_multiplier", 0.0)) * 100.0))
-    if not black_market.purchased_ids.is_empty():
-        lines.append("Marché noir : %d pacte(s)" % black_market.purchased_ids.size())
+    lines.append_array(black_market.active_effect_summaries())
     return lines
 
 func _set_run_end_actions_visible(value: bool) -> void:
