@@ -73,6 +73,9 @@ jobs:
       - name: Run mobile monster test
         run: timeout 45s ./godot --headless --path . --script tests/mobile_monster_test.gd
 
+      - name: Run Pac-Man loop rules test
+        run: timeout 45s ./godot --headless --path . --script tests/pacman_loop_rules_test.gd
+
       - name: Install export templates
         run: |
           curl --fail --location --retry 3 \
