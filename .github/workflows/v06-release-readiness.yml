@@ -21,3 +21,11 @@ jobs:
         run: ./godot --headless --path . --import
       - name: Test v0.6 release metadata and migration
         run: ./godot --headless --path . --script tests/v06_release_readiness_test.gd
+      - name: Test full v0.6 run integration
+        run: ./godot --headless --path . --script tests/v06_full_run_integration_test.gd
+      - name: Test v0.6 content wiring
+        run: ./godot --headless --path . --script tests/v06_content_wiring_test.gd
+      - name: Test monster progression, families and traits
+        run: ./godot --headless --path . --script tests/monster_progression_family_test.gd
+      - name: Test v0.6 balance guardrails
+        run: ./godot --headless --path . --script tests/v06_balance_guardrails_test.gd

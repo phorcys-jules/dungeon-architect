@@ -26,7 +26,7 @@ func _init() -> void:
     restored.from_dict(progress.to_dict())
     assert(restored.state_of("monster_slime") == EncyclopediaCatalog.DiscoveryState.DISCOVERED)
     assert(int(restored.stats["monster_slime"].uses) == 2)
-    assert(catalog.list_by_kind("monster").size() == 2)
+    assert(catalog.list_by_kind("monster").size() == 4)
 
     print("encyclopedia test passed")
     quit()

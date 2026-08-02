@@ -59,6 +59,13 @@ func _start_new_campaign() -> void:
     super._start_new_campaign()
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode == KEY_W:
+            _set_construction_mode(ConstructionMode.PLACE_WALL)
+            return
+        if event.keycode == KEY_R:
+            _set_construction_mode(ConstructionMode.REMOVE_WALL)
+            return
     if construction_mode == ConstructionMode.DEFENCES or game_state != GameState.PREPARATION:
         super._unhandled_input(event)
         return
@@ -92,6 +99,7 @@ func _try_place_free_wall(cell: Vector2i) -> void:
         return
     economy.spend(-int(result.gold_delta))
     walls.append(cell)
+    record_v06_wall_placed()
     astar.set_point_solid(cell, true)
     _recalculate_path()
     status_label.text = "Mur placé. Budget restant : %d." % dungeon_build.remaining_wall_budget()

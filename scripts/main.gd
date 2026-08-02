@@ -6,6 +6,12 @@ const DefenderScript := preload("res://scripts/monsters/defender.gd")
 const RunStatsScript := preload("res://scripts/core/run_stats.gd")
 const EconomyScript := preload("res://scripts/core/economy.gd")
 const WaveManagerScript := preload("res://scripts/core/wave_manager.gd")
+const MonsterSprite := preload("res://assets/sprites/characters/monster_imp.png")
+const ADVENTURER_TEXTURES := {
+    "scout": preload("res://assets/sprites/characters/adventurer_scout.png"),
+    "warrior": preload("res://assets/sprites/characters/adventurer_warrior.png"),
+    "champion": preload("res://assets/sprites/characters/adventurer_knight.png"),
+}
 
 const GRID_SIZE := Vector2i(15, 10)
 const CELL_SIZE := 48
@@ -19,6 +25,7 @@ const STARTING_GOLD := 100
 const SPIKE_TRAP_COST := 25
 const DEFENDER_COST := 40
 const DOOR_COST := 10
+const CHARACTER_DRAW_SIZE := Vector2(48, 48)
 
 enum GameState { PREPARATION, INVASION, WAVE_RESULT, CAMPAIGN_FINISHED }
 enum BuildMode { SPIKE_TRAP, DEFENDER }
@@ -89,7 +96,7 @@ func _process(delta: float) -> void:
         return
 
     var target := path[path_index]
-    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * waves.get_speed_multiplier() * delta)
+    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * _current_adventurer_speed_multiplier() * delta)
     if adventurer_position.distance_to(target) < 1.0:
         adventurer_position = target
         _trigger_trap_at(_cell_from_world(adventurer_position))
@@ -99,6 +106,17 @@ func _process(delta: float) -> void:
     queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        match event.keycode:
+            KEY_1:
+                _set_build_mode(BuildMode.SPIKE_TRAP)
+            KEY_2:
+                _set_build_mode(BuildMode.DEFENDER)
+            KEY_SPACE, KEY_ENTER:
+                _on_primary_button_pressed()
+            KEY_D:
+                _toggle_door()
+        return
     if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
         return
     var cell := _cell_from_world(event.position)
@@ -291,9 +309,11 @@ func _place_spike_trap(cell: Vector2i) -> void:
         return
     var trap: SpikeTrap = SpikeTrapScript.new()
     trap.setup(cell)
+    _configure_trap(trap)
     trap.triggered.connect(func(damage: int): run_stats.record_trap(damage); status_label.text = "Piège déclenché : %d dégâts." % damage)
     add_child(trap)
     traps[cell] = trap
+    _on_trap_placed()
     status_label.text = "Piège placé pour %d or." % SPIKE_TRAP_COST
     _refresh_build_ui()
     queue_redraw()
@@ -307,6 +327,7 @@ func _place_defender(cell: Vector2i) -> void:
         return
     var defender: Defender = DefenderScript.new()
     defender.setup(cell, _world_from_cell(cell))
+    _configure_defender(defender)
     defender.attacked.connect(func(damage: int): run_stats.record_defender_attack(damage); status_label.text = "Le défenseur inflige %d dégâts." % damage)
     add_child(defender)
     defenders[cell] = defender
@@ -469,16 +490,15 @@ func _draw_defenders() -> void:
     for cell: Vector2i in defenders:
         var defender: Defender = defenders[cell]
         var center := _world_from_cell(cell)
-        draw_circle(center, 15.0, Color("9b5de5") if defender.is_ready else Color("5e4778"))
-        draw_circle(center + Vector2(-5, -4), 2.0, Color.WHITE)
-        draw_circle(center + Vector2(5, -4), 2.0, Color.WHITE)
+        var tint := Color("c9a7ff") if defender.is_ready else Color("766484")
+        draw_texture_rect(MonsterSprite, Rect2(center - CHARACTER_DRAW_SIZE / 2.0, CHARACTER_DRAW_SIZE), false, tint)
 
 func _draw_adventurer() -> void:
     if adventurer_health.is_dead:
         return
-    draw_circle(adventurer_position, 14.0, Color("62a7ff"))
-    draw_circle(adventurer_position + Vector2(-5, -4), 2.0, Color.WHITE)
-    draw_circle(adventurer_position + Vector2(5, -4), 2.0, Color.WHITE)
+    var adventurer_id := waves.get_adventurer_data().id
+    var texture: Texture2D = ADVENTURER_TEXTURES.get(adventurer_id, ADVENTURER_TEXTURES.champion)
+    draw_texture_rect(texture, Rect2(adventurer_position - CHARACTER_DRAW_SIZE / 2.0, CHARACTER_DRAW_SIZE), false)
     var bar_position := adventurer_position + Vector2(-18, -25)
     draw_rect(Rect2(bar_position, Vector2(36, 5)), Color("2a2d36"))
     draw_rect(Rect2(bar_position, Vector2(36.0 * adventurer_health.get_health_ratio(), 5)), Color("63d471"))
@@ -495,3 +515,15 @@ func _cell_from_world(world_position: Vector2) -> Vector2i:
 
 func _is_inside_grid(cell: Vector2i) -> bool:
     return cell.x >= 0 and cell.y >= 0 and cell.x < GRID_SIZE.x and cell.y < GRID_SIZE.y
+
+func _current_adventurer_speed_multiplier() -> float:
+    return waves.get_speed_multiplier()
+
+func _on_trap_placed() -> void:
+    pass
+
+func _configure_trap(_trap: SpikeTrap) -> void:
+    pass
+
+func _configure_defender(_defender: Defender) -> void:
+    pass
