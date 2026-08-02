@@ -4,6 +4,7 @@ signal run_requested
 
 const VillageBackground := preload("res://assets/backgrounds/monster_village.png")
 const VillageMusic := preload("res://assets/audio/music/village_night.wav")
+const VillageAmbientAnimatorScript := preload("res://scripts/village/village_ambient_animator.gd")
 const BUILDING_TEXTURES := {
     "den": preload("res://assets/sprites/buildings/den.png"),
     "forge": preload("res://assets/sprites/buildings/forge.png"),
@@ -29,11 +30,13 @@ var progression_service := V04ProgressionService.new()
 var selected_building := "den"
 var building_buttons: Dictionary = {}
 var music_player: AudioStreamPlayer
+var ambient_animator: VillageAmbientAnimator
 
 func _ready() -> void:
     super._ready()
     _load_village_state()
     _build_village_map()
+    _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
     _select_building("den")
@@ -127,6 +130,13 @@ func _start_village_music() -> void:
     add_child(music_player)
     music_player.play()
     create_tween().tween_property(music_player, "volume_db", -19.0, 1.8)
+
+func _start_village_animations() -> void:
+    ambient_animator = VillageAmbientAnimatorScript.new()
+    ambient_animator.name = "VillageAmbientAnimations"
+    ambient_animator.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    add_child(ambient_animator)
+    move_child(ambient_animator, 1)
 
 func _select_building(building_id: String) -> void:
     selected_building = building_id

@@ -78,6 +78,11 @@ en ré mineur mêlant bourdon grave, nappes et cloches discrètes. La lecture d�
 fondu de 1,8 seconde à −19 dB et disparaît en 0,45 seconde avant le lancement d'une run afin
 d'éviter une coupure sèche ou la superposition de plusieurs pistes.
 
+Le décor possède également une couche d'animation procédurale entre le fond et les bâtiments :
+le feu de camp central pulse et projette neuf braises, les douze torches vacillent avec des
+phases différentes, et cinq volutes de fumée s'échappent de la cheminée de la forge en dérivant
+vers la droite. Cette couche ignore la souris et ne modifie donc aucune zone cliquable.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;

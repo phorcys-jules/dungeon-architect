@@ -27,6 +27,14 @@ func _init() -> void:
     if (screen.music_player.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_FORWARD:
         quit(1)
         return
+    if screen.ambient_animator == null or screen.ambient_animator.TORCH_POSITIONS.size() != 12:
+        quit(1)
+        return
+    var animation_time := screen.ambient_animator.elapsed
+    screen.ambient_animator._process(0.1)
+    if screen.ambient_animator.elapsed <= animation_time:
+        quit(1)
+        return
     screen.transition_in_progress = true
     screen._refresh_navigation()
     if not screen.start_run_button.disabled:
