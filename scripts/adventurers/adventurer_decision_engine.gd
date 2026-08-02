@@ -24,6 +24,15 @@ func choose_action(class_id: String, perception: AdventurerPerception, inventory
         return {"action": "use_item", "item": "torch"}
 
     match class_id:
+        "scout":
+            if nearby_threats > 0 and health_ratio > 0.35:
+                return {"action": "fight", "style": "ranged"}
+        "warrior":
+            if nearby_threats > 0:
+                return {"action": "fight", "style": "nearest"}
+        "champion":
+            if nearby_threats > 0:
+                return {"action": "fight", "style": "dangerous"}
         "thief":
             if relic_visible and nearby_threats <= 1:
                 return {"action": "collect_relic"}

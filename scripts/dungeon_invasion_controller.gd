@@ -7,6 +7,7 @@ const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd"
 const LabyrinthGeneratorScript := preload("res://scripts/core/labyrinth_generator.gd")
 const MonsterAiCoordinatorScript := preload("res://scripts/monsters/monster_ai_coordinator.gd")
 const MonsterTacticalRuntimeScript := preload("res://scripts/monsters/monster_tactical_runtime.gd")
+const AdventurerCombatAiScript := preload("res://scripts/adventurers/adventurer_combat_ai.gd")
 const MONSTER_ARCHETYPES: Array[MonsterArchetypeData] = [
     preload("res://resources/monsters/ghost.tres"),
     preload("res://resources/monsters/slime.tres"),
@@ -68,6 +69,7 @@ var adventurer_direction := Vector2i.RIGHT
 var room_deck := RoomDeck.new()
 var placed_rooms: Dictionary = {}
 var active_biome := BiomeRuntime.new()
+var adventurer_attack_cooldown := 0.0
 
 func _build_level() -> void:
     active_biome.select_for_zone(campaign_seed, 0)
@@ -99,17 +101,19 @@ func _ready() -> void:
 
 func _prepare_current_wave() -> void:
     blessing_available = true
+    adventurer_attack_cooldown = 0.0
     slime_trails.clear()
     spider_webs.clear()
     super._prepare_current_wave()
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
-        monster.reset_to_home(CELL_SIZE)
+        monster.revive_at_home(CELL_SIZE)
         monster_burst_available[index] = true
         monster_ability_cooldowns[index] = 0.0
 
 func _process(delta: float) -> void:
     loop_rules.tick(delta)
+    adventurer_attack_cooldown = maxf(adventurer_attack_cooldown - delta, 0.0)
     for index in monster_attack_flashes.size():
         monster_attack_flashes[index] = maxf(monster_attack_flashes[index] - delta, 0.0)
         monster_ability_flashes[index] = maxf(monster_ability_flashes[index] - delta, 0.0)
@@ -145,7 +149,7 @@ func _spawn_mobile_monsters() -> void:
     for index in MONSTER_HOME_CELLS.size():
         var monster: MobileMonster = MobileMonsterScript.new()
         var archetype := MONSTER_ARCHETYPES[index]
-        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed)
+        monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed, 42 + archetype.base_damage * 2)
         monster.world_position = Vector2(MONSTER_HOME_CELLS[index]) * CELL_SIZE
         mobile_monsters.append(monster)
         monster_facings.append(1.0)
@@ -155,6 +159,9 @@ func _spawn_mobile_monsters() -> void:
         monster_burst_available.append(true)
 
 func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
+    for monster in mobile_monsters:
+        monster.tick_respawn(delta, CELL_SIZE)
+    _try_adventurer_attack()
     var occupied: Array[Vector2i] = []
     for monster in mobile_monsters:
         occupied.append(monster.cell)
@@ -167,6 +174,8 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         var archetype := MONSTER_ARCHETYPES[index]
+        if not monster.is_active():
+            continue
         if archetype.has_ability(&"phase") and monster_ability_cooldowns[index] <= 0.0:
             var landing := MonsterTacticalRuntimeScript.phase_destination(monster.cell, adventurer_cell, walls, GRID_SIZE)
             if landing != monster.cell:
@@ -224,6 +233,43 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
 
+func _try_adventurer_attack() -> bool:
+    if adventurer_attack_cooldown > 0.0 or adventurer_health.is_dead:
+        return false
+    var adventurer_data := waves.get_adventurer_data()
+    var profile: Dictionary = AdventurerCombatAiScript.profile(adventurer_data.id)
+    var attack_range := float(profile.range_cells) * CELL_SIZE
+    var candidates: Array[Dictionary] = []
+    for index in mobile_monsters.size():
+        var monster := mobile_monsters[index]
+        var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+        var distance := adventurer_position.distance_to(center)
+        if distance <= attack_range:
+            candidates.append({
+                "index": index,
+                "active": monster.is_active(),
+                "distance": distance / CELL_SIZE,
+                "health_ratio": monster.get_health_ratio(),
+                "threat": MONSTER_ARCHETYPES[index].base_damage,
+            })
+    var target_index := AdventurerCombatAiScript.choose_target(candidates, StringName(profile.strategy))
+    if target_index < 0:
+        return false
+    var target := mobile_monsters[target_index]
+    var target_center := GRID_ORIGIN + target.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+    var applied_damage := target.take_damage(int(profile.damage))
+    if applied_damage <= 0:
+        return false
+    adventurer_attack_cooldown = float(profile.cooldown)
+    _play_adventurer_attack(target_center, bool(profile.ranged))
+    monster_ability_flashes[target_index] = 0.2
+    if target.is_active():
+        status_label.text = "%s attaque %s : %d dégâts." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name, applied_damage]
+    else:
+        target.reset_to_home(CELL_SIZE)
+        status_label.text = "%s neutralise %s, qui reviendra bientôt." % [adventurer_data.display_name, MONSTER_ARCHETYPES[target_index].display_name]
+    return true
+
 func _play_monster_attack(archetype_id: StringName, attack_origin: Vector2) -> void:
     match archetype_id:
         &"ghost":
@@ -265,7 +311,8 @@ func _tick_zone_durations(zones: Dictionary, delta: float) -> void:
 func _check_capture(adventurer_cell: Vector2i) -> void:
     var monster_cells: Array[Vector2i] = []
     for monster in mobile_monsters:
-        monster_cells.append(monster.cell)
+        if monster.is_active():
+            monster_cells.append(monster.cell)
     var blocked := walls.duplicate()
     if door_closed:
         blocked.append(DOOR)
@@ -318,6 +365,8 @@ func _draw() -> void:
         _draw_collectible(BLESSING_TEXTURE, _world_from_cell(BLESSING_CELL), Vector2(40, 40))
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
+        if not monster.is_active():
+            continue
         var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
         var archetype := MONSTER_ARCHETYPES[index]
         var texture: Texture2D = MONSTER_TEXTURES[archetype.archetype_id]
@@ -329,6 +378,10 @@ func _draw() -> void:
         if monster_ability_flashes[index] > 0.0:
             scale += 0.08
         _draw_character_frame(texture, center, tint, monster.has_path(), monster_facings[index], archetype.base_speed / 120.0, scale, index * 0.07)
+        var health_width := 32.0
+        var health_origin := center + Vector2(-health_width / 2.0, -24.0)
+        draw_rect(Rect2(health_origin, Vector2(health_width, 4)), Color("261f2d"))
+        draw_rect(Rect2(health_origin, Vector2(health_width * monster.get_health_ratio(), 4)), Color("e05d6f"))
 
 func _draw_web(center: Vector2) -> void:
     var color := Color("d6c5f0", 0.7)

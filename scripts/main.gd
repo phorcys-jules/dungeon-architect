@@ -629,12 +629,16 @@ func _tick_combat_presentation(delta: float) -> void:
             combat_effects.remove_at(index)
 
 func _play_clash(monster_position: Vector2, effect_kind: StringName, color: Color) -> void:
-    var direction := monster_position - adventurer_position
+    _spawn_combat_effect(effect_kind, monster_position, adventurer_position, color, 0.34)
+
+func _play_adventurer_attack(target: Vector2, ranged: bool) -> void:
+    var direction := target - adventurer_position
     adventurer_attack_direction = direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
     adventurer_facing = CharacterAnimationRuntimeScript.facing_sign(direction.x, adventurer_facing)
     adventurer_attack_flash = 0.22
-    _spawn_combat_effect(effect_kind, monster_position, adventurer_position, color, 0.34)
-    _spawn_combat_effect(&"slash", adventurer_position, monster_position, Color("fff0b8"), 0.24)
+    var kind: StringName = &"projectile" if ranged else &"slash"
+    var color := Color("78d8ff") if ranged else Color("fff0b8")
+    _spawn_combat_effect(kind, adventurer_position, target, color, 0.28 if ranged else 0.24)
 
 func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, color: Color, duration: float) -> void:
     combat_effects.append({
@@ -716,7 +720,8 @@ func _is_inside_grid(cell: Vector2i) -> bool:
     return cell.x >= 0 and cell.y >= 0 and cell.x < GRID_SIZE.x and cell.y < GRID_SIZE.y
 
 func _current_adventurer_speed_multiplier() -> float:
-    return waves.get_speed_multiplier()
+    var attack_brake := 0.2 if adventurer_attack_flash > 0.0 else 1.0
+    return waves.get_speed_multiplier() * attack_brake
 
 func _on_trap_placed() -> void:
     pass

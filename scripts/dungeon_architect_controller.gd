@@ -128,6 +128,9 @@ func _synchronize_wall_pathfinding() -> void:
     astar.set_point_solid(DOOR, door_closed)
 
 func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
+    for monster in mobile_monsters:
+        monster.tick_respawn(delta, CELL_SIZE)
+    _try_adventurer_attack()
     var occupied: Array[Vector2i] = []
     for monster in mobile_monsters:
         occupied.append(monster.cell)
@@ -140,6 +143,8 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     for index in mobile_monsters.size():
         passage_cooldowns[index] = maxf(float(passage_cooldowns.get(index, 0.0)) - delta, 0.0)
         var monster := mobile_monsters[index]
+        if not monster.is_active():
+            continue
         if not monster.has_path():
             var target := monster.home_cell if loop_rules.is_panicking() else targets[index]
             target.x = clampi(target.x, 0, GRID_SIZE.x - 1)
@@ -153,7 +158,9 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                     cells.append(point_cell)
             monster.set_path(cells)
 
+        var previous_position := monster.world_position
         monster.tick_grid(delta, CELL_SIZE)
+        monster_facings[index] = CharacterAnimationRuntimeScript.facing_sign(monster.world_position.x - previous_position.x, monster_facings[index])
         var monster_cell := monster.cell
         if float(passage_cooldowns[index]) <= 0.0:
             var passage_destination := dungeon_build.resolve_monster_passage(monster_cell, _monster_passage_tags(index))
@@ -166,20 +173,16 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 passage_cooldowns[index] = 1.0
                 status_label.text = "Un monstre emprunte un passage secret."
 
-        monster.world_position = GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-        monster.world_position = _world_from_cell(monster_cell) if not monster.has_path() else monster.world_position
-
         if monster_cell == adventurer_cell:
             if loop_rules.is_panicking():
                 monster.reset_to_home(CELL_SIZE)
-                monster.world_position = _world_from_cell(monster.home_cell)
                 status_label.text = "Un monstre paniqué retourne dans son repaire."
             else:
-                _play_monster_attack(MONSTER_ARCHETYPES[index].archetype_id, monster.world_position)
+                var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+                _play_monster_attack(MONSTER_ARCHETYPES[index].archetype_id, attack_origin)
                 adventurer_health.take_damage(MONSTER_HIT_DAMAGE)
                 monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
-                monster.world_position = _world_from_cell(monster.home_cell)
 
 func _monster_passage_tags(index: int) -> Array[String]:
     match monster_behaviours[index]:

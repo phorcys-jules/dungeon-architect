@@ -48,7 +48,7 @@ func _process(delta: float) -> void:
         return
 
     var target := path[path_index]
-    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * waves.get_speed_multiplier() * delta)
+    adventurer_position = adventurer_position.move_toward(target, MOVE_SPEED * _current_adventurer_speed_multiplier() * delta)
     if adventurer_position.distance_to(target) < 1.0:
         adventurer_position = target
         var reached_cell := _cell_from_world(adventurer_position)

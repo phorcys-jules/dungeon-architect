@@ -10,6 +10,12 @@ func _init() -> void:
     assert(game.mobile_monsters.size() == 4)
     assert(game.monster_ability_cooldowns.size() == 4)
     assert(game.monster_burst_available == [true, true, true, true])
+    var combat_target: MobileMonster = game.mobile_monsters[0]
+    combat_target.world_position = Vector2(game.ENTRANCE) * game.CELL_SIZE
+    var previous_monster_health := combat_target.current_health
+    assert(game._try_adventurer_attack())
+    assert(combat_target.current_health < previous_monster_health)
+    combat_target.reset_to_home(game.CELL_SIZE)
     for index in game.mobile_monsters.size():
         var expected_position: Vector2 = Vector2(game.MONSTER_HOME_CELLS[index]) * game.CELL_SIZE
         assert(game.mobile_monsters[index].world_position == expected_position)
@@ -33,6 +39,7 @@ func _init() -> void:
         assert(texture != null)
         assert(texture.get_width() == 128)
         assert(texture.get_height() == 128)
+    game.combat_effects.clear()
     game._spawn_combat_effect(&"projectile", Vector2.ZERO, Vector2.RIGHT * 48.0, Color.WHITE, 0.3)
     assert(game.combat_effects.size() == 1)
     game._tick_combat_presentation(0.1)

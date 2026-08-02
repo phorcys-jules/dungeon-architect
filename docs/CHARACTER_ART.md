@@ -59,6 +59,12 @@ un effet identifiable : frappe spectrale du fantôme, éclaboussure du slime, mo
 et projectile de toile de l'araignée. Au contact, l'aventurier répond par un arc d'arme doré ;
 les impacts produisent une gerbe brève et sa réception des dégâts reste signalée par un flash.
 
+L'attaque de l'aventurier est désormais pilotée par son profil. L'éclaireur tire à distance
+sur les cibles blessées, le guerrier engage le monstre le plus proche et le champion privilégie
+la menace la plus dangereuse. Chaque monstre possède des points de vie visibles ; une cible
+neutralisée disparaît quelques secondes avant de revenir à son repaire. L'aventurier ralentit
+brièvement pendant sa frappe puis reprend automatiquement son objectif de run.
+
 ## Suite prévue
 
 - ajouter des variantes visuelles liées aux traits et familles ;
