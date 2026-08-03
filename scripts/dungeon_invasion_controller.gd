@@ -282,6 +282,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
                 _play_monster_attack(archetype.archetype_id, attack_origin)
                 adventurer_health.take_damage(damage)
+                _on_monster_hit_adventurer(archetype.archetype_id, archetype.has_ability(&"first_hit_burst") and monster_burst_available[index])
                 if archetype.has_ability(&"first_hit_burst") and monster_burst_available[index]:
                     monster_burst_available[index] = false
                     monster_ability_flashes[index] = 0.35
@@ -371,6 +372,9 @@ func _play_monster_attack(archetype_id: StringName, attack_origin: Vector2) -> v
             _play_clash(attack_origin, &"web", Color("e4d3ff"))
         _:
             _play_clash(attack_origin, &"slash", Color("ff9f68"))
+
+func _on_monster_hit_adventurer(_archetype_id: StringName, _was_ambush: bool) -> void:
+    pass
 
 func _apply_monster_zone_ability(index: int, archetype: MonsterArchetypeData, previous_cell: Vector2i, current_cell: Vector2i) -> void:
     if archetype.has_ability(&"slow_trail"):

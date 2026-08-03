@@ -4,6 +4,7 @@ class_name GameController
 const RunEndControllerScript := preload("res://scripts/core/run_end_controller.gd")
 const AdventurerIntelligenceScript := preload("res://scripts/meta/adventurer_intelligence.gd")
 const RetroSfxPlayerScript := preload("res://scripts/presentation/retro_sfx_player.gd")
+const ComboRuntimeScript := preload("res://scripts/combat/combo_runtime.gd")
 
 var run_end: RunEndController = RunEndControllerScript.new()
 var village_button: Button
@@ -37,6 +38,8 @@ var selected_choice_ids: Array[StringName] = []
 var run_choice_modifiers: Dictionary = {}
 var feedback_settings := GameFeedbackSettings.new()
 var sfx_player: Node
+var combo_runtime = ComboRuntimeScript.new()
+var combo_zone_cell := Vector2i(-1, -1)
 var pending_run_choice := false
 
 func _ready() -> void:
@@ -159,6 +162,8 @@ func _begin_tracked_run() -> void:
     _set_run_end_actions_visible(false)
 
 func _prepare_current_wave() -> void:
+    combo_runtime.clear()
+    combo_zone_cell = Vector2i(-1, -1)
     _set_choice_buttons_visible(false)
     result_summary.size.y = 318
     var announcement := v06_integration.start_wave(waves.current_wave, active_biome.active_biome_id)
@@ -209,6 +214,7 @@ func _finish_campaign(victory: bool, message: String) -> void:
         "room_ids": _placed_room_ids(),
         "biome": active_biome.active_biome_id,
         "resources_lost": 0 if victory else 1,
+        "combo_counts": combo_runtime.trigger_counts.duplicate(true),
     })
     var challenge_rewards: Dictionary = meta.challenge_rewards
     result_summary.text += "\nDéfis : +%d or, +%d essence" % [int(challenge_rewards.gold), int(challenge_rewards.essence)]
@@ -338,6 +344,47 @@ func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, co
         sfx_player.call("play_event", String(kind), feedback_settings)
     var adjusted_duration := duration * (0.45 if feedback_settings.reduced_motion else 1.0)
     super._spawn_combat_effect(kind, origin, target, color, adjusted_duration)
+
+func _process(delta: float) -> void:
+    super._process(delta)
+    if game_state != GameState.INVASION:
+        return
+    var cell := _cell_from_world(adventurer_position)
+    if cell == combo_zone_cell:
+        return
+    combo_zone_cell = cell
+    if slime_trails.has(cell):
+        _apply_combo_state("slimed")
+    if spider_webs.has(cell):
+        _apply_combo_state("webbed")
+    if active_biome.active_biome_id == BiomeCatalog.SEWERS:
+        _apply_combo_state("wet")
+
+func _on_trap_status_applied(effect_id: StringName, duration: float, strength: float) -> void:
+    super._on_trap_status_applied(effect_id, duration, strength)
+    var state_by_effect := {&"tar_slow": "tarred", &"frost_slow": "frozen", &"void_slow": "cursed", &"burning": "burning", &"vulnerable": "vulnerable", &"frightened": "frightened"}
+    if state_by_effect.has(effect_id):
+        _apply_combo_state(String(state_by_effect[effect_id]))
+
+func _on_monster_hit_adventurer(archetype_id: StringName, was_ambush: bool) -> void:
+    if archetype_id == &"ghost":
+        _apply_combo_state("spectral")
+    if was_ambush:
+        _apply_combo_state("ambushed")
+
+func _apply_combo_state(state_id: String) -> Dictionary:
+    var combo: Dictionary = combo_runtime.apply_state(state_id)
+    if combo.is_empty():
+        return combo
+    var damage := int(combo.damage)
+    adventurer_health.take_damage(damage)
+    run_stats.total_damage += damage
+    var result_state := String(combo.get("result", ""))
+    if not result_state.is_empty() and not combo_runtime.states.has(result_state):
+        combo_runtime.states.append(result_state)
+    status_label.text = "COMBO — %s : %d dégâts !" % [String(combo.name), damage]
+    _spawn_combat_effect(&"splash", adventurer_position, adventurer_position, Color("ffd166"), 0.55)
+    return combo
 
 func _wave_reward_multiplier() -> float:
     return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))

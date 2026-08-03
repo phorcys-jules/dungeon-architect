@@ -138,6 +138,12 @@ func _init() -> void:
     game._spawn_combat_effect(&"splash", Vector2.ZERO, Vector2.ONE, Color.WHITE, 0.3)
     assert(game.combat_effects.size() == effect_count)
     game.feedback_settings.particles_enabled = true
+    game.combo_runtime.clear()
+    game.adventurer_health.reset()
+    var combo_health: int = game.adventurer_health.current_health
+    assert(game._apply_combo_state("tarred").is_empty())
+    assert(String(game._apply_combo_state("burning").id) == "inferno_tar")
+    assert(game.adventurer_health.current_health < combo_health)
     game.v06_integration.events.active_events.clear()
     game.v06_integration.synergies.active = previous_synergies
     var previous_modifiers: Dictionary = game.village_modifiers.duplicate(true)
