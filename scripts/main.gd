@@ -195,7 +195,7 @@ func _build_interface() -> void:
     add_child(header_panel)
 
     var title := Label.new()
-    title.text = "DUNGEON ARCHITECT  •  v0.6 ALPHA"
+    title.text = "DUNGEON ARCHITECT  •  v0.7 ALPHA"
     title.position = Vector2(42, 22)
     title.size = Vector2(520, 32)
     title.add_theme_font_size_override("font_size", 24)

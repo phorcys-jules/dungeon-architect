@@ -38,8 +38,11 @@ func remaining_wall_budget() -> int:
 
 func configure_default_passages() -> void:
     secret_passages.passages.clear()
-    secret_passages.add_passage(Vector2i(3, 3), Vector2i(11, 7), ["ghost", "ambusher"])
-    secret_passages.add_passage(Vector2i(11, 7), Vector2i(3, 3), ["ghost", "ambusher"])
+    secret_passages.add_passage(Vector2i(3, 3), Vector2i(11, 7), ["ghost", "ambusher", "adventurer"], 1.5)
+    secret_passages.add_passage(Vector2i(11, 7), Vector2i(3, 3), ["ghost", "ambusher", "adventurer"], 1.5)
 
 func resolve_monster_passage(cell: Vector2i, tags: Array[String]) -> Vector2i:
     return secret_passages.destination_for(cell, tags)
+
+func resolve_adventurer_passage(cell: Vector2i) -> Vector2i:
+    return secret_passages.destination_for(cell, ["adventurer"])

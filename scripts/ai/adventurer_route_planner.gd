@@ -3,7 +3,7 @@ extends RefCounted
 
 const INF_COST := 1.0e20
 
-func find_path(graph: Dictionary, start: Vector2i, goal: Vector2i, risk: Dictionary = {}) -> Array[Vector2i]:
+func find_path(graph: Dictionary, start: Vector2i, goal: Vector2i, risk: Dictionary = {}, portals: Array[Dictionary] = []) -> Array[Vector2i]:
     if start == goal:
         return [start]
     if not graph.has(start) or not graph.has(goal):
@@ -17,9 +17,13 @@ func find_path(graph: Dictionary, start: Vector2i, goal: Vector2i, risk: Diction
         var current := _take_lowest(frontier, costs)
         if current == goal:
             return _reconstruct(previous, start, goal)
-        for neighbor_variant in graph.get(current, []):
+        var neighbors: Array = graph.get(current, []).duplicate()
+        for portal in portals:
+            if portal.get("from", Vector2i(-1, -1)) == current:
+                neighbors.append(portal.get("to", current))
+        for neighbor_variant in neighbors:
             var neighbor: Vector2i = neighbor_variant
-            var step_cost := 1.0 + maxf(float(risk.get(neighbor, 0.0)), 0.0)
+            var step_cost := _portal_cost(current, neighbor, portals) + maxf(float(risk.get(neighbor, 0.0)), 0.0)
             var candidate := float(costs[current]) + step_cost
             if candidate < float(costs.get(neighbor, INF_COST)):
                 costs[neighbor] = candidate
@@ -27,6 +31,12 @@ func find_path(graph: Dictionary, start: Vector2i, goal: Vector2i, risk: Diction
                 if not frontier.has(neighbor):
                     frontier.append(neighbor)
     return []
+
+func _portal_cost(from: Vector2i, to: Vector2i, portals: Array[Dictionary]) -> float:
+    for portal in portals:
+        if portal.get("from") == from and portal.get("to") == to:
+            return maxf(float(portal.get("cost", 1.0)), 0.1)
+    return 1.0
 
 func choose_goal(origin: Vector2i, goals: Array[Dictionary], risk: Dictionary = {}) -> Dictionary:
     var best := {}

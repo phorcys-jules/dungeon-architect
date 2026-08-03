@@ -7,6 +7,10 @@ const RetroSfxPlayerScript := preload("res://scripts/presentation/retro_sfx_play
 const ComboRuntimeScript := preload("res://scripts/combat/combo_runtime.gd")
 const DefenseEvolutionScript := preload("res://scripts/core/defense_evolution.gd")
 const TacticalPowerRuntimeScript := preload("res://scripts/run/tactical_power_runtime.gd")
+const AdventurerSquadRuntimeScript := preload("res://scripts/run/adventurer_squad_runtime.gd")
+const TacticalHeatmapScript := preload("res://scripts/run/tactical_heatmap.gd")
+const RoomRuleRuntimeScript := preload("res://scripts/run/room_rule_runtime.gd")
+const ContextualTutorialScript := preload("res://scripts/tutorial/contextual_tutorial.gd")
 
 var run_end: RunEndController = RunEndControllerScript.new()
 var village_button: Button
@@ -53,6 +57,12 @@ var emergency_lock_time := 0.0
 var hunt_order_time := 0.0
 var hunt_original_behaviours: Array[PacmanLoopRules.Behaviour] = []
 var pending_run_choice := false
+var adventurer_squad = AdventurerSquadRuntimeScript.new()
+var tactical_heatmap = TacticalHeatmapScript.new()
+var room_rules = RoomRuleRuntimeScript.new()
+var contextual_tutorial = ContextualTutorialScript.new()
+var heatmap_visible := false
+var heatmap_button: Button
 
 func _ready() -> void:
     village_den = village_den_store.load_den()
@@ -119,6 +129,13 @@ func _build_interface() -> void:
     add_child(event_banner)
     _build_defense_inspector()
     _build_tactical_power_ui()
+    heatmap_button = Button.new()
+    heatmap_button.position = Vector2(772, 568)
+    heatmap_button.size = Vector2(152, 26)
+    heatmap_button.text = "[H] Carte tactique"
+    heatmap_button.tooltip_text = "Affiche la circulation de la vague précédente."
+    heatmap_button.pressed.connect(_toggle_heatmap)
+    add_child(heatmap_button)
     for index in 3:
         var choice_button := Button.new()
         choice_button.position = Vector2(32 + index * 160, 326)
@@ -185,6 +202,12 @@ func _prepare_current_wave() -> void:
     result_summary.size.y = 318
     var announcement := v06_integration.start_wave(waves.current_wave, active_biome.active_biome_id)
     super._prepare_current_wave()
+    adventurer_squad.configure(waves.current_wave)
+    tactical_heatmap.finish_wave()
+    _configure_room_rules()
+    var hint := contextual_tutorial.next_hint(&"start_wave")
+    if not hint.is_empty():
+        status_label.tooltip_text = "%s\nCodex : %s" % [String(hint.text), String(hint.codex)]
     _refresh_adventurer_intelligence()
     var village_health := 1.0 + float(village_modifiers.get("adventurer_health_multiplier", 0.0))
     adventurer_health.max_health = maxi(1, roundi(float(waves.get_adventurer_health()) * v06_integration.adventurer_health_multiplier() * village_health))
@@ -232,6 +255,9 @@ func _finish_campaign(victory: bool, message: String) -> void:
         "biome": active_biome.active_biome_id,
         "resources_lost": 0 if victory else 1,
         "combo_counts": combo_runtime.trigger_counts.duplicate(true),
+        "tactical_heatmap": tactical_heatmap.snapshot(),
+        "room_rule_stats": room_rules.stats(),
+        "squad_roles": adventurer_squad.members.map(func(member): return String(member.role)),
     })
     var challenge_rewards: Dictionary = meta.challenge_rewards
     result_summary.text += "\nDéfis : +%d or, +%d essence" % [int(challenge_rewards.gold), int(challenge_rewards.essence)]
@@ -248,6 +274,7 @@ func _finish_campaign(victory: bool, message: String) -> void:
     persisted_state["labyrinth_modules"] = labyrinth_modules.to_dict()
     persisted_state["room_deck_selection"] = room_deck_selection.to_dict()
     persisted_state["adventurer_intelligence"] = adventurer_intelligence.to_dict()
+    persisted_state["contextual_tutorial"] = contextual_tutorial.serialize()
     v06_integration.store.save_state(persisted_state)
     result_summary.text += "\nÉquipe de monstres : +%d XP" % experience_gain
     _set_run_end_actions_visible(true)
@@ -287,6 +314,7 @@ func _load_village_progression() -> void:
     labyrinth_modules.from_dict(state.get("labyrinth_modules", {}), village_progression.state.buildings)
     room_deck_selection.from_dict(state.get("room_deck_selection", {}))
     adventurer_intelligence.from_dict(state.get("adventurer_intelligence", {}))
+    contextual_tutorial.restore(state.get("contextual_tutorial", {}))
     var labyrinth_modifiers := labyrinth_modules.generator_modifiers()
     labyrinth_generator.wall_density = clampf(0.34 + float(labyrinth_modifiers.density), 0.18, 0.48)
     labyrinth_generator.minimum_loops = 4 + int(labyrinth_modifiers.loops)
@@ -379,6 +407,8 @@ func _process(delta: float) -> void:
     if game_state != GameState.INVASION:
         return
     var cell := _cell_from_world(adventurer_position)
+    tactical_heatmap.record(&"traffic", cell)
+    adventurer_squad.tick(delta)
     if cell == combo_zone_cell:
         return
     combo_zone_cell = cell
@@ -427,6 +457,9 @@ func _unhandled_input(event: InputEvent) -> void:
                 return
             KEY_F:
                 _activate_tactical_power("trap_overcharge")
+                return
+            KEY_H:
+                _toggle_heatmap()
                 return
     super._unhandled_input(event)
 
@@ -497,6 +530,32 @@ func _activate_tactical_power(power_id: String) -> void:
 
 func _on_trap_triggered_for_power(damage: int) -> void:
     tactical_powers.gain_from_trap(damage)
+    tactical_heatmap.record(&"triggers", _cell_from_world(adventurer_position))
+    tactical_heatmap.record(&"damage", _cell_from_world(adventurer_position), damage)
+
+func _toggle_heatmap() -> void:
+    heatmap_visible = not heatmap_visible
+    if heatmap_button:
+        heatmap_button.text = "[H] Masquer la carte" if heatmap_visible else "[H] Carte tactique"
+    queue_redraw()
+
+func _configure_room_rules() -> void:
+    room_rules.room_rules.clear()
+    var rules: Array[StringName] = [&"silence", &"darkness", &"fragile_floor", &"altar", &"prison", &"mana_reserve"]
+    var cells: Array[Vector2i] = [Vector2i(3, 3), Vector2i(6, 3), Vector2i(9, 3), Vector2i(3, 7), Vector2i(6, 7), Vector2i(9, 7)]
+    for index in mini(rules.size(), cells.size()):
+        room_rules.assign(cells[index], rules[index])
+
+func _draw() -> void:
+    super._draw()
+    if not heatmap_visible:
+        return
+    for x in GRID_SIZE.x:
+        for y in GRID_SIZE.y:
+            var cell := Vector2i(x, y)
+            var value := tactical_heatmap.intensity(&"traffic", cell)
+            if value > 0.0:
+                draw_rect(Rect2(GRID_ORIGIN + Vector2(cell) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE)), Color(0.2 + value * 0.7, 0.25, 0.85 - value * 0.5, 0.18 + value * 0.3), true)
 
 func _wave_reward_multiplier() -> float:
     return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))
