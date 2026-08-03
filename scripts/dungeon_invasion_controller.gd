@@ -103,6 +103,7 @@ var adventurer_attack_cooldown := 0.0
 var power_pellet_was_active := false
 var round_state := PacmanRoundState.new()
 var round_state_label: Label
+var door_cooldown_label: Label
 var loot_ledger := RunLootLedger.new()
 var ai_director := AIDirectorScript.new()
 var director_difficulty_modifier := 1.0
@@ -116,6 +117,15 @@ func _build_interface() -> void:
     round_state_label.add_theme_font_size_override("font_size", 12)
     round_state_label.add_theme_color_override("font_color", Color("f4d35e"))
     add_child(round_state_label)
+
+    # Door cooldown indicator (updated during invasion by the controller)
+    door_cooldown_label = Label.new()
+    door_cooldown_label.position = Vector2(760, 56)
+    door_cooldown_label.size = Vector2(140, 24)
+    door_cooldown_label.add_theme_font_size_override("font_size", 12)
+    door_cooldown_label.add_theme_color_override("font_color", Color("f4d35e"))
+    door_cooldown_label.text = ""
+    add_child(door_cooldown_label)
 
 func _draw_grid() -> void:
     var biome := active_biome.catalog.get_biome(active_biome.active_biome_id)
@@ -267,6 +277,15 @@ func _finish_campaign(victory: bool, message: String) -> void:
     status_label.text = "%s · Director: win_rate=%.2f target=%.2f spawn_rate=%.2f" % [status_label.text, float(adjustment.get("current_win_rate", 0.0)), float(adjustment.get("target_win_rate", 0.0)), float(adjustment.get("spawn_rate", 1.0))]
 
     super._finish_campaign(victory, message)
+
+func _refresh_door_ui() -> void:
+    # Extend base door UI: show cooldown during invasion
+    super._refresh_door_ui()
+    if door_cooldown_label:
+        if game_state == GameState.INVASION and loop_rules != null and loop_rules.door_cooldown_left > 0.0:
+            door_cooldown_label.text = "Recharge porte : %d s" % ceili(loop_rules.door_cooldown_left)
+        else:
+            door_cooldown_label.text = ""
 
 func _spawn_mobile_monsters() -> void:
     mobile_monsters.clear()
