@@ -1,4 +1,4 @@
-extends GameController
+extends "res://scripts/game_controller.gd"
 
 const DungeonBuildRuntimeScript := preload("res://scripts/build/dungeon_build_runtime.gd")
 
