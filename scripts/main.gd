@@ -290,6 +290,7 @@ func _build_interface() -> void:
     trap_button.size = Vector2(152, 34)
     _style_action_button(trap_button, Color("6f4b8b"))
     trap_button.pressed.connect(_cycle_trap_type)
+    trap_button.tooltip_text = "Sélectionner un piège · Raccourci clavier : [1—9]"
     add_child(trap_button)
     trap_button.visible = false
 
@@ -298,6 +299,7 @@ func _build_interface() -> void:
     defender_button.size = Vector2(152, 34)
     _style_action_button(defender_button, Color("456990"))
     defender_button.pressed.connect(func(): _set_build_mode(BuildMode.DEFENDER))
+    defender_button.tooltip_text = "Placer un défenseur · Raccourci clavier : [7]"
     add_child(defender_button)
     defender_button.visible = false
 
@@ -314,6 +316,7 @@ func _build_interface() -> void:
     start_button.size = Vector2(170, 44)
     _style_action_button(start_button, Color("3d6b66"))
     start_button.pressed.connect(_on_primary_button_pressed)
+    start_button.tooltip_text = "Entrée / Espace : Lancer / Abandonner la vague"
     add_child(start_button)
 
     result_panel = Panel.new()
@@ -842,6 +845,7 @@ func _build_shortcut_bar() -> void:
         button.expand_icon = true
         button.add_theme_font_size_override("font_size", 10)
         button.pressed.connect(_activate_build_shortcut.bind(slot))
+        button.tooltip_text = "Raccourci [%d]" % slot
         add_child(button)
         shortcut_buttons[slot] = button
     door_button.position = Vector2(772, 557)
