@@ -3,18 +3,57 @@ extends RefCounted
 
 # Minimal mod validation: mod is a Dictionary with keys: id, type (trap|monster), data
 func validate_mod_definition(defn: Dictionary) -> bool:
+	if not defn or typeof(defn) != TYPE_DICTIONARY:
+		return false
 	if not defn.has("id") or not defn.has("type") or not defn.has("data"):
 		return false
-	var t := defn.get("type")	
+	var t := String(defn.get("type"))
 	if t != "trap" and t != "monster":
 		return false
-	return true
+	# type-specific required fields
+	var d := defn.get("data")
+	if typeof(d) != TYPE_DICTIONARY:
+		return false
+	if t == "trap":
+		if not d.has("name") or not d.has("cost") or not d.has("damage") or not d.has("cooldown"):
+			return false
+		# basic type checks
+		if typeof(d.name) != TYPE_STRING or typeof(d.cost) != TYPE_INT and typeof(d.cost) != TYPE_FLOAT:
+			return false
+		return true
+	else:
+		# monster
+		if not d.has("name") or not d.has("base_speed") or not d.has("hp") or not d.has("attack"):
+			return false
+		if typeof(d.name) != TYPE_STRING:
+			return false
+		if typeof(d.base_speed) != TYPE_FLOAT and typeof(d.base_speed) != TYPE_INT:
+			return false
+		return true
+
+# simple registry kept in-memory for the running session
+var _registry := {}
+
+func register_mod(mod: Dictionary) -> void:
+	if not mod or not mod.has("id"):
+		return
+	_registry[str(mod.id)] = mod
+
+func get_registered_mod(id: String) -> Dictionary:
+	return _registry.get(id, {})
+
+func get_registered_mods() -> Dictionary:
+	return _registry
+
+func clear_registry() -> void:
+	_registry.clear()
 
 func load_mod(defn: Dictionary) -> Dictionary:
 	if not validate_mod_definition(defn):
 		return {}
-	# return normalized definition
-	return {"id":str(defn.id), "type":str(defn.type), "data":defn.data}
+	var normalized = {"id":str(defn.id), "type":str(defn.type), "data":defn.data}
+	register_mod(normalized)
+	return normalized
 
 func load_mods_from_dir(path: String) -> Array:
 	var dir := DirAccess.open(path)
