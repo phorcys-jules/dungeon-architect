@@ -28,6 +28,7 @@ const DeckLabyrinthProfileScript := preload("res://scripts/core/deck_labyrinth_p
 const MonsterAiCoordinatorScript := preload("res://scripts/monsters/monster_ai_coordinator.gd")
 const MonsterTacticalRuntimeScript := preload("res://scripts/monsters/monster_tactical_runtime.gd")
 const AdventurerCombatAiScript := preload("res://scripts/adventurers/adventurer_combat_ai.gd")
+const AIDirectorScript := preload("res://scripts/ai_director.gd")
 const MONSTER_ARCHETYPES: Array[MonsterArchetypeData] = [
     preload("res://resources/monsters/ghost.tres"),
     preload("res://resources/monsters/slime.tres"),
@@ -103,6 +104,8 @@ var power_pellet_was_active := false
 var round_state := PacmanRoundState.new()
 var round_state_label: Label
 var loot_ledger := RunLootLedger.new()
+var ai_director := AIDirectorScript.new()
+var director_difficulty_modifier := 1.0
 
 func _build_interface() -> void:
     super._build_interface()
@@ -249,6 +252,16 @@ func _finish_campaign(victory: bool, message: String) -> void:
     if not victory:
         loot_ledger.lose_carried_loot()
     _refresh_round_state(true)
+
+    # Record run outcome with AI Director and update difficulty modifiers
+    var summary := {"total": 1, "victories": (1 if victory else 0)}
+    ai_director.record_summary(summary)
+    var adjustment := ai_director.compute_adjustment()
+    director_difficulty_modifier = float(adjustment.get("difficulty_modifier", 1.0))
+
+    # surface director info to the status label for debugging
+    status_label.text = "%s · Director: win_rate=%.2f target=%.2f spawn_rate=%.2f" % [status_label.text, float(adjustment.get("current_win_rate", 0.0)), float(adjustment.get("target_win_rate", 0.0)), float(adjustment.get("spawn_rate", 1.0))]
+
     super._finish_campaign(victory, message)
 
 func _spawn_mobile_monsters() -> void:
@@ -671,13 +684,17 @@ func set_biome(biome_id: String) -> bool:
     return true
 
 func _monster_respawn_delay(base_delay: float) -> float:
-    return base_delay
+    # Director speeds up respawns when difficulty increases (difficulty_modifier > 1 increases difficulty)
+    if director_difficulty_modifier <= 0.0:
+        return base_delay
+    return base_delay / director_difficulty_modifier
 
 func _monster_damage_multiplier() -> float:
     return 1.0
 
 func _monster_speed_multiplier() -> float:
-    return 1.0
+    # Apply director difficulty modifier to global monster speed
+    return director_difficulty_modifier
 
 func _monster_evasion(_archetype_id: StringName) -> float:
     return 0.0
