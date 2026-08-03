@@ -10,10 +10,9 @@ var definitions: Dictionary = {
     CRYPT: {
         "name": "Crypte",
         "tags": ["undead", "dark"],
+        "palette": {"floor_a": "211c2b", "floor_b": "191622", "grid": "514564", "wall": "62536f", "accent": "b995d6"},
         "rules": {
-            "ghost_speed_multiplier": 1.15,
-            "fear_gain_multiplier": 1.2,
-            "healing_multiplier": 0.85,
+            "monster_speed_multiplier": 1.10,
         },
         "construction": {
             "wall_cost_multiplier": 1.0,
@@ -24,10 +23,10 @@ var definitions: Dictionary = {
     MINE: {
         "name": "Mine",
         "tags": ["stone", "narrow"],
+        "palette": {"floor_a": "2c2925", "floor_b": "25221f", "grid": "5b5144", "wall": "716452", "accent": "d4a95d"},
         "rules": {
             "trap_damage_multiplier": 1.15,
             "movement_speed_multiplier": 0.95,
-            "stone_reward_multiplier": 1.35,
         },
         "construction": {
             "wall_cost_multiplier": 0.8,
@@ -38,10 +37,9 @@ var definitions: Dictionary = {
     CASTLE: {
         "name": "Château",
         "tags": ["royal", "fortified"],
+        "palette": {"floor_a": "252b3a", "floor_b": "202533", "grid": "4d5b78", "wall": "667798", "accent": "f4d35e"},
         "rules": {
-            "door_health_multiplier": 1.4,
-            "elite_rate_bonus": 0.1,
-            "gold_reward_multiplier": 1.2,
+            "starting_gold_adjustment": 15.0,
         },
         "construction": {
             "wall_cost_multiplier": 1.2,
@@ -52,10 +50,10 @@ var definitions: Dictionary = {
     SEWERS: {
         "name": "Égouts",
         "tags": ["slime", "wet"],
+        "palette": {"floor_a": "1d302b", "floor_b": "172722", "grid": "395b50", "wall": "4f7969", "accent": "77d68c"},
         "rules": {
-            "slime_duration_multiplier": 1.35,
-            "fire_damage_multiplier": 0.75,
-            "poison_damage_multiplier": 1.2,
+            "effect_duration_multiplier": 1.25,
+            "movement_speed_multiplier": 0.92,
         },
         "construction": {
             "wall_cost_multiplier": 0.9,

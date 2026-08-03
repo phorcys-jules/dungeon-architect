@@ -267,7 +267,7 @@ func _max_defenders() -> int:
     return village_den.get_capacity()
 
 func _starting_gold_adjustment() -> int:
-    return int(village_modifiers.get("starting_gold_adjustment", 0))
+    return int(village_modifiers.get("starting_gold_adjustment", 0)) + roundi(active_biome.rule_value("starting_gold_adjustment", 0.0))
 
 func _monster_respawn_delay(base_delay: float) -> float:
     var speed_bonus := float(village_modifiers.get("monster_respawn_speed_multiplier", 0.0))
@@ -278,7 +278,7 @@ func _monster_damage_multiplier() -> float:
     return (1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))) * v06_integration.event_multiplier("monster_damage_multiplier")
 
 func _monster_speed_multiplier() -> float:
-    return v06_integration.event_multiplier("monster_speed_multiplier") * (1.0 + float(run_choice_modifiers.get("monster_speed_multiplier", 0.0)))
+    return v06_integration.event_multiplier("monster_speed_multiplier") * active_biome.rule_value("monster_speed_multiplier", 1.0) * (1.0 + float(run_choice_modifiers.get("monster_speed_multiplier", 0.0)))
 
 func _monster_evasion(archetype_id: StringName) -> float:
     return v06_integration.synergy_bonus("evasion") + float(run_choice_modifiers.get("ghost_evasion", 0.0)) if archetype_id == &"ghost" else 0.0
@@ -301,7 +301,7 @@ func _monster_specific_damage_multiplier(archetype_id: String) -> float:
     return float(monster_progression.stat_multipliers(archetype_id).damage)
 
 func _effect_duration_multiplier() -> float:
-    return 1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))
+    return (1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))) * active_biome.rule_value("effect_duration_multiplier", 1.0)
 
 func _wave_reward_multiplier() -> float:
     return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))
