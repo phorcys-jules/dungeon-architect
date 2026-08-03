@@ -1,0 +1,10 @@
+{
+  "id": "example_fire_trap",
+  "type": "trap",
+  "data": {
+    "name": "Fire Trap",
+    "cost": 20,
+    "damage": 8,
+    "cooldown": 3
+  }
+}
