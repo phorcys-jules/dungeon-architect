@@ -19,13 +19,13 @@ func _init() -> void:
     var selected: Dictionary = game.current_choice_offer[0]
     game._select_run_choice(0)
     assert(not game.pending_run_choice)
-    assert(game.selected_choice_ids.has(StringName(selected.id)))
+    assert(game.run_build_state.selected_choice_ids.has(StringName(selected.id)))
     assert(not game.start_button.disabled)
     assert(game.choice_buttons[0].text.begins_with("✓"))
     assert(game.effect_rows.any(func(row: Button): return row.text == String(selected.label)))
 
     for key: Variant in selected.get("modifiers", {}).keys():
-        assert(is_equal_approx(float(game.run_choice_modifiers[key]), float(selected.modifiers[key])))
+        assert(is_equal_approx(float(game.run_build_state.modifiers[key]), float(selected.modifiers[key])))
     for tag: Variant in selected.get("tags", []):
         assert(game.v06_integration.run_tags.has("room:%s" % String(tag)))
 

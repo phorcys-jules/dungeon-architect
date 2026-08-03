@@ -113,7 +113,18 @@ func route_preview(node_id: String) -> Dictionary:
     if node.is_empty():
         return {}
     var faction := faction_definition(StringName(node.faction))
-    return {"id": node.id, "act": node.act, "type": node.type, "faction": faction, "biome": node.biome, "known": true}
+    var biome := BiomeCatalog.new().get_biome(String(node.biome))
+    var type_names := ["Combat", "Élite", "Marchand", "Événement", "Boss"]
+    return {
+        "id": node.id,
+        "act": node.act,
+        "type": node.type,
+        "type_name": type_names[int(node.type)],
+        "faction": faction,
+        "biome": node.biome,
+        "biome_definition": biome,
+        "known": true,
+    }
 
 func _faction_for(run_seed: int, column_index: int, row_index: int) -> StringName:
     var ids: Array[StringName] = [&"sun_order", &"free_blades", &"arcane_circle"]

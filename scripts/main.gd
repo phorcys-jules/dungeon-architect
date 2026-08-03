@@ -10,6 +10,14 @@ const WaveManagerScript := preload("res://scripts/core/wave_manager.gd")
 const CharacterAnimationRuntimeScript := preload("res://scripts/presentation/character_animation_runtime.gd")
 const MonsterSprite := preload("res://assets/sprites/characters/animations/monster_imp_walk.png")
 const TREASURE_TEXTURE := preload("res://assets/sprites/collectibles/treasure_chest.png")
+const TRAP_TEXTURES := {
+    &"spikes": preload("res://assets/sprites/traps/spikes.png"),
+    &"tar_pit": preload("res://assets/sprites/traps/tar_pit.png"),
+    &"fire_rune": preload("res://assets/sprites/traps/fire_rune.png"),
+    &"frost_sigil": preload("res://assets/sprites/traps/frost_sigil.png"),
+    &"soul_mine": preload("res://assets/sprites/traps/soul_mine.png"),
+    &"void_snare": preload("res://assets/sprites/traps/void_snare.png"),
+}
 const ADVENTURER_TEXTURES := {
     "scout": preload("res://assets/sprites/characters/animations/adventurer_scout_walk.png"),
     "warrior": preload("res://assets/sprites/characters/animations/adventurer_warrior_walk.png"),
@@ -31,6 +39,7 @@ const DOOR_COST := 10
 const CHARACTER_DRAW_SIZE := Vector2(48, 48)
 const CHARACTER_FRAME_SIZE := Vector2(128, 128)
 const COLLECTIBLE_DRAW_SIZE := Vector2(44, 44)
+const TRAP_DRAW_SIZE := Vector2(44, 44)
 
 enum GameState { PREPARATION, INVASION, WAVE_RESULT, CAMPAIGN_FINISHED }
 enum BuildMode { SPIKE_TRAP, DEFENDER }
@@ -474,7 +483,12 @@ func _on_trap_triggered_for_power(_damage: int) -> void:
 
 func _trigger_trap_at(cell: Vector2i) -> void:
     if traps.has(cell):
-        (traps[cell] as SpikeTrap).try_trigger(adventurer_health)
+        var trap := traps[cell] as SpikeTrap
+        if trap.try_trigger(adventurer_health):
+            _on_trap_revealed(cell, trap.damage)
+
+func _on_trap_revealed(_cell: Vector2i, _damage: int) -> void:
+    pass
 
 func _toggle_door() -> void:
     if game_state != GameState.PREPARATION:
@@ -616,8 +630,13 @@ func _draw_traps() -> void:
     for cell: Vector2i in traps:
         var trap: SpikeTrap = traps[cell]
         var center := _world_from_cell(cell)
-        var color := trap.visual_color if trap.is_ready else trap.visual_color.darkened(0.55)
-        _draw_trap_symbol(trap.trap_id, center, color)
+        var texture: Texture2D = TRAP_TEXTURES.get(trap.trap_id)
+        if texture:
+            var tint := Color.WHITE if trap.is_ready else Color(0.38, 0.4, 0.48, 0.72)
+            draw_texture_rect(texture, Rect2(center - TRAP_DRAW_SIZE / 2.0, TRAP_DRAW_SIZE), false, tint)
+        else:
+            var color := trap.visual_color if trap.is_ready else trap.visual_color.darkened(0.55)
+            _draw_trap_symbol(trap.trap_id, center, color)
 
 func _draw_defenders() -> void:
     for cell: Vector2i in defenders:
@@ -807,6 +826,7 @@ func _build_shortcut_bar() -> void:
         button.position = Vector2(772 + column * 52, 450 + row * 35)
         button.size = Vector2(48, 31)
         button.toggle_mode = true
+        button.expand_icon = true
         button.add_theme_font_size_override("font_size", 10)
         button.pressed.connect(_activate_build_shortcut.bind(slot))
         add_child(button)
@@ -855,13 +875,17 @@ func _refresh_shortcut_bar() -> void:
         if slot <= TrapCatalogScript.ORDER.size():
             var trap_id: StringName = TrapCatalogScript.ORDER[slot - 1]
             var definition := TrapCatalogScript.definition(trap_id)
+            button.text = str(slot)
+            button.icon = TRAP_TEXTURES.get(trap_id)
             button.tooltip_text = "%d — %s (%d or)" % [slot, String(definition.name), int(definition.cost)]
             if not unlocked_trap_ids.has(trap_id):
                 button.disabled = true
                 button.tooltip_text += " — Forge niveau %d" % int(definition.forge_level)
         elif slot == 7:
+            button.icon = null
             button.tooltip_text = "7 — Défenseur (%d or)" % DEFENDER_COST
         else:
+            button.icon = null
             button.tooltip_text = "%d — emplacement réservé" % slot
 
 func _cycle_trap_type() -> void:

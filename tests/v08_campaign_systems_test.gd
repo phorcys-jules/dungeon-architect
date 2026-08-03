@@ -14,6 +14,8 @@ func _init() -> void:
     assert(campaign.world_map.columns.size() == 9)
     assert(campaign.available_routes().size() == 3)
     var first_route := campaign.available_routes()[0]
+    assert(not String(first_route.type_name).is_empty())
+    assert(not Dictionary(first_route.biome_definition).is_empty())
     assert(bool(campaign.choose_route(String(first_route.id)).ok))
     assert(campaign.run_tags().size() == 3)
     var restored_campaign := Campaign.new()

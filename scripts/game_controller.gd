@@ -40,9 +40,9 @@ var intelligence_label: Label
 var choice_engine := RogueliteChoiceEngine.new()
 var choice_buttons: Array[Button] = []
 var current_choice_offer: Array[Dictionary] = []
-var selected_choice_ids: Array[StringName] = []
-var run_choice_modifiers: Dictionary = {}
+var run_build_state := RunBuildState.new()
 var feedback_settings := GameFeedbackSettings.new()
+var feedback_catalog := FeedbackEventCatalog.new()
 var sfx_player: Node
 var combo_runtime = ComboRuntimeScript.new()
 var combo_zone_cell := Vector2i(-1, -1)
@@ -69,6 +69,22 @@ var blueprint_placement_mode := false
 var blueprint_button: Button
 var patrols_visible := false
 var audio_update_left := 0.0
+var decision_engine := AdventurerDecisionEngine.new()
+var adventurer_perception := AdventurerPerception.new()
+var adventurer_inventory := AdventurerInventory.new()
+var adventurer_risk_memory := AdventurerRiskMemory.new()
+var adventurer_route_planner := AdventurerRoutePlanner.new()
+var interaction_resolver := DungeonInteractionResolver.new()
+var ability_runtime := AbilityRuntime.new()
+var ability_catalog := AdventurerAbilityCatalog.new()
+var combat_resolver := CombatResolver.new()
+var monster_combat_effects := MonsterCombatEffects.new()
+var objective_resolver := RunObjectiveResolver.new()
+var treasure_state := TreasureChestState.new()
+var run_hud_model := RunHudViewModel.new()
+var ai_decision_left := 0.0
+var adventurer_ai_speed_factor := 1.0
+var last_adventurer_decision: Dictionary = {}
 
 func _ready() -> void:
     village_den = village_den_store.load_den()
@@ -183,8 +199,7 @@ func _begin_tracked_run() -> void:
     current_run_id = "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_msec()]
     captures_this_run = 0
     relics_protected_this_run = 0
-    selected_choice_ids.clear()
-    run_choice_modifiers.clear()
+    run_build_state = RunBuildState.new()
     current_choice_offer.clear()
     pending_run_choice = false
     tactical_powers.reset()
@@ -216,6 +231,7 @@ func _prepare_current_wave() -> void:
     var announcement := v06_integration.start_wave(waves.current_wave, active_biome.active_biome_id)
     super._prepare_current_wave()
     adventurer_squad.configure(waves.current_wave)
+    _configure_integrated_adventurer_systems()
     tactical_heatmap.finish_wave()
     _configure_room_rules()
     _configure_v08_environment()
@@ -298,6 +314,11 @@ func _finish_campaign(victory: bool, message: String) -> void:
         "adventurer_id": String(waves.get_adventurer_data().id),
         "adventurer_name": waves.get_adventurer_name(),
     })
+    if not victory:
+        treasure_state.begin_steal(String(waves.get_adventurer_data().id))
+        treasure_state.tick_channel(treasure_state.channel_duration)
+    var objective_outcome := objective_resolver.resolve(treasure_state, not victory, 0 if victory else 1, 0)
+    result_summary.text += "\n%s" % objective_resolver.message(objective_outcome)
     var challenge_rewards: Dictionary = meta.challenge_rewards
     result_summary.text += "\nDéfis : +%d or, +%d essence" % [int(challenge_rewards.gold), int(challenge_rewards.essence)]
     if not meta.completed_challenges.is_empty():
@@ -312,6 +333,11 @@ func _finish_campaign(victory: bool, message: String) -> void:
     var debrief: Dictionary = meta.get("debrief", {})
     for finding in debrief.get("findings", []):
         result_summary.text += "\n" + tr("Conseil : %s") % v06_integration.v08.localization.text(String(finding.text_key))
+    var integrated_summary: Dictionary = meta.get("summary", {})
+    if not integrated_summary.is_empty():
+        result_summary.text += "\nScore tactique : %d · %s" % [int(meta.performance.score), String(integrated_summary.next_objective.label)]
+    if not Array(meta.get("relics", [])).is_empty():
+        result_summary.text += "\nReliques actives : %s" % ", ".join(meta.relics)
     var experience_gain := maxi(completed_waves * 6 + captures_this_run * 12, 6)
     for archetype in active_monster_archetypes:
         monster_progression.grant_experience(archetype.archetype_id, experience_gain)
@@ -336,17 +362,21 @@ func _current_adventurer_speed_multiplier() -> float:
     var environment_speed := 1.0 / (1.0 + environment_cost)
     var difficulty_level: DifficultyDirector.Level = v06_integration.v08.difficulty_rules().level
     var difficulty_speed := float(v06_integration.v08.difficulty.profile(difficulty_level).speed)
-    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed * environment_speed * difficulty_speed
+    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed * environment_speed * difficulty_speed * adventurer_ai_speed_factor
 
 func _configure_trap(trap: SpikeTrap) -> void:
-    var run_bonus := float(run_choice_modifiers.get("trap_damage_multiplier", 0.0))
-    trap.damage = roundi(trap.damage * (1.0 + float(village_modifiers.get("trap_damage_multiplier", 0.0)) + run_bonus) * active_biome.rule_value("trap_damage_multiplier", 1.0))
+    var run_bonus := float(run_build_state.modifiers.get("trap_damage_multiplier", 0.0))
+    var relic_multiplier := float(v06_integration.relics.combined_effects().get("trap_damage_multiplier", 1.0))
+    var merchant_multiplier := 1.15 if v06_integration.unlock_economy.is_unlocked("trap_damage") else 1.0
+    trap.damage = roundi(trap.damage * (1.0 + float(village_modifiers.get("trap_damage_multiplier", 0.0)) + run_bonus) * active_biome.rule_value("trap_damage_multiplier", 1.0) * relic_multiplier * merchant_multiplier)
+    trap.damage = DamageResolver.resolve(trap.damage, waves.get_adventurer_data(), DamageResolver.DamageSource.TRAP)
     trap.effect_duration *= _effect_duration_multiplier()
     trap.cooldown_duration *= v06_integration.event_multiplier("trap_cooldown_multiplier")
 
 func _configure_defender(defender: Defender) -> void:
     defender.cooldown = maxf(0.2, defender.cooldown / (1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))))
     defender.damage = roundi(float(defender.damage) * (1.0 + float(village_modifiers.get("defender_damage_multiplier", 0.0))))
+    defender.damage = DamageResolver.resolve(defender.damage, waves.get_adventurer_data(), DamageResolver.DamageSource.DEFENDER)
 
 func _load_village_progression() -> void:
     var state := v06_integration.store.load_state()
@@ -397,6 +427,112 @@ func _refresh_adventurer_intelligence() -> void:
     intelligence_label.text = "\n".join(lines)
     intelligence_label.tooltip_text = "%s\n\nLe laboratoire révèle une information fiable supplémentaire par niveau." % intelligence_label.text
 
+func _configure_integrated_adventurer_systems() -> void:
+    var profile_id := _integrated_profile_id()
+    adventurer_perception = AdventurerPerception.new()
+    adventurer_perception.configure_for_class(profile_id)
+    adventurer_inventory = AdventurerInventory.new()
+    adventurer_inventory.add("potion")
+    adventurer_inventory.add("key" if door_closed else "torch")
+    if profile_id in ["mage", "berserker", "ranger"]:
+        adventurer_inventory.add("bomb")
+    adventurer_ai_speed_factor = 1.0
+    ai_decision_left = 0.0
+    treasure_state = TreasureChestState.new()
+    treasure_state.unlock()
+
+func _integrated_profile_id() -> String:
+    return {"scout": "ranger", "warrior": "berserker", "champion": "paladin"}.get(String(waves.get_adventurer_data().id), "ranger")
+
+func _update_integrated_adventurer_ai(cell: Vector2i) -> void:
+    var nearby := 0
+    for index in mobile_monsters.size():
+        var monster_cell: Vector2i = mobile_monsters[index].cell
+        if monster_cell.distance_to(cell) <= float(adventurer_perception.vision_range):
+            nearby += 1
+            adventurer_risk_memory.remember_monster(monster_cell, float(active_monster_archetypes[index].base_damage) / 12.0)
+    var profile_id := _integrated_profile_id()
+    var context := {
+        "health_ratio": adventurer_health.get_health_ratio(),
+        "nearby_threats": nearby,
+        "locked_door": door_closed and cell.distance_to(DOOR) <= 1.0,
+        "darkness": float(room_rules.effects_at(cell).get("adventurer_vision_multiplier", 1.0)) < 1.0,
+        "relic_visible": collectible_route.get_remaining_count() > 0,
+        "exit_visible": cell.distance_to(ENTRANCE) <= float(adventurer_perception.vision_range),
+        "empowered": loop_rules.is_panicking(),
+    }
+    last_adventurer_decision = decision_engine.choose_action(profile_id, adventurer_perception, adventurer_inventory, context)
+    var action := String(last_adventurer_decision.get("action", "advance"))
+    adventurer_ai_speed_factor = 0.75 if action == "advance_carefully" else (1.15 if action == "flee" else 1.0)
+    if action == "use_item":
+        _apply_integrated_item(String(last_adventurer_decision.get("item", "")))
+    elif action in ["fight", "hunt_monster"]:
+        _use_integrated_ability(profile_id)
+        _try_adventurer_attack()
+    if bool(context.locked_door):
+        _resolve_integrated_door(profile_id)
+    if action == "advance_carefully":
+        _apply_risk_aware_route(cell)
+    v06_integration.v08.intents.announce("adventurer_ai", StringName(action) if TacticalIntentRuntime.TYPES.has(StringName(action)) else &"chase", cell, TREASURE, 0.8)
+    intelligence_label.tooltip_text = "Décision : %s\nPeur : %d · moral : %d\nInventaire : %s" % [action.replace("_", " "), roundi(adventurer_perception.fear), roundi(adventurer_perception.morale), ", ".join(adventurer_inventory.items)]
+
+func _apply_integrated_item(item_id: String) -> void:
+    if item_id.is_empty() or not adventurer_inventory.consume(item_id):
+        return
+    match item_id:
+        "potion": adventurer_health.heal(25)
+        "key":
+            door_closed = false
+            astar.set_point_solid(DOOR, false)
+            _recalculate_path()
+        "bomb":
+            _try_adventurer_attack()
+        "smoke_bomb": adventurer_ai_speed_factor = 1.25
+
+func _use_integrated_ability(profile_id: String) -> void:
+    var ability := ability_catalog.get_ability(profile_id)
+    var use_result := ability_runtime.use("adventurer", ability)
+    if not bool(use_result.success):
+        return
+    var attacker := CombatStats.new()
+    attacker.attack = float(use_result.power)
+    var defender_stats := CombatStats.new()
+    defender_stats.armor = 2.0
+    var resolved := combat_resolver.resolve_damage(attacker, defender_stats, 1.0)
+    status_label.text = "CAPACITÉ — %s : %.0f puissance, %.0f dégâts potentiels." % [String(ability.get("id", profile_id)), float(use_result.power), float(resolved.damage)]
+
+func _resolve_integrated_door(profile_id: String) -> void:
+    var action := interaction_resolver.resolve_door(profile_id, adventurer_inventory.has("key"), profile_id == "mage")
+    if not interaction_resolver.changes_navigation(action):
+        return
+    if interaction_resolver.consumes_key(action):
+        adventurer_inventory.consume("key")
+    door_closed = false
+    astar.set_point_solid(DOOR, false)
+    _recalculate_path()
+
+func _apply_risk_aware_route(cell: Vector2i) -> void:
+    var graph := {}
+    var walkable: Array[Vector2i] = []
+    for x in GRID_SIZE.x:
+        for y in GRID_SIZE.y:
+            var candidate := Vector2i(x, y)
+            if walls.has(candidate) or (door_closed and candidate == DOOR):
+                continue
+            walkable.append(candidate)
+    for candidate in walkable:
+        var neighbors: Array[Vector2i] = []
+        for direction in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+            if walkable.has(candidate + direction):
+                neighbors.append(candidate + direction)
+        graph[candidate] = neighbors
+    var planned := adventurer_route_planner.find_path(graph, cell, TREASURE, adventurer_risk_memory.build_risk_map(walkable))
+    if planned.size() > 1:
+        path.clear()
+        for route_cell in planned.slice(1):
+            path.append(_world_from_cell(route_cell))
+        path_index = 0
+
 func _max_defenders() -> int:
     return village_den.get_capacity()
 
@@ -409,24 +545,26 @@ func _monster_respawn_delay(base_delay: float) -> float:
     return maxf(0.5, base_delay / (1.0 + speed_bonus + lair_bonus))
 
 func _monster_damage_multiplier() -> float:
-    return (1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))) * v06_integration.event_multiplier("monster_damage_multiplier")
+    var relic_multiplier := float(v06_integration.relics.combined_effects().get("monster_damage_multiplier", 1.0))
+    return (1.0 + float(village_modifiers.get("monster_damage_multiplier", 0.0))) * v06_integration.event_multiplier("monster_damage_multiplier") * relic_multiplier
 
 func _monster_speed_multiplier() -> float:
-    return v06_integration.event_multiplier("monster_speed_multiplier") * active_biome.rule_value("monster_speed_multiplier", 1.0) * (1.0 + float(run_choice_modifiers.get("monster_speed_multiplier", 0.0)))
+    return v06_integration.event_multiplier("monster_speed_multiplier") * active_biome.rule_value("monster_speed_multiplier", 1.0) * (1.0 + float(run_build_state.modifiers.get("monster_speed_multiplier", 0.0)))
 
 func _monster_evasion(archetype_id: StringName) -> float:
-    return v06_integration.synergy_bonus("evasion") + float(run_choice_modifiers.get("ghost_evasion", 0.0)) if archetype_id == &"ghost" else 0.0
+    return v06_integration.synergy_bonus("evasion") + float(run_build_state.modifiers.get("ghost_evasion", 0.0)) if archetype_id == &"ghost" else 0.0
 
 func _monster_ambush_multiplier(archetype_id: StringName, first_hit: bool) -> float:
     if archetype_id == &"mimic" and first_hit:
-        return 1.0 + v06_integration.synergy_bonus("ambush_damage") + float(run_choice_modifiers.get("ambush_damage", 0.0))
+        return 1.0 + v06_integration.synergy_bonus("ambush_damage") + float(run_build_state.modifiers.get("ambush_damage", 0.0))
     return 1.0
 
 func _slime_slow_multiplier(base_multiplier: float) -> float:
-    return base_multiplier * (1.0 - v06_integration.synergy_bonus("enemy_slow") - float(run_choice_modifiers.get("enemy_slow", 0.0)))
+    return base_multiplier * (1.0 - v06_integration.synergy_bonus("enemy_slow") - float(run_build_state.modifiers.get("enemy_slow", 0.0)))
 
 func _monster_health_multiplier() -> float:
-    return 1.0 + float(village_modifiers.get("monster_health_multiplier", 0.0))
+    var merchant_multiplier := 1.15 if v06_integration.unlock_economy.is_unlocked("monster_health") else 1.0
+    return (1.0 + float(village_modifiers.get("monster_health_multiplier", 0.0))) * merchant_multiplier
 
 func _monster_progression_multipliers(archetype_id: String) -> Dictionary:
     return monster_progression.stat_multipliers(archetype_id)
@@ -434,20 +572,29 @@ func _monster_progression_multipliers(archetype_id: String) -> Dictionary:
 func _monster_specific_damage_multiplier(archetype_id: String) -> float:
     return float(monster_progression.stat_multipliers(archetype_id).damage)
 
+func _on_trap_revealed(cell: Vector2i, damage: int) -> void:
+    adventurer_risk_memory.remember_trap(cell, maxf(float(damage) / 20.0, 0.5))
+    adventurer_perception.apply_threat(minf(float(damage) * 0.35, 25.0), 5.0)
+
 func _effect_duration_multiplier() -> float:
     return (1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))) * active_biome.rule_value("effect_duration_multiplier", 1.0)
 
 func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, color: Color, duration: float) -> void:
-    if not feedback_settings.particles_enabled:
+    var event_id := "monster_attack" if kind in [&"projectile", &"slash"] else "damage"
+    var feedback := feedback_catalog.event(event_id, feedback_settings)
+    if not bool(feedback.get("particles", false)):
         return
     if sfx_player != null:
-        sfx_player.call("play_event", String(kind), feedback_settings)
+        sfx_player.call("play_event", String(feedback.get("sound", kind)), feedback_settings)
     var adjusted_duration := duration * (0.45 if feedback_settings.reduced_motion else 1.0)
+    adjusted_duration *= 1.0 + float(feedback.get("shake", 0.0)) * 0.15
     super._spawn_combat_effect(kind, origin, target, color, adjusted_duration)
 
 func _process(delta: float) -> void:
     super._process(delta)
     tactical_powers.tick(delta)
+    ability_runtime.tick(delta)
+    ai_decision_left = maxf(ai_decision_left - delta, 0.0)
     v06_integration.v08.formations.tick(delta)
     environment_tick_left = maxf(environment_tick_left - delta, 0.0)
     audio_update_left = maxf(audio_update_left - delta, 0.0)
@@ -465,6 +612,9 @@ func _process(delta: float) -> void:
     if game_state != GameState.INVASION:
         return
     var cell := _cell_from_world(adventurer_position)
+    if ai_decision_left <= 0.0:
+        ai_decision_left = 0.4
+        _update_integrated_adventurer_ai(cell)
     tactical_heatmap.record(&"traffic", cell)
     adventurer_squad.tick(delta)
     if audio_update_left <= 0.0:
@@ -498,6 +648,13 @@ func _on_trap_status_applied(effect_id: StringName, duration: float, strength: f
         _apply_combo_state(String(state_by_effect[effect_id]))
 
 func _on_monster_hit_adventurer(archetype_id: StringName, was_ambush: bool) -> void:
+    var effect := monster_combat_effects.resolve(String(archetype_id), {
+        "damage_multiplier": _monster_specific_damage_multiplier(String(archetype_id)),
+        "duration_bonus": _effect_duration_multiplier() - 1.0,
+    })
+    if bool(effect.get("success", false)):
+        adventurer_perception.apply_threat(float(effect.damage) * 0.25, float(effect.duration) * 2.0)
+        _apply_combo_state(String(effect.status))
     if archetype_id == &"ghost":
         _apply_combo_state("spectral")
     if was_ambush:
@@ -850,13 +1007,16 @@ func _draw() -> void:
             for cell in zone.cells:
                 draw_rect(Rect2(GRID_ORIGIN + Vector2(cell) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE)), colors.get(StringName(zone.type), Color.WHITE), true)
     for intent in v06_integration.v08.intents.intents.values():
-        var origin := GRID_ORIGIN + (Vector2(intent.origin) + Vector2(0.5, 0.5)) * CELL_SIZE
-        var target := GRID_ORIGIN + (Vector2(intent.target) + Vector2(0.5, 0.5)) * CELL_SIZE
+        var origin_cell: Vector2i = intent.origin
+        var target_cell: Vector2i = intent.target
+        var origin := GRID_ORIGIN + (Vector2(origin_cell) + Vector2(0.5, 0.5)) * CELL_SIZE
+        var target := GRID_ORIGIN + (Vector2(target_cell) + Vector2(0.5, 0.5)) * CELL_SIZE
         draw_dashed_line(origin, target, Color("ffcf5c"), 2.0, 6.0)
         draw_circle(target, 7.0, Color("ff6b6b", 0.7), false, 2.0)
 
 func _wave_reward_multiplier() -> float:
-    return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))
+    var relic_multiplier := float(v06_integration.relics.combined_effects().get("reward_multiplier", 1.0))
+    return (1.0 + float(run_build_state.modifiers.get("permanent_reward_multiplier", 0.0))) * relic_multiplier
 
 func _on_trap_placed() -> void:
     v06_integration.record_trap_placed()
@@ -871,7 +1031,7 @@ func record_v06_wall_placed() -> void:
 func _offer_run_choices() -> void:
     current_choice_offer.clear()
     for choice: Dictionary in choice_engine.offer(v06_integration.run_seed, waves.current_wave, RogueliteChoiceEngine.CHOICES.size()):
-        if not selected_choice_ids.has(StringName(choice.id)):
+        if not run_build_state.selected_choice_ids.has(StringName(choice.id)):
             current_choice_offer.append(choice)
         if current_choice_offer.size() >= 3:
             break
@@ -898,9 +1058,8 @@ func _select_run_choice(index: int) -> void:
         return
     var choice: Dictionary = current_choice_offer[index]
     var choice_id := StringName(choice.id)
-    selected_choice_ids.append(choice_id)
-    for key: Variant in choice.get("modifiers", {}).keys():
-        run_choice_modifiers[key] = float(run_choice_modifiers.get(key, 0.0)) + float(choice.modifiers[key])
+    if not run_build_state.apply_choice(choice):
+        return
     v06_integration.apply_choice_tags(choice.get("tags", []))
     pending_run_choice = false
     start_button.disabled = false
@@ -908,7 +1067,7 @@ func _select_run_choice(index: int) -> void:
         choice_buttons[button_index].disabled = true
         if button_index == index:
             choice_buttons[button_index].text = "✓ %s" % String(choice.label)
-    loop_rules.door_cooldown = 2.0 * maxf(0.2, 1.0 + float(run_choice_modifiers.get("door_cooldown_multiplier", 0.0)))
+    loop_rules.door_cooldown = 2.0 * maxf(0.2, 1.0 + float(run_build_state.modifiers.get("door_cooldown_multiplier", 0.0)))
     result_summary.text += "\nAmélioration choisie : %s — %s" % [String(choice.label), String(choice.description)]
     status_label.text = "%s activé. Vous pouvez préparer la prochaine vague." % String(choice.label)
     _refresh_active_gameplay_modifiers()
@@ -922,7 +1081,7 @@ func _set_choice_buttons_visible(value: bool) -> void:
 
 func _choice_effect_entries() -> Array[Dictionary]:
     var entries: Array[Dictionary] = []
-    for choice_id in selected_choice_ids:
+    for choice_id in run_build_state.selected_choice_ids:
         for choice: Dictionary in RogueliteChoiceEngine.CHOICES:
             if StringName(choice.id) == choice_id:
                 entries.append({"kind": "choice", "name": String(choice.label), "description": String(choice.description)})
@@ -933,7 +1092,19 @@ func _refresh_v06_hud() -> void:
     if not objectives_label or not modifiers_label:
         return
     var snapshot := v06_integration.hud_snapshot()
+    var hud := run_hud_model.build({
+        "current_health": adventurer_health.current_health,
+        "max_health": adventurer_health.max_health,
+        "wave": waves.current_wave,
+        "total_waves": WaveManager.MAX_WAVES,
+        "treasure_state": TreasureChestState.State.keys()[treasure_state.state].to_lower(),
+        "active_synergies": v06_integration.synergies.active.map(func(entry): return String(entry.name)),
+        "status_effects": combo_runtime.states,
+        "gold": economy.current_gold,
+        "difficulty": String(v06_integration.v08.effective_difficulty_profile()).capitalize(),
+    })
     objectives_label.text = tr("OBJECTIFS\n%s") % ("\n".join(snapshot.challenges) if not snapshot.challenges.is_empty() else tr("Aucun"))
+    objectives_label.tooltip_text = "%s · %s\n%s\n%s" % [String(hud.wave_text), String(hud.difficulty_text), String(hud.treasure_text), String(hud.synergy_text)]
     _refresh_effect_rows(_village_effect_entries() + _choice_effect_entries() + snapshot.effect_entries)
     _refresh_event_history(snapshot.event_history)
 

@@ -65,6 +65,23 @@ func _init() -> void:
     if screen.feedback_button == null or screen.feedback_panel == null:
         quit(1)
         return
+    var details_panel := screen.get_node("Panel") as Control
+    var campaign_panel := screen.get_node("CampaignV08Panel") as Control
+    var header := screen.get_node("VillageHeader") as Control
+    _assert_no_overlap(details_panel, campaign_panel)
+    _assert_no_overlap(details_panel, header)
+    _assert_no_overlap(campaign_panel, screen.archives_button)
+    _assert_no_overlap(campaign_panel, screen.feedback_button)
+    _assert_no_overlap(screen.archives_button, screen.feedback_button)
+    assert((screen.get_node("Panel/DetailsScroll") as ScrollContainer).horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED)
+    for building_button: Button in screen.building_buttons.values():
+        _assert_no_overlap(details_panel, building_button)
+        _assert_no_overlap(campaign_panel, building_button)
+        _assert_no_overlap(screen.archives_button, building_button)
+        _assert_no_overlap(screen.feedback_button, building_button)
+    if screen.campaign_route_preview == null or not String(screen.campaign_route_preview.text).contains("récompense"):
+        quit(1)
+        return
     screen._set_feedback_option("music_volume", 0.35)
     if not is_equal_approx(float(meta_store.load_state().feedback_settings.music_volume), 0.35):
         quit(1)
@@ -89,5 +106,14 @@ func _init() -> void:
         return
     den_store.delete_save()
     meta_store.delete_save()
+    screen.music_player.stop()
+    screen.music_player.stream = null
+    screen.music_player.queue_free()
+    await process_frame
+    screen.queue_free()
+    await process_frame
     print("Village navigation test passed")
     quit(0)
+
+func _assert_no_overlap(first: Control, second: Control) -> void:
+    assert(not first.get_global_rect().intersects(second.get_global_rect()), "%s %s overlaps %s %s" % [first.name, first.get_global_rect(), second.name, second.get_global_rect()])

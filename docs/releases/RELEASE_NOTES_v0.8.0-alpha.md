@@ -6,6 +6,7 @@ La v0.8 transforme les runs en campagne tactique persistante. Les choix du villa
 
 - Carte déterministe de neuf étapes réparties en trois actes.
 - Trois factions d'aventuriers avec résistances, styles et récompenses propres.
+- Aperçu tactique des routes au village : type de rencontre, biome, résistance, style, récompense et modificateurs avant confirmation.
 - Trois boss à trois phases avec intentions annoncées et actions sur l'architecture.
 - Système de némésis mémorisant les pièges et monstres rencontrés.
 
@@ -13,16 +14,20 @@ La v0.8 transforme les runs en campagne tactique persistante. Les choix du villa
 
 - Deux évolutions pour chacune des quatre familles de monstres.
 - Quatre mutations à avantage et contrepartie, avec capacité dédiée.
+- Le mimic se déguise désormais en coffre, attire les aventuriers et ne révèle son embuscade qu'à l'ouverture.
+- Les six pièges disposent de sprites dédiés, également visibles dans les raccourcis de construction.
+- Les cryptes, mines, châteaux et égouts utilisent chacun des atlas distincts pour leurs sols et leurs murs.
 - Propagation déterministe de l'eau, du feu, de la fumée, du givre et de la corruption.
 - Plans locaux avec rotation, miroir, prévisualisation, validation et coût avant confirmation.
 - Export et import de graines de défi versionnées.
 
 ## Village et confort
 
+- Refonte visuelle complète du village : grille sans chevauchement, panneau d'inspection défilable, barre narrative et identité cuivre/braise/brume.
 - Trois quêtes pour chacun des quatre habitants fonctionnels du village.
 - Remappage des actions, palettes daltoniennes, réglages audio séparés et réduction des effets.
 - Défi quotidien hors ligne reproductible et sans progression permanente.
-- Migration automatique des sauvegardes v0.7 vers le format 5.
+- Migration automatique des sauvegardes v0.7 vers le format 6.
 
 ## Validation
 

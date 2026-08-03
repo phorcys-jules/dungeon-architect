@@ -1,10 +1,30 @@
 extends "res://scripts/collectible_run_controller.gd"
 
 const BLESSING_TEXTURE := preload("res://assets/sprites/collectibles/blessing_flame.png")
+const BIOME_TILE_TEXTURES := {
+    "crypt": {
+        "floor": preload("res://assets/sprites/biomes/crypt_floor.png"),
+        "wall": preload("res://assets/sprites/biomes/crypt_wall.png"),
+    },
+    "mine": {
+        "floor": preload("res://assets/sprites/biomes/mine_floor.png"),
+        "wall": preload("res://assets/sprites/biomes/mine_wall.png"),
+    },
+    "castle": {
+        "floor": preload("res://assets/sprites/biomes/castle_floor.png"),
+        "wall": preload("res://assets/sprites/biomes/castle_wall.png"),
+    },
+    "sewers": {
+        "floor": preload("res://assets/sprites/biomes/sewers_floor.png"),
+        "wall": preload("res://assets/sprites/biomes/sewers_wall.png"),
+    },
+}
+const BIOME_TILE_SOURCE_SIZE := Vector2(64, 64)
 
 const MobileMonsterScript := preload("res://scripts/monsters/mobile_monster.gd")
 const PacmanLoopRulesScript := preload("res://scripts/core/pacman_loop_rules.gd")
 const LabyrinthGeneratorScript := preload("res://scripts/core/labyrinth_generator.gd")
+const DeckLabyrinthProfileScript := preload("res://scripts/core/deck_labyrinth_profile.gd")
 const MonsterAiCoordinatorScript := preload("res://scripts/monsters/monster_ai_coordinator.gd")
 const MonsterTacticalRuntimeScript := preload("res://scripts/monsters/monster_tactical_runtime.gd")
 const AdventurerCombatAiScript := preload("res://scripts/adventurers/adventurer_combat_ai.gd")
@@ -50,6 +70,7 @@ const MONSTER_HOME_CELLS: Array[Vector2i] = [Vector2i(6, 5), Vector2i(8, 5), Vec
 const MONSTER_HIT_DAMAGE := 20
 
 var mobile_monsters: Array[MobileMonster] = []
+var deck_labyrinth_profile := DeckLabyrinthProfileScript.new()
 var active_monster_archetypes: Array[MonsterArchetypeData] = MONSTER_ARCHETYPES.duplicate()
 var monster_behaviours: Array[PacmanLoopRules.Behaviour] = [
     PacmanLoopRules.Behaviour.CHASER,
@@ -65,6 +86,7 @@ var monster_attack_flashes: Array[float] = []
 var monster_ability_flashes: Array[float] = []
 var monster_ability_cooldowns: Array[float] = []
 var monster_burst_available: Array[bool] = []
+var monster_revealed: Array[bool] = []
 var slime_trails: Dictionary = {}
 var spider_webs: Dictionary = {}
 var campaign_seed := int(Time.get_unix_time_from_system())
@@ -95,14 +117,25 @@ func _build_interface() -> void:
 func _draw_grid() -> void:
     var biome := active_biome.catalog.get_biome(active_biome.active_biome_id)
     var palette: Dictionary = biome.get("palette", {})
+    var biome_tiles: Dictionary = BIOME_TILE_TEXTURES.get(String(active_biome.active_biome_id), {})
+    var floor_texture: Texture2D = biome_tiles.get("floor")
     var floor_a := Color(String(palette.get("floor_a", "252a3a")))
     var floor_b := Color(String(palette.get("floor_b", "212635")))
     var grid_color := Color(String(palette.get("grid", "3b4358")))
     for y in GRID_SIZE.y:
         for x in GRID_SIZE.x:
             var rect := Rect2(GRID_ORIGIN + Vector2(x, y) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE))
-            draw_rect(rect, floor_a if (x + y) % 2 == 0 else floor_b)
-            draw_rect(rect, grid_color, false, 1.0)
+            if floor_texture:
+                _draw_biome_tile(floor_texture, Vector2i(x, y), rect)
+                draw_rect(rect, Color(grid_color, 0.42), false, 1.0)
+            else:
+                draw_rect(rect, floor_a if (x + y) % 2 == 0 else floor_b)
+                draw_rect(rect, grid_color, false, 1.0)
+
+func _draw_biome_tile(texture: Texture2D, cell: Vector2i, destination: Rect2) -> void:
+    var variant := Vector2i(posmod(cell.x, 2), posmod(cell.y, 2))
+    var source := Rect2(Vector2(variant) * BIOME_TILE_SOURCE_SIZE, BIOME_TILE_SOURCE_SIZE)
+    draw_texture_rect_region(texture, destination, source)
 
 func _build_level() -> void:
     if configured_biome_id.is_empty() or not active_biome.set_active(configured_biome_id):
@@ -126,7 +159,12 @@ func _build_level() -> void:
     required_cells.append_array(MONSTER_HOME_CELLS)
     required_cells.append(DOOR)
     required_cells.append_array(room_cells)
-    var layout := labyrinth_generator.generate(campaign_seed, required_cells)
+    var room_tags: Array[StringName] = []
+    for room in placed_rooms.values():
+        for tag: StringName in (room as RoomData).tags:
+            if not room_tags.has(tag):
+                room_tags.append(tag)
+    var layout := deck_labyrinth_profile.generate(labyrinth_generator, campaign_seed, required_cells, room_tags)
     walls.assign(layout.get("walls", []))
 
 func _ready() -> void:
@@ -146,9 +184,28 @@ func _prepare_current_wave() -> void:
     _refresh_round_state()
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
-        monster.hold_at_home(active_monster_archetypes[index].get_effect(&"release_delay", float(index) * 0.8), CELL_SIZE)
+        var is_mimic := active_monster_archetypes[index].archetype_id == &"mimic"
+        var release_delay := 0.0 if is_mimic else active_monster_archetypes[index].get_effect(&"release_delay", float(index) * 0.8)
+        monster.hold_at_home(release_delay, CELL_SIZE)
+        if is_mimic:
+            _disguise_mimic(index)
+        else:
+            monster_revealed[index] = true
         monster_burst_available[index] = true
         monster_ability_cooldowns[index] = 0.0
+    _route_adventurer_to_mimic_bait()
+
+func _route_adventurer_to_mimic_bait() -> bool:
+    for index in mobile_monsters.size():
+        if active_monster_archetypes[index].archetype_id != &"mimic" or monster_revealed[index]:
+            continue
+        active_route_target = mobile_monsters[index].cell
+        path.clear()
+        path_index = 0
+        for cell in astar.get_id_path(ENTRANCE, active_route_target):
+            path.append(_world_from_cell(Vector2i(cell)))
+        return not path.is_empty()
+    return false
 
 func _process(delta: float) -> void:
     var panic_before_tick := loop_rules.is_panicking()
@@ -201,6 +258,7 @@ func _spawn_mobile_monsters() -> void:
     monster_ability_flashes.clear()
     monster_ability_cooldowns.clear()
     monster_burst_available.clear()
+    monster_revealed.clear()
     for index in active_monster_archetypes.size():
         var monster: MobileMonster = MobileMonsterScript.new()
         var archetype := active_monster_archetypes[index]
@@ -213,14 +271,19 @@ func _spawn_mobile_monsters() -> void:
         monster_ability_flashes.append(0.0)
         monster_ability_cooldowns.append(0.0)
         monster_burst_available.append(true)
+        monster_revealed.append(archetype.archetype_id != &"mimic")
 
 func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
-    for monster in mobile_monsters:
-        monster.tick_respawn(delta, CELL_SIZE)
+    for index in mobile_monsters.size():
+        var revived := mobile_monsters[index].tick_respawn(delta, CELL_SIZE)
+        if revived and active_monster_archetypes[index].archetype_id == &"mimic":
+            _disguise_mimic(index)
+    _try_reveal_mimic(adventurer_cell)
     _try_adventurer_attack()
     var occupied: Array[Vector2i] = []
-    for monster in mobile_monsters:
-        if monster.is_active():
+    for index in mobile_monsters.size():
+        var monster := mobile_monsters[index]
+        if monster.is_active() and monster_revealed[index]:
             occupied.append(monster.cell)
 
     var blocked: Array[Vector2i] = walls.duplicate()
@@ -231,7 +294,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
         var archetype := active_monster_archetypes[index]
-        if not monster.is_active():
+        if not monster.is_active() or not monster_revealed[index]:
             continue
         if archetype.has_ability(&"phase") and monster_ability_cooldowns[index] <= 0.0:
             var landing := MonsterTacticalRuntimeScript.phase_destination(monster.cell, adventurer_cell, walls, GRID_SIZE)
@@ -290,6 +353,32 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 monster_attack_flashes[index] = 0.18
                 monster.reset_to_home(CELL_SIZE)
 
+func _try_reveal_mimic(adventurer_cell: Vector2i, resume_route: bool = true) -> bool:
+    for index in mobile_monsters.size():
+        if active_monster_archetypes[index].archetype_id != &"mimic" or monster_revealed[index]:
+            continue
+        var mimic := mobile_monsters[index]
+        if not mimic.is_active() or mimic.cell != adventurer_cell:
+            continue
+        monster_revealed[index] = true
+        monster_ability_flashes[index] = 0.45
+        mimic.path.clear()
+        mimic.path_index = 0
+        status_label.text = "Le coffre ouvre une gueule pleine de crocs : c'était un mimic !"
+        _spawn_combat_effect(&"splash", _world_from_cell(mimic.cell), _world_from_cell(mimic.cell), Color("f7c66f"), 0.5)
+        if resume_route:
+            _recalculate_path()
+        return true
+    return false
+
+func _disguise_mimic(index: int) -> void:
+    if index < 0 or index >= mobile_monsters.size():
+        return
+    monster_revealed[index] = false
+    monster_burst_available[index] = true
+    mobile_monsters[index].path.clear()
+    mobile_monsters[index].path_index = 0
+
 func _try_adventurer_attack() -> bool:
     if adventurer_attack_cooldown > 0.0 or adventurer_health.is_dead:
         return false
@@ -300,6 +389,8 @@ func _try_adventurer_attack() -> bool:
     var candidates: Array[Dictionary] = []
     for index in mobile_monsters.size():
         var monster := mobile_monsters[index]
+        if not monster_revealed[index]:
+            continue
         var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
         var distance := adventurer_position.distance_to(center)
         if distance <= attack_range:
@@ -478,10 +569,13 @@ func _draw() -> void:
             draw_circle(spirit_center, 11.0, Color("a8ecff", 0.28))
             draw_arc(spirit_center, 13.0, 0.0, TAU, 16, Color("d8f7ff", 0.85), 2.0)
             continue
+        var archetype := active_monster_archetypes[index]
+        var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+        if archetype.archetype_id == &"mimic" and not monster_revealed[index]:
+            _draw_collectible(TREASURE_TEXTURE, center, Vector2(42, 42))
+            continue
         if not monster.is_active():
             continue
-        var center := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
-        var archetype := active_monster_archetypes[index]
         var texture: Texture2D = MONSTER_TEXTURES[archetype.archetype_id]
         var tint := Color("f7c66f") if monster_ability_flashes[index] > 0.0 else Color.WHITE
         if loop_rules.is_panicking():
@@ -604,6 +698,13 @@ func _draw_level_objects() -> void:
     var wall_fill := Color(String(palette.get("wall", "58446f")))
     var wall_accent := Color(String(palette.get("accent", "b995d6")))
     super._draw_level_objects()
+    var biome_tiles: Dictionary = BIOME_TILE_TEXTURES.get(String(active_biome.active_biome_id), {})
+    var wall_texture: Texture2D = biome_tiles.get("wall")
+    if wall_texture:
+        for cell: Vector2i in walls:
+            var wall_rect := Rect2(_cell_top_left(cell) + Vector2(2, 2), Vector2(CELL_SIZE - 4, CELL_SIZE - 4))
+            _draw_biome_tile(wall_texture, cell, wall_rect)
+            draw_rect(wall_rect, Color(wall_accent, 0.7), false, 1.5)
     for cell: Vector2i in placed_rooms:
         var room: RoomData = placed_rooms[cell]
         var rect := Rect2(_cell_top_left(cell) + Vector2(3, 3), Vector2(CELL_SIZE - 6, CELL_SIZE - 6))

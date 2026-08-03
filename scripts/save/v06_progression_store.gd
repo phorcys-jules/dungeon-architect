@@ -22,13 +22,29 @@ func load_state() -> Dictionary:
     var payload: Dictionary = parsed
     if int(payload.get("version", 0)) != SAVE_VERSION:
         return {}
-    return Dictionary(payload.get("state", {})).duplicate(true)
+    var state := Dictionary(payload.get("state", {})).duplicate(true)
+    var migrator := SaveMigrator.new()
+    if not migrator.is_supported(state):
+        return {}
+    state = migrator.migrate(state)
+    if not state.has("unlock_economy") and state.has("resources"):
+        var migrated_unlocks := {}
+        for unlock_id in state.get("unlocks", []):
+            migrated_unlocks[String(unlock_id)] = true
+        state["unlock_economy"] = {"resources": Dictionary(state.resources).duplicate(true), "unlocked": migrated_unlocks}
+    if not state.has("tutorial_progress") and state.has("tutorial"):
+        state["tutorial_progress"] = Dictionary(state.tutorial).duplicate(true)
+    if not state.has("v08_campaign") and state.has("campaign_v08"):
+        state["v08_campaign"] = Dictionary(state.campaign_v08).duplicate(true)
+    return state
 
 func save_state(state: Dictionary) -> bool:
     var file := FileAccess.open(save_path, FileAccess.WRITE)
     if file == null:
         return false
-    file.store_string(JSON.stringify({"version": SAVE_VERSION, "state": state}))
+    var versioned_state := state.duplicate(true)
+    versioned_state["version"] = GameVersion.SAVE_VERSION
+    file.store_string(JSON.stringify({"version": SAVE_VERSION, "state": versioned_state}))
     file.close()
     return true
 

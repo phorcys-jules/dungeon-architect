@@ -172,6 +172,11 @@ func _init() -> void:
     game.v06_integration.events.active_events.clear()
     game.v06_integration.synergies.active = previous_synergies
     var previous_modifiers: Dictionary = game.village_modifiers.duplicate(true)
+    game.village_modifiers = previous_modifiers.duplicate(true)
+    game.village_modifiers["trap_damage_multiplier"] = 0.0
+    var baseline_trap := SpikeTrap.new()
+    baseline_trap.configure(TrapCatalog.definition(&"frost_sigil"))
+    game._configure_trap(baseline_trap)
     game.village_modifiers = {
         "trap_damage_multiplier": 0.2,
         "effect_duration_multiplier": 0.4,
@@ -182,7 +187,7 @@ func _init() -> void:
     var linked_trap := SpikeTrap.new()
     linked_trap.configure(TrapCatalog.definition(&"frost_sigil"))
     game._configure_trap(linked_trap)
-    assert(linked_trap.damage > 15)
+    assert(linked_trap.damage > baseline_trap.damage)
     assert(is_equal_approx(linked_trap.effect_duration, 2.4 * 1.4))
     assert(is_equal_approx(game._monster_respawn_delay(3.0), 3.0 / 1.66))
     assert(is_equal_approx(game._monster_damage_multiplier(), 1.25))
