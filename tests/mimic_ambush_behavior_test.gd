@@ -17,11 +17,15 @@ func _init() -> void:
 
     var mimic: MobileMonster = game.mobile_monsters[mimic_index]
     mimic.activation_delay_left = 0.0
+    # mimic should start disguised and not revealed
     assert(not game.monster_revealed[mimic_index])
+    assert(mimic.disguised)
     assert(not game._try_reveal_mimic(mimic.cell + Vector2i.RIGHT, false))
     assert(not game.monster_revealed[mimic_index])
     assert(game._try_reveal_mimic(mimic.cell, false))
     assert(game.monster_revealed[mimic_index])
+    # reveal should clear disguise
+    assert(not mimic.disguised)
 
     game._disguise_mimic(mimic_index)
     assert(not game.monster_revealed[mimic_index])

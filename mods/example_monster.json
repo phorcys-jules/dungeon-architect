@@ -1,0 +1,10 @@
+{
+  "id": "example_slow_mimic",
+  "type": "monster",
+  "data": {
+    "name": "Slow Mimic",
+    "base_speed": 0.6,
+    "hp": 24,
+    "attack": 5
+  }
+}

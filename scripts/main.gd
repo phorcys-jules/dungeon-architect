@@ -89,6 +89,13 @@ var result_panel: Panel
 var result_title: Label
 var result_summary: RichTextLabel
 
+func _style_header_label(label: Label, max_width: int) -> void:
+    # ensure header labels don't overflow: set truncation and clamp width
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    label.custom_minimum_size = Vector2(min(max_width, int(label.size.x)), int(label.size.y))
+    label.clip_text = true
+
 func _ready() -> void:
     _build_level()
     _configure_pathfinding()
@@ -204,32 +211,35 @@ func _build_interface() -> void:
     add_child(header_panel)
 
     var title := Label.new()
-    title.text = "DUNGEON ARCHITECT  •  v0.8 ALPHA"
+    title.text = "DUNGEON ARCHITECT  •  v0.9 ALPHA"
     title.position = Vector2(42, 22)
-    title.size = Vector2(520, 32)
+    title.size = Vector2(420, 32)
     title.add_theme_font_size_override("font_size", 24)
     title.add_theme_color_override("font_color", Color("f3e9d2"))
     add_child(title)
 
     phase_label = Label.new()
     phase_label.position = Vector2(42, 56)
-    phase_label.size = Vector2(205, 24)
+    phase_label.size = Vector2(180, 24)
     phase_label.add_theme_font_size_override("font_size", 14)
     phase_label.add_theme_color_override("font_color", Color("a9bdd6"))
+    _style_header_label(phase_label, 180)
     add_child(phase_label)
 
     countdown_label = Label.new()
-    countdown_label.position = Vector2(250, 56)
-    countdown_label.size = Vector2(170, 24)
+    countdown_label.position = Vector2(240, 56)
+    countdown_label.size = Vector2(140, 24)
     countdown_label.add_theme_font_size_override("font_size", 14)
     countdown_label.add_theme_color_override("font_color", Color("f6c177"))
+    _style_header_label(countdown_label, 140)
     add_child(countdown_label)
 
     wave_label = Label.new()
-    wave_label.position = Vector2(425, 56)
-    wave_label.size = Vector2(205, 24)
+    wave_label.position = Vector2(392, 56)
+    wave_label.size = Vector2(160, 24)
     wave_label.add_theme_font_size_override("font_size", 14)
     wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    _style_header_label(wave_label, 160)
     add_child(wave_label)
 
     gold_label = Label.new()
@@ -280,6 +290,7 @@ func _build_interface() -> void:
     trap_button.size = Vector2(152, 34)
     _style_action_button(trap_button, Color("6f4b8b"))
     trap_button.pressed.connect(_cycle_trap_type)
+    trap_button.tooltip_text = "Sélectionner un piège · Raccourci clavier : [1—9]"
     add_child(trap_button)
     trap_button.visible = false
 
@@ -288,6 +299,7 @@ func _build_interface() -> void:
     defender_button.size = Vector2(152, 34)
     _style_action_button(defender_button, Color("456990"))
     defender_button.pressed.connect(func(): _set_build_mode(BuildMode.DEFENDER))
+    defender_button.tooltip_text = "Placer un défenseur · Raccourci clavier : [7]"
     add_child(defender_button)
     defender_button.visible = false
 
@@ -304,6 +316,7 @@ func _build_interface() -> void:
     start_button.size = Vector2(170, 44)
     _style_action_button(start_button, Color("3d6b66"))
     start_button.pressed.connect(_on_primary_button_pressed)
+    start_button.tooltip_text = "Entrée / Espace : Lancer / Abandonner la vague"
     add_child(start_button)
 
     result_panel = Panel.new()
@@ -500,6 +513,9 @@ func _toggle_door() -> void:
         door_purchased = true
     door_closed = not door_closed
     astar.set_point_solid(DOOR, door_closed)
+    var door_world := _world_from_cell(DOOR)
+    var color := Color("b64d55") if door_closed else Color("5fbf82")
+    _spawn_combat_effect(&"splash", door_world, door_world, color, 0.45)
     status_label.text = "Porte verrouillée." if door_closed else "Porte ouverte."
     _refresh_all_ui()
     queue_redraw()
@@ -829,6 +845,7 @@ func _build_shortcut_bar() -> void:
         button.expand_icon = true
         button.add_theme_font_size_override("font_size", 10)
         button.pressed.connect(_activate_build_shortcut.bind(slot))
+        button.tooltip_text = "Raccourci [%d]" % slot
         add_child(button)
         shortcut_buttons[slot] = button
     door_button.position = Vector2(772, 557)

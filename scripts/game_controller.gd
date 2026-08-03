@@ -348,6 +348,9 @@ func _finish_campaign(victory: bool, message: String) -> void:
     persisted_state["room_deck_selection"] = room_deck_selection.to_dict()
     persisted_state["adventurer_intelligence"] = adventurer_intelligence.to_dict()
     persisted_state["contextual_tutorial"] = contextual_tutorial.serialize()
+    # persist AI Director state
+    if ai_director != null:
+        persisted_state["ai_director"] = ai_director.to_dict()
     v06_integration.store.save_state(persisted_state)
     result_summary.text += "\nÉquipe de monstres : +%d XP" % experience_gain
     _set_run_end_actions_visible(true)
@@ -411,6 +414,10 @@ func _load_village_progression() -> void:
     var market_modifiers := black_market.combined_modifiers()
     for key in market_modifiers:
         village_modifiers[key] = float(village_modifiers.get(key, 0.0)) + float(market_modifiers[key])
+    # restore AI Director state if present
+    var state := v06_integration.store.load_state()
+    if state.has("ai_director") and ai_director != null:
+        ai_director.from_dict(state.ai_director)
 
 func _refresh_adventurer_intelligence() -> void:
     var adventurer := waves.get_adventurer_data()

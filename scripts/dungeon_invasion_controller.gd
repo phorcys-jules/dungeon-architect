@@ -28,6 +28,7 @@ const DeckLabyrinthProfileScript := preload("res://scripts/core/deck_labyrinth_p
 const MonsterAiCoordinatorScript := preload("res://scripts/monsters/monster_ai_coordinator.gd")
 const MonsterTacticalRuntimeScript := preload("res://scripts/monsters/monster_tactical_runtime.gd")
 const AdventurerCombatAiScript := preload("res://scripts/adventurers/adventurer_combat_ai.gd")
+const AIDirectorScript := preload("res://scripts/ai_director.gd")
 const MONSTER_ARCHETYPES: Array[MonsterArchetypeData] = [
     preload("res://resources/monsters/ghost.tres"),
     preload("res://resources/monsters/slime.tres"),
@@ -102,7 +103,10 @@ var adventurer_attack_cooldown := 0.0
 var power_pellet_was_active := false
 var round_state := PacmanRoundState.new()
 var round_state_label: Label
+var door_cooldown_label: Label
 var loot_ledger := RunLootLedger.new()
+var ai_director := AIDirectorScript.new()
+var director_difficulty_modifier := 1.0
 
 func _build_interface() -> void:
     super._build_interface()
@@ -113,6 +117,15 @@ func _build_interface() -> void:
     round_state_label.add_theme_font_size_override("font_size", 12)
     round_state_label.add_theme_color_override("font_color", Color("f4d35e"))
     add_child(round_state_label)
+
+    # Door cooldown indicator (updated during invasion by the controller)
+    door_cooldown_label = Label.new()
+    door_cooldown_label.position = Vector2(760, 56)
+    door_cooldown_label.size = Vector2(140, 24)
+    door_cooldown_label.add_theme_font_size_override("font_size", 12)
+    door_cooldown_label.add_theme_color_override("font_color", Color("f4d35e"))
+    door_cooldown_label.text = ""
+    add_child(door_cooldown_label)
 
 func _draw_grid() -> void:
     var biome := active_biome.catalog.get_biome(active_biome.active_biome_id)
@@ -186,7 +199,11 @@ func _prepare_current_wave() -> void:
         var monster := mobile_monsters[index]
         var is_mimic := active_monster_archetypes[index].archetype_id == &"mimic"
         var release_delay := 0.0 if is_mimic else active_monster_archetypes[index].get_effect(&"release_delay", float(index) * 0.8)
-        monster.hold_at_home(release_delay, CELL_SIZE)
+        # director spawn_rate shortens release delays when spawn_rate > 1.0
+        var adjusted_release := release_delay
+        if not is_mimic:
+            adjusted_release = float(release_delay) / max(0.001, ai_director.get_spawn_rate())
+        monster.hold_at_home(adjusted_release, CELL_SIZE)
         if is_mimic:
             _disguise_mimic(index)
         else:
@@ -249,7 +266,26 @@ func _finish_campaign(victory: bool, message: String) -> void:
     if not victory:
         loot_ledger.lose_carried_loot()
     _refresh_round_state(true)
+
+    # Record run outcome with AI Director and update difficulty modifiers
+    var summary := {"total": 1, "victories": (1 if victory else 0)}
+    ai_director.record_summary(summary)
+    var adjustment := ai_director.compute_adjustment()
+    director_difficulty_modifier = float(adjustment.get("difficulty_modifier", 1.0))
+
+    # surface director info to the status label for debugging
+    status_label.text = "%s · Director: win_rate=%.2f target=%.2f spawn_rate=%.2f" % [status_label.text, float(adjustment.get("current_win_rate", 0.0)), float(adjustment.get("target_win_rate", 0.0)), float(adjustment.get("spawn_rate", 1.0))]
+
     super._finish_campaign(victory, message)
+
+func _refresh_door_ui() -> void:
+    # Extend base door UI: show cooldown during invasion
+    super._refresh_door_ui()
+    if door_cooldown_label:
+        if game_state == GameState.INVASION and loop_rules != null and loop_rules.door_cooldown_left > 0.0:
+            door_cooldown_label.text = "Recharge porte : %d s" % ceili(loop_rules.door_cooldown_left)
+        else:
+            door_cooldown_label.text = ""
 
 func _spawn_mobile_monsters() -> void:
     mobile_monsters.clear()
@@ -266,6 +302,11 @@ func _spawn_mobile_monsters() -> void:
         monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed * _monster_speed_multiplier() * float(progression.speed), roundi(float(42 + archetype.base_damage * 2) * _monster_health_multiplier() * float(progression.health)))
         monster.world_position = Vector2(MONSTER_HOME_CELLS[index]) * CELL_SIZE
         mobile_monsters.append(monster)
+        # Ensure disguised state matches archetype (mimics start disguised)
+        if archetype.archetype_id == &"mimic":
+            monster.set_disguised(true)
+        else:
+            monster.set_disguised(false)
         monster_facings.append(1.0)
         monster_attack_flashes.append(0.0)
         monster_ability_flashes.append(0.0)
@@ -360,8 +401,13 @@ func _try_reveal_mimic(adventurer_cell: Vector2i, resume_route: bool = true) -> 
         var mimic := mobile_monsters[index]
         if not mimic.is_active() or mimic.cell != adventurer_cell:
             continue
+        var archetype := active_monster_archetypes[index]
+        var progression := _monster_progression_multipliers(archetype.archetype_id)
         monster_revealed[index] = true
         monster_ability_flashes[index] = 0.45
+        # reveal: stop disguise and set mimic to a slower attack speed
+        mimic.set_disguised(false)
+        mimic.move_speed = archetype.base_speed * 0.55 * _monster_speed_multiplier() * float(progression.speed)
         mimic.path.clear()
         mimic.path_index = 0
         status_label.text = "Le coffre ouvre une gueule pleine de crocs : c'était un mimic !"
@@ -378,6 +424,7 @@ func _disguise_mimic(index: int) -> void:
     monster_burst_available[index] = true
     mobile_monsters[index].path.clear()
     mobile_monsters[index].path_index = 0
+    mobile_monsters[index].set_disguised(true)
 
 func _try_adventurer_attack() -> bool:
     if adventurer_attack_cooldown > 0.0 or adventurer_health.is_dead:
@@ -513,6 +560,10 @@ func _toggle_door() -> void:
             return
         door_closed = not door_closed
         astar.set_point_solid(DOOR, door_closed)
+        # Visual feedback: splash effect at the door when toggled
+        var door_world := _world_from_cell(DOOR)
+        var color := Color("b64d55") if door_closed else Color("5fbf82")
+        _spawn_combat_effect(&"splash", door_world, door_world, color, 0.45)
         _recalculate_path()
         status_label.text = "Porte fermée pendant l'invasion." if door_closed else "Porte ouverte pendant l'invasion."
         _refresh_door_ui()
@@ -660,13 +711,17 @@ func set_biome(biome_id: String) -> bool:
     return true
 
 func _monster_respawn_delay(base_delay: float) -> float:
-    return base_delay
+    # Director speeds up respawns when difficulty increases (difficulty_modifier > 1 increases difficulty)
+    if director_difficulty_modifier <= 0.0:
+        return base_delay
+    return base_delay / director_difficulty_modifier
 
 func _monster_damage_multiplier() -> float:
     return 1.0
 
 func _monster_speed_multiplier() -> float:
-    return 1.0
+    # Apply director difficulty modifier to global monster speed
+    return director_difficulty_modifier
 
 func _monster_evasion(_archetype_id: StringName) -> float:
     return 0.0
