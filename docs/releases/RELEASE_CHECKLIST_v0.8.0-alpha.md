@@ -12,6 +12,7 @@
 - [x] 100 défis personnalisés exportés et réimportés avec checksum.
 - [x] Guide, intentions, formations, sauvetages et débrief testés.
 - [x] Catalogues FR/EN complets et profils de difficulté sauvegardés.
+- [x] Couverture et paramètres des traductions FR/EN vérifiés en CI.
 - [ ] GitHub Actions vertes sur la PR.
 - [ ] Revue et fusion dans `main`.
 - [ ] Créer le tag et la release GitHub `v0.8.0-alpha`.

@@ -69,3 +69,5 @@ jobs:
         run: timeout 45s ./godot --headless --path . --script tests/v08_custom_challenge_matrix_test.gd
       - name: Test v0.8 guided campaign, intentions, formations, rescue, debrief, localization and difficulty
         run: timeout 45s ./godot --headless --path . --script tests/v08_polish_systems_test.gd
+      - name: Validate French and English catalog coverage and placeholders
+        run: timeout 45s ./godot --headless --path . --script tests/v08_localization_coverage_test.gd

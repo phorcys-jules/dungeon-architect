@@ -796,12 +796,12 @@ func _build_campaign_controls() -> void:
     var settings_row := HBoxContainer.new()
     column.add_child(settings_row)
     var language_button := Button.new()
-    language_button.text = "Langue : %s" % String(v08_campaign.localization.locale).to_upper()
+    language_button.text = tr("Langue : %s") % String(v08_campaign.localization.locale).to_upper()
     language_button.add_theme_font_size_override("font_size", 9)
     language_button.pressed.connect(_cycle_language.bind(language_button))
     settings_row.add_child(language_button)
     var difficulty_button := Button.new()
-    difficulty_button.text = "Difficulté : %s" % String(v08_campaign.difficulty.selected_profile).capitalize()
+    difficulty_button.text = tr("Difficulté : %s") % String(v08_campaign.difficulty.selected_profile).capitalize()
     difficulty_button.add_theme_font_size_override("font_size", 9)
     difficulty_button.pressed.connect(_cycle_difficulty.bind(difficulty_button))
     settings_row.add_child(difficulty_button)
@@ -823,47 +823,47 @@ func _refresh_campaign_routes() -> void:
         campaign_route_selector.add_item("Acte %d · %s · %s" % [int(route.act), String(faction.get("name", route.id)), String(route.biome).capitalize()])
         campaign_route_selector.set_item_metadata(campaign_route_selector.item_count - 1, String(route.id))
     var node_text := "Choisissez la prochaine route" if v08_campaign.active_node.is_empty() else "Étape : %s · acte %d" % [String(v08_campaign.active_node.get("faction", "inconnue")).replace("_", " ").capitalize(), int(v08_campaign.active_node.get("act", 1))]
-    campaign_status.text = "CAMPAGNE 0.8 — %s" % node_text
+    campaign_status.text = tr("CAMPAGNE 0.8 — %s") % node_text
     var quest_lines: Array[String] = []
     for resident in VillageQuestRuntime.CHAINS:
         var quest := v08_campaign.quests.current_quest(resident)
         if not quest.is_empty():
             quest_lines.append("%s : %s %d/%d" % [String(resident).replace("_", " ").capitalize(), String(quest.id).replace("_", " "), int(quest.current), int(quest.target)])
     campaign_status.tooltip_text = "QUÊTES DU VILLAGE\n%s" % "\n".join(quest_lines)
-    campaign_status.tooltip_text += "\n\nPrisonniers : %d/%d" % [v08_campaign.prisoners.prisoners.size(), v08_campaign.prisoners.capacity]
+    campaign_status.tooltip_text += "\n\n" + tr("Prisonniers : %d/%d") % [v08_campaign.prisoners.prisoners.size(), v08_campaign.prisoners.capacity]
     var tutorial_step := v08_campaign.guided_campaign.current()
     if not tutorial_step.is_empty():
         campaign_status.tooltip_text += "\n\nGUIDE : %s" % v08_campaign.localization.text(String(tutorial_step.text_key))
 
 func _choose_campaign_route() -> void:
     if campaign_route_selector.item_count == 0:
-        status_label.text = "Aucune route disponible."
+        status_label.text = tr("Aucune route disponible.")
         return
     var node_id := String(campaign_route_selector.get_item_metadata(campaign_route_selector.selected))
     var result := v08_campaign.choose_route(node_id)
     if not bool(result.ok):
-        status_label.text = "Cette route n'est plus disponible."
+        status_label.text = tr("Cette route n'est plus disponible.")
         return
     _persist_village_state()
     _refresh_campaign_routes()
-    status_label.text = "Route choisie : %s." % String(result.faction.name)
+    status_label.text = tr("Route choisie : %s.") % String(result.faction.name)
 
 func _start_daily_challenge() -> void:
     var date := Time.get_date_string_from_system()
     var challenge := v08_campaign.start_daily(date, GameVersion.VALUE)
     _persist_village_state()
     _refresh_campaign_routes()
-    status_label.text = "Défi du %s : %s. Les récompenses permanentes sont désactivées." % [date, String(challenge.modifier).replace("_", " ")]
+    status_label.text = tr("Défi du %s : %s. Les récompenses permanentes sont désactivées.") % [date, String(challenge.modifier).replace("_", " ")]
 
 func _decide_first_prisoner(decision: String) -> void:
     var available := v08_campaign.prisoners.prisoners.keys().filter(func(id): return not bool(v08_campaign.prisoners.prisoners[id].resolved))
     if available.is_empty():
-        status_label.text = "Aucun prisonnier en attente."
+        status_label.text = tr("Aucun prisonnier en attente.")
         return
     var laboratory_level := int(progression_service.state.buildings.get("laboratory", 0))
     var result := v08_campaign.prisoners.decide(String(available[0]), StringName(decision), laboratory_level)
     if not bool(result.get("ok", false)):
-        status_label.text = "Cette décision n'est pas disponible."
+        status_label.text = tr("Cette décision n'est pas disponible.")
         return
     _persist_village_state()
     _refresh_campaign_routes()
@@ -887,7 +887,7 @@ func _start_custom_challenge() -> void:
 func _cycle_language(button: Button) -> void:
     var next: StringName = &"en" if v08_campaign.localization.locale == &"fr" else &"fr"
     v08_campaign.localization.set_locale(next)
-    button.text = "Langue : %s" % String(next).to_upper()
+    button.text = tr("Langue : %s") % String(next).to_upper()
     _persist_village_state()
     _refresh_campaign_routes()
 
@@ -895,14 +895,14 @@ func _cycle_difficulty(button: Button) -> void:
     var ids: Array[StringName] = [&"discovery", &"architect", &"ruthless"]
     var index := posmod(ids.find(v08_campaign.difficulty.selected_profile) + 1, ids.size())
     v08_campaign.difficulty.select_profile(ids[index])
-    button.text = "Difficulté : %s" % String(ids[index]).capitalize()
+    button.text = tr("Difficulté : %s") % String(ids[index]).capitalize()
     _persist_village_state()
 
 func _toggle_guided_campaign(button: Button) -> void:
     if v08_campaign.guided_campaign.enabled and not v08_campaign.guided_campaign.is_complete():
         v08_campaign.guided_campaign.skip()
         button.text = "Rejouer guide"
-        status_label.text = "Campagne guidée suspendue."
+        status_label.text = tr("Campagne guidée suspendue.")
     else:
         v08_campaign.guided_campaign.restart()
         button.text = "Masquer guide"
@@ -957,7 +957,7 @@ func _on_start_run_pressed() -> void:
         _refresh_room_deck_controls()
         return
     if v08_campaign.active_node.is_empty():
-        status_label.text = "Choisissez une route de campagne avant de lancer la run."
+        status_label.text = tr("Choisissez une route de campagne avant de lancer la run.")
         return
     transition_in_progress = true
     _refresh_navigation()
