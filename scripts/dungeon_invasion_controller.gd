@@ -189,7 +189,11 @@ func _prepare_current_wave() -> void:
         var monster := mobile_monsters[index]
         var is_mimic := active_monster_archetypes[index].archetype_id == &"mimic"
         var release_delay := 0.0 if is_mimic else active_monster_archetypes[index].get_effect(&"release_delay", float(index) * 0.8)
-        monster.hold_at_home(release_delay, CELL_SIZE)
+        # director spawn_rate shortens release delays when spawn_rate > 1.0
+        var adjusted_release := release_delay
+        if not is_mimic:
+            adjusted_release = float(release_delay) / max(0.001, ai_director.get_spawn_rate())
+        monster.hold_at_home(adjusted_release, CELL_SIZE)
         if is_mimic:
             _disguise_mimic(index)
         else:

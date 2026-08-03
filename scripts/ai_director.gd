@@ -42,3 +42,31 @@ func compute_adjustment() -> Dictionary:
 func reset() -> void:
 	history.clear()
 	spawn_rate = 1.0
+
+# Serialization for persistence and tuning
+func to_dict() -> Dictionary:
+	return {"history": history.duplicate(true), "window": window, "target_win_rate": target_win_rate, "spawn_rate": spawn_rate}
+
+func from_dict(data: Dictionary) -> void:
+	history = Array(data.get("history", [])).duplicate(true)
+	window = int(data.get("window", window))
+	target_win_rate = float(data.get("target_win_rate", target_win_rate))
+	spawn_rate = float(data.get("spawn_rate", spawn_rate))
+
+func get_spawn_rate() -> float:
+	return spawn_rate
+
+func set_params(new_window: int, new_target: float) -> void:
+	window = max(new_window, 1)
+	target_win_rate = clamp(new_target, 0.0, 1.0)
+
+func apply_to_wave(wave: Dictionary) -> Dictionary:
+	# Example: scale release delays / counts via spawn_rate
+	var out := wave.duplicate(true)
+	if out.has("release_delay"):
+		out["release_delay"] = float(out["release_delay"]) / max(0.001, spawn_rate)
+	if out.has("monster_count"):
+		out["monster_count"] = int(round(float(out["monster_count"]) * spawn_rate))
+	if out.has("elite_chance"):
+		out["elite_chance"] = clamp(float(out["elite_chance"]) * (1.0 + (spawn_rate - 1.0) * 0.4), 0.0, 1.0)
+	return out
