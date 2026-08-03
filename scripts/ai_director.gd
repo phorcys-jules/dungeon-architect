@@ -29,9 +29,9 @@ func compute_adjustment() -> Dictionary:
 	# Positive diff means players win more than target -> increase difficulty
 	var diff := current - target_win_rate
 	# change is proportional to diff but clamped
-	var delta := clamp(diff * 0.8, -0.5, 0.5)
+	var delta := clamp(diff * 0.6, -0.3, 0.3)
 	spawn_rate = clamp(spawn_rate + delta, 0.2, 3.0)
-	var difficulty_modifier := 1.0 + (spawn_rate - 1.0) * 0.6
+		var difficulty_modifier := 1.0 + (spawn_rate - 1.0) * 0.5
 	return {
 		"spawn_rate": spawn_rate,
 		"difficulty_modifier": difficulty_modifier,

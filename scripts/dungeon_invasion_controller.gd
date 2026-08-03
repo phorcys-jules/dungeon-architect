@@ -407,7 +407,7 @@ func _try_reveal_mimic(adventurer_cell: Vector2i, resume_route: bool = true) -> 
         monster_ability_flashes[index] = 0.45
         # reveal: stop disguise and set mimic to a slower attack speed
         mimic.set_disguised(false)
-        mimic.move_speed = archetype.base_speed * 0.6 * _monster_speed_multiplier() * float(progression.speed)
+        mimic.move_speed = archetype.base_speed * 0.55 * _monster_speed_multiplier() * float(progression.speed)
         mimic.path.clear()
         mimic.path_index = 0
         status_label.text = "Le coffre ouvre une gueule pleine de crocs : c'était un mimic !"
