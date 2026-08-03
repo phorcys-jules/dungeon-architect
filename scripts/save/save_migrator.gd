@@ -1,7 +1,7 @@
 class_name SaveMigrator
 extends RefCounted
 
-const CURRENT_VERSION := 5
+const CURRENT_VERSION := 6
 
 func migrate(payload: Dictionary) -> Dictionary:
     var result := payload.duplicate(true)
@@ -37,6 +37,15 @@ func migrate(payload: Dictionary) -> Dictionary:
         result["last_replay_v08"] = result.get("last_replay_v08", {})
         result["custom_challenge_v08"] = result.get("custom_challenge_v08", {})
         version = 5
+
+    if version < 6:
+        result["guided_campaign_v08"] = result.get("guided_campaign_v08", {})
+        result["formations_v08"] = result.get("formations_v08", {})
+        result["rescue_v08"] = result.get("rescue_v08", {})
+        result["last_debrief_v08"] = result.get("last_debrief_v08", {})
+        result["localization_v08"] = result.get("localization_v08", {"locale": "fr"})
+        result["difficulty_v08"] = result.get("difficulty_v08", {"selected_profile": "architect"})
+        version = 6
 
     result["version"] = CURRENT_VERSION
     return result

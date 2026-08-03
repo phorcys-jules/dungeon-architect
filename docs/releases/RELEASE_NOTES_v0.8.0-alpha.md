@@ -38,3 +38,12 @@ La v0.8 transforme les runs en campagne tactique persistante. Les choix du villa
 - Une chronologie compacte enregistre les événements majeurs ; `J` permet de les parcourir.
 - La direction audio calcule des couches réactives au biome, à la faction, au danger et au boss.
 - Des défis personnalisés combinent mutateurs, restrictions, score et code partageable avec checksum.
+
+## Finition de campagne
+
+- Une campagne guidée accompagne la première run et reste rejouable.
+- Les intentions adverses et formations de monstres clarifient les menaces tactiques.
+- Les risques d'évasion deviennent des missions de sauvetage annoncées.
+- Le débrief relie ses conseils aux événements enregistrés dans le replay.
+- Les textes structurants disposent de catalogues français et anglais.
+- Les profils Découverte, Architecte et Impitoyable annoncent toutes leurs règles.

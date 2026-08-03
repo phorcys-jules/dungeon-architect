@@ -47,10 +47,9 @@ func tick_day(campaign_seed: int) -> Array[Dictionary]:
         prisoner.days = int(prisoner.days) + 1
         var roll := float(abs(hash([campaign_seed, int(prisoner.seed), int(prisoner.days)])) % 10000) / 10000.0
         if roll < float(prisoner.escape_risk):
-            events.append({"type": "escape", "id": id, "faction": prisoner.faction})
-            prisoners.erase(id)
-        else:
-            prisoners[id] = prisoner
+            events.append({"type": "rescue_warning", "id": id, "faction": prisoner.faction})
+            prisoner.escape_risk = minf(float(prisoner.escape_risk) + 0.05, 0.75)
+        prisoners[id] = prisoner
     return events
 
 func rescue_targets(faction: StringName) -> Array[String]:
