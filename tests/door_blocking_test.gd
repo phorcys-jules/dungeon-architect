@@ -9,15 +9,15 @@ func _check(condition: bool, message: String) -> bool:
 
 func _init() -> void:
     var astar := AStarGrid2D.new()
-    var GRID_SIZE := Vector2i(15, 10)
-    var CELL_SIZE := 48
-    var ENTRANCE := Vector2i(0, 5)
-    var TREASURE := Vector2i(14, 5)
-    var DOOR := Vector2i(7, 5)
+    var grid_size := Vector2i(15, 10)
+    var cell_size := 48
+    var entrance := Vector2i(0, 5)
+    var treasure := Vector2i(14, 5)
+    var door := Vector2i(7, 5)
 
-    astar.region = Rect2i(Vector2i.ZERO, GRID_SIZE)
-    astar.cell_size = Vector2(CELL_SIZE, CELL_SIZE)
-    astar.offset = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+    astar.region = Rect2i(Vector2i.ZERO, grid_size)
+    astar.cell_size = Vector2(cell_size, cell_size)
+    astar.offset = Vector2(cell_size / 2.0, cell_size / 2.0)
     astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
     astar.update()
 

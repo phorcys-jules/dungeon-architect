@@ -15,8 +15,7 @@ func resolve_order(monster_profile: Dictionary, order: String, context: Dictiona
 		# prefer guard if stable and not panicked
 		if panic < 0.5:
 			return {"accepted": true, "reason": "guarding", "priority": priority}
-		else:
-			return {"accepted": false, "reason": "refused_panicked", "priority": 0}
+		return {"accepted": false, "reason": "refused_panicked", "priority": 0}
 	if order == "retreat":
 		if bravery < 0.4 or panic > 0.6:
 			return {"accepted": true, "reason": "retreating", "priority": priority}
