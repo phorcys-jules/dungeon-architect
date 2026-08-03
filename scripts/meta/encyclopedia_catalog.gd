@@ -8,6 +8,8 @@ var entries := {
     "monster_ghost": {"kind": "monster", "name": "Fantôme", "hint": "Une présence spectrale."},
     "adventurer_thief": {"kind": "adventurer", "name": "Voleur", "hint": "Rapide et opportuniste."},
     "adventurer_mage": {"kind": "adventurer", "name": "Mage", "hint": "Maîtrise les arcanes."},
+    "adventurer_priest": {"kind": "adventurer", "name": "Prêtre", "hint": "Purifie les pièges et protège son groupe."},
+    "adventurer_berserker": {"kind": "adventurer", "name": "Berserker", "hint": "Devient plus dangereux quand il est blessé."},
     "room_treasure": {"kind": "room", "name": "Salle au trésor", "hint": "Attire les plus avides."},
     "synergy_ghost_fog": {"kind": "synergy", "name": "Voile spectral", "hint": "Le brouillard favorise les esprits."},
     "monster_mimic": {"kind": "monster", "name": "Mimic", "hint": "Un coffre qui mord."},
@@ -21,6 +23,13 @@ var entries := {
     "room_slime_pool": {"kind": "room", "name": "Bassin de slime", "hint": "Une mare collante."},
     "room_false_treasure": {"kind": "room", "name": "Faux trésor", "hint": "Un appât suspect."},
     "room_monster_portal": {"kind": "room", "name": "Portail", "hint": "Un raccourci pour les monstres."},
+    "room_corridor": {"kind": "room", "name": "Couloir", "hint": "Un passage simple propice aux embuscades."},
+    "room_crossroads": {"kind": "room", "name": "Carrefour", "hint": "Quatre routes et autant de décisions."},
+    "room_ice_gallery": {"kind": "room", "name": "Galerie de glace", "hint": "Un sol glissant difficile à franchir."},
+    "room_cursed_shrine": {"kind": "room", "name": "Sanctuaire maudit", "hint": "Un pouvoir puissant assorti d'un risque."},
+    "room_treasure_hall": {"kind": "room", "name": "Salle au trésor", "hint": "Un appât irrésistible pour les aventuriers."},
+    "synergy_slime_ice": {"kind": "synergy", "name": "Gel visqueux", "hint": "Le froid transforme le slime en piège durable."},
+    "synergy_mimic_treasure": {"kind": "synergy", "name": "Trésor piégé", "hint": "Les richesses rendent le mimic plus dangereux."},
     "biome_crypt": {"kind": "biome", "name": "Crypte", "hint": "Les morts y sont chez eux."},
     "biome_mine": {"kind": "biome", "name": "Mine", "hint": "Des galeries étroites."},
     "biome_castle": {"kind": "biome", "name": "Château", "hint": "Une forteresse abandonnée."},
@@ -42,4 +51,5 @@ func list_by_kind(kind: String) -> Array[Dictionary]:
             var copy := entry.duplicate(true)
             copy["id"] = entry_id
             result.append(copy)
+    result.sort_custom(func(a: Dictionary, b: Dictionary): return String(a.id) < String(b.id))
     return result

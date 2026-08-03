@@ -16,6 +16,8 @@ var modifiers_label: Label
 var modifiers_scroll: ScrollContainer
 var modifiers_list: VBoxContainer
 var effect_rows: Array[Button] = []
+var event_banner: Label
+var history_button: Button
 var village_progression := V04ProgressionService.new()
 var black_market := VillageBlackMarket.new()
 var village_modifiers: Dictionary = {}
@@ -59,7 +61,7 @@ func _build_interface() -> void:
     objectives_label.position = Vector2(772, 206)
     objectives_label.size = Vector2(152, 92)
     objectives_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    objectives_label.add_theme_font_size_override("font_size", 12)
+    objectives_label.add_theme_font_size_override("font_size", 9)
     add_child(objectives_label)
     modifiers_label = Label.new()
     modifiers_label.position = Vector2(772, 302)
@@ -76,6 +78,24 @@ func _build_interface() -> void:
     modifiers_list.custom_minimum_size = Vector2(156, 0)
     modifiers_list.add_theme_constant_override("separation", 2)
     modifiers_scroll.add_child(modifiers_list)
+    history_button = Button.new()
+    history_button.name = "EventHistoryButton"
+    history_button.position = Vector2(768, 430)
+    history_button.size = Vector2(160, 24)
+    history_button.text = "HISTORIQUE (0)"
+    history_button.add_theme_font_size_override("font_size", 10)
+    history_button.pressed.connect(_show_event_history)
+    add_child(history_button)
+    event_banner = Label.new()
+    event_banner.name = "EventBanner"
+    event_banner.position = Vector2(205, 108)
+    event_banner.size = Vector2(530, 42)
+    event_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    event_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    event_banner.add_theme_font_size_override("font_size", 15)
+    event_banner.add_theme_color_override("font_color", Color("ffe08a"))
+    event_banner.visible = false
+    add_child(event_banner)
     for index in 3:
         var choice_button := Button.new()
         choice_button.position = Vector2(32 + index * 160, 326)
@@ -143,6 +163,7 @@ func _prepare_current_wave() -> void:
     adventurer_health.reset()
     if not announcement.is_empty():
         status_label.text += "\nÉvénement : %s — %s" % [String(announcement.title), String(announcement.body)]
+        _announce_event(announcement)
     _refresh_active_gameplay_modifiers()
     _refresh_v06_hud()
 
@@ -381,6 +402,27 @@ func _refresh_v06_hud() -> void:
     var snapshot := v06_integration.hud_snapshot()
     objectives_label.text = "OBJECTIFS\n%s" % ("\n".join(snapshot.challenges) if not snapshot.challenges.is_empty() else "Aucun")
     _refresh_effect_rows(_village_effect_entries() + _choice_effect_entries() + snapshot.effect_entries)
+    _refresh_event_history(snapshot.event_history)
+
+func _announce_event(announcement: Dictionary) -> void:
+    event_banner.text = "⚡ %s · %d vague(s)" % [String(announcement.title), int(announcement.duration)]
+    event_banner.modulate = Color.WHITE
+    event_banner.visible = true
+    var tween := create_tween()
+    tween.tween_interval(2.2)
+    tween.tween_property(event_banner, "modulate:a", 0.0, 0.4)
+    tween.tween_callback(func(): event_banner.visible = false)
+
+func _refresh_event_history(history: Array) -> void:
+    history_button.text = "HISTORIQUE (%d)" % history.size()
+    var lines: Array[String] = []
+    for event_id in history:
+        var definition := v06_integration.events.catalog.get_event(String(event_id))
+        lines.append("• %s — %s" % [String(definition.get("name", event_id)), String(definition.get("description", ""))])
+    history_button.tooltip_text = "\n".join(lines) if not lines.is_empty() else "Aucun événement déclenché pendant cette run."
+
+func _show_event_history() -> void:
+    status_label.text = "HISTORIQUE DES ÉVÉNEMENTS\n%s" % history_button.tooltip_text
 
 func _refresh_effect_rows(entries: Array) -> void:
     for row in effect_rows:

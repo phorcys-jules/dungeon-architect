@@ -43,6 +43,14 @@ func _init() -> void:
     if screen.building_buttons.size() != 5:
         quit(1)
         return
+    if screen.archives_button == null or screen.archives_panel == null or screen.archives_text == null:
+        quit(1)
+        return
+    screen._open_archives()
+    if not screen.archives_panel.visible or screen.archives_text.text.is_empty():
+        quit(1)
+        return
+    screen.archives_panel.visible = false
     for building_button: Button in screen.building_buttons.values():
         var artwork := building_button.get_node_or_null("Artwork") as TextureRect
         if artwork == null or artwork.texture == null:

@@ -39,6 +39,15 @@ var room_deck_selection := RoomDeckSelection.new()
 var biome_selector: OptionButton
 var room_selector: OptionButton
 var room_deck_label: Label
+var encyclopedia := EncyclopediaProgress.new()
+var encyclopedia_catalog := EncyclopediaCatalog.new()
+var global_stats := GlobalRunStats.new()
+var achievements := AchievementTracker.new()
+var archives_button: Button
+var archives_panel: PanelContainer
+var archives_category: OptionButton
+var archives_text: RichTextLabel
+var archives_stats: Label
 
 func _ready() -> void:
     super._ready()
@@ -47,6 +56,7 @@ func _ready() -> void:
     _build_roster_controls()
     _build_module_controls()
     _build_room_deck_controls()
+    _build_archives()
     _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
@@ -68,6 +78,9 @@ func _load_village_state() -> void:
         monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
     labyrinth_modules.from_dict(state.get("labyrinth_modules", {}), progression_service.state.buildings)
     room_deck_selection.from_dict(state.get("room_deck_selection", {}))
+    encyclopedia.from_dict(state.get("encyclopedia", {}))
+    global_stats.from_dict(state.get("global_stats", {}))
+    achievements.from_dict(state.get("achievements", {}))
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
 
@@ -332,6 +345,95 @@ func _select_biome(index: int) -> void:
         status_label.text = "Biome sélectionné." if bool(validation.ok) else room_deck_selection.rejection_message(validation)
     _refresh_room_deck_controls()
 
+func _build_archives() -> void:
+    archives_button = Button.new()
+    archives_button.name = "ArchivesButton"
+    archives_button.position = Vector2(20, 20)
+    archives_button.size = Vector2(190, 38)
+    archives_button.text = "ARCHIVES"
+    var pending := encyclopedia.pending_notifications.size()
+    if pending > 0:
+        archives_button.text += " · %d nouveau(x)" % pending
+    archives_button.tooltip_text = "Encyclopédie, statistiques globales, records et succès."
+    archives_button.pressed.connect(_open_archives)
+    add_child(archives_button)
+
+    archives_panel = PanelContainer.new()
+    archives_panel.name = "ArchivesPanel"
+    archives_panel.set_anchors_preset(Control.PRESET_CENTER)
+    archives_panel.offset_left = -330.0
+    archives_panel.offset_top = -270.0
+    archives_panel.offset_right = 330.0
+    archives_panel.offset_bottom = 270.0
+    archives_panel.visible = false
+    add_child(archives_panel)
+    var margin := MarginContainer.new()
+    margin.add_theme_constant_override("margin_left", 20)
+    margin.add_theme_constant_override("margin_top", 16)
+    margin.add_theme_constant_override("margin_right", 20)
+    margin.add_theme_constant_override("margin_bottom", 16)
+    archives_panel.add_child(margin)
+    var column := VBoxContainer.new()
+    column.add_theme_constant_override("separation", 8)
+    margin.add_child(column)
+    var heading := Label.new()
+    heading.text = "ARCHIVES DU MAÎTRE DU DONJON"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    heading.add_theme_font_size_override("font_size", 20)
+    column.add_child(heading)
+    archives_stats = Label.new()
+    archives_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    archives_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    column.add_child(archives_stats)
+    archives_category = OptionButton.new()
+    for category in ["monster", "adventurer", "room", "biome", "synergy", "achievement"]:
+        archives_category.add_item({"monster": "Monstres", "adventurer": "Aventuriers", "room": "Pièces", "biome": "Biomes", "synergy": "Synergies", "achievement": "Succès"}[category])
+        archives_category.set_item_metadata(archives_category.item_count - 1, category)
+    archives_category.item_selected.connect(_refresh_archives)
+    column.add_child(archives_category)
+    archives_text = RichTextLabel.new()
+    archives_text.bbcode_enabled = true
+    archives_text.fit_content = false
+    archives_text.custom_minimum_size = Vector2(600, 350)
+    archives_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    column.add_child(archives_text)
+    var close_button := Button.new()
+    close_button.text = "Fermer"
+    close_button.pressed.connect(func(): archives_panel.visible = false)
+    column.add_child(close_button)
+
+func _open_archives() -> void:
+    archives_panel.visible = true
+    archives_panel.move_to_front()
+    var notifications := encyclopedia.consume_notifications()
+    if not notifications.is_empty():
+        status_label.text = "%d nouvelle(s) découverte(s) ajoutée(s) aux Archives." % notifications.size()
+        _persist_village_state()
+    archives_button.text = "ARCHIVES"
+    _refresh_archives(archives_category.selected)
+
+func _refresh_archives(index: int) -> void:
+    var favorite_monster := global_stats.most_used(global_stats.favorite_monsters)
+    var favorite_synergy := global_stats.most_used(global_stats.favorite_synergies)
+    archives_stats.text = "Runs : %d · Victoires : %d%% · Record : %d · Vague max : %d · Favoris : %s / %s" % [global_stats.total_runs, roundi(global_stats.win_rate() * 100.0), global_stats.best_score, global_stats.best_wave, favorite_monster if not favorite_monster.is_empty() else "—", favorite_synergy if not favorite_synergy.is_empty() else "—"]
+    var category := String(archives_category.get_item_metadata(index))
+    var lines: Array[String] = []
+    if category == "achievement":
+        for achievement_id in achievements.definitions:
+            var definition: Dictionary = achievements.definitions[achievement_id]
+            var progress := achievements.progress(achievement_id)
+            var icon := "✓" if bool(progress.complete) else "○"
+            lines.append("[b]%s %s[/b]  %d/%d" % [icon, String(definition.name), int(progress.current), int(progress.target)])
+    else:
+        for raw_entry in encyclopedia_catalog.list_by_kind(category):
+            var entry := encyclopedia.visible_entry(encyclopedia_catalog, String(raw_entry.id))
+            var state_label: String = ["INCONNU", "APERÇU", "DÉCOUVERT"][int(entry.state)]
+            var line := "[b]%s[/b]  [color=#9aa8bf]%s[/color]\n%s" % [String(entry.name), state_label, String(entry.description)]
+            if entry.has("stats"):
+                line += " · Utilisations : %d · Victoires : %d" % [int(entry.stats.uses), int(entry.stats.wins)]
+            lines.append(line)
+    archives_text.text = "\n\n".join(lines)
+
 func _start_village_music() -> void:
     music_player = AudioStreamPlayer.new()
     music_player.name = "VillageAmbience"
@@ -456,6 +558,7 @@ func _persist_village_state() -> void:
     state["monster_roster"] = monster_roster.to_dict()
     state["labyrinth_modules"] = labyrinth_modules.to_dict()
     state["room_deck_selection"] = room_deck_selection.to_dict()
+    state["encyclopedia"] = encyclopedia.to_dict()
     meta_store.save_state(state)
 
 func _building_data(building_id: String) -> VillageBuildingData:

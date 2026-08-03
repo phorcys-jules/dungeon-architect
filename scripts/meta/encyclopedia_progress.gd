@@ -3,6 +3,7 @@ extends RefCounted
 
 var states: Dictionary = {}
 var stats: Dictionary = {}
+var pending_notifications: Array[String] = []
 
 func preview(entry_id: String) -> void:
     var current := int(states.get(entry_id, EncyclopediaCatalog.DiscoveryState.UNKNOWN))
@@ -13,7 +14,14 @@ func discover(entry_id: String) -> bool:
     var was_discovered := int(states.get(entry_id, EncyclopediaCatalog.DiscoveryState.UNKNOWN)) == EncyclopediaCatalog.DiscoveryState.DISCOVERED
     states[entry_id] = EncyclopediaCatalog.DiscoveryState.DISCOVERED
     _ensure_stats(entry_id)
+    if not was_discovered and not pending_notifications.has(entry_id):
+        pending_notifications.append(entry_id)
     return not was_discovered
+
+func consume_notifications() -> Array[String]:
+    var result := pending_notifications.duplicate()
+    pending_notifications.clear()
+    return result
 
 func record_use(entry_id: String, won: bool = false) -> void:
     discover(entry_id)
@@ -44,11 +52,12 @@ func visible_entry(catalog: EncyclopediaCatalog, entry_id: String) -> Dictionary
     return result
 
 func to_dict() -> Dictionary:
-    return {"states": states.duplicate(true), "stats": stats.duplicate(true)}
+    return {"states": states.duplicate(true), "stats": stats.duplicate(true), "pending_notifications": pending_notifications.duplicate()}
 
 func from_dict(data: Dictionary) -> void:
     states = Dictionary(data.get("states", {})).duplicate(true)
     stats = Dictionary(data.get("stats", {})).duplicate(true)
+    pending_notifications.assign(data.get("pending_notifications", []))
 
 func _ensure_stats(entry_id: String) -> void:
     if not stats.has(entry_id):

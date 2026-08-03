@@ -19,6 +19,10 @@ func _init() -> void:
     assert(is_equal_approx(integration.event_multiplier("monster_damage_multiplier"), 1.25))
     assert(is_equal_approx(integration.event_multiplier("monster_speed_multiplier"), 0.8))
     assert(is_equal_approx(integration.event_multiplier("trap_cooldown_multiplier"), 0.65))
+    var snapshot := integration.hud_snapshot()
+    assert(String(snapshot.challenges[0]).contains("/"))
+    assert(String(snapshot.challenges[0]).contains("+"))
+    assert(snapshot.event_history.size() == 1)
     assert(not String(integration.hud_snapshot().effect_entries[0].description).is_empty())
     integration.synergies.active = [integration.synergies.catalog.get_entry("ghost_fog"), integration.synergies.catalog.get_entry("mimic_treasure")]
     assert(is_equal_approx(integration.synergy_bonus("evasion"), 0.20))

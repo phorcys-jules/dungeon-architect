@@ -132,6 +132,7 @@ func _init() -> void:
     assert(is_equal_approx(accelerated_trap.cooldown_duration, 1.5 * 0.65))
     game._refresh_v06_hud()
     assert(game.effect_rows.any(func(row: Button): return row.text == "Modificateurs actifs" and not row.tooltip_text.is_empty()))
+    assert(game.history_button != null and game.history_button.text.begins_with("HISTORIQUE"))
     game.v06_integration.events.active_events.clear()
     game.v06_integration.synergies.active = previous_synergies
     var previous_modifiers: Dictionary = game.village_modifiers.duplicate(true)

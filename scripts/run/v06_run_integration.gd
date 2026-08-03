@@ -73,7 +73,9 @@ func hud_snapshot() -> Dictionary:
     var challenge_labels: Array[String] = []
     for challenge_id in challenges.active:
         var progress := challenges.progress(challenge_id)
-        challenge_labels.append("%s%s" % [String(progress.get("name", challenge_id)), " ✓" if bool(progress.get("completed", false)) else ""])
+        var definition := challenges.catalog.get_definition(challenge_id)
+        var reward: Dictionary = definition.get("reward", {})
+        challenge_labels.append("%s %d/%d%s · +%d/+%d" % [String(progress.get("name", challenge_id)), roundi(float(progress.current)), roundi(float(progress.target)), " ✓" if bool(progress.get("completed", false)) else "", int(reward.get("gold", 0)), int(reward.get("essence", 0))])
     var event_labels: Array[String] = []
     var effect_entries: Array[Dictionary] = []
     for event in events.active_events:
@@ -87,12 +89,26 @@ func hud_snapshot() -> Dictionary:
     for synergy in synergies.presentation():
         synergy_labels.append(String(synergy.name))
         effect_entries.append({"kind": "synergy", "name": String(synergy.name), "description": String(synergy.description)})
+    var near_synergies: Array[String] = []
+    for synergy in synergies.catalog.all():
+        if synergies.active.any(func(active_entry: Dictionary): return String(active_entry.id) == String(synergy.id)):
+            continue
+        var missing: Array[String] = []
+        for required_tag in synergy.requires:
+            if not run_tags.has(String(required_tag)):
+                missing.append(String(required_tag))
+        if missing.size() == 1:
+            var hint := "%s — manque %s" % [String(synergy.name), missing[0].replace(":", " : ")]
+            near_synergies.append(hint)
+            effect_entries.append({"kind": "synergy_hint", "name": "Presque : %s" % String(synergy.name), "description": "Condition manquante : %s" % missing[0]})
     return {
         "challenges": challenge_labels,
         "events": event_labels,
         "synergies": synergy_labels,
         "modifiers": events.combined_effects(),
         "effect_entries": effect_entries,
+        "near_synergies": near_synergies,
+        "event_history": events.history.duplicate(),
     }
 
 func finish_run(result: Dictionary) -> Dictionary:
