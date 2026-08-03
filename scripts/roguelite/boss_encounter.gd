@@ -6,6 +6,7 @@ var definition: Dictionary = {}
 var current_health := 0.0
 var current_phase := 0
 var finished := false
+var announced_phase := -1
 
 func start(id: String, boss_definition: Dictionary) -> bool:
     if boss_definition.is_empty():
@@ -15,6 +16,7 @@ func start(id: String, boss_definition: Dictionary) -> bool:
     current_health = float(definition.get("max_health", 1))
     current_phase = 0
     finished = false
+    announced_phase = -1
     return true
 
 func take_damage(amount: float) -> Dictionary:
@@ -59,7 +61,30 @@ func snapshot() -> Dictionary:
         "ability": current_ability(),
         "damage": damage_output(),
         "finished": finished,
+        "intent": current_intent(),
     }
+
+func current_intent() -> Dictionary:
+    var phases: Array = definition.get("phases", [])
+    if phases.is_empty():
+        return {}
+    var phase: Dictionary = phases[current_phase]
+    return {"ability": phase.get("ability", ""), "text": phase.get("intent", ""), "architecture": phase.get("architecture", ""), "counter": phase.get("counter", ""), "delay": 2.0}
+
+func consume_phase_intent() -> Dictionary:
+    if announced_phase == current_phase:
+        return {}
+    announced_phase = current_phase
+    return current_intent()
+
+func resolve_architecture_action(valid_cells: Array[Vector2i], protected_cells: Array[Vector2i] = []) -> Dictionary:
+    var intent := current_intent()
+    if intent.is_empty():
+        return {"ok": false, "reason": "no_intent"}
+    for cell in valid_cells:
+        if not protected_cells.has(cell):
+            return {"ok": true, "action": intent.architecture, "cell": cell, "counter": intent.counter}
+    return {"ok": false, "reason": "no_safe_target"}
 
 func _refresh_phase() -> void:
     var phases: Array = definition.get("phases", [])

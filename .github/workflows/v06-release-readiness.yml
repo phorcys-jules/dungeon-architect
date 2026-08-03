@@ -1,4 +1,4 @@
-name: v0.7 Release Readiness
+name: v0.8 Release Readiness
 
 on:
   push:
@@ -19,8 +19,8 @@ jobs:
           chmod +x godot
       - name: Import project
         run: ./godot --headless --path . --import
-      - name: Test v0.7 release metadata and migration
-        run: ./godot --headless --path . --script tests/v07_release_readiness_test.gd
+      - name: Test v0.8 release metadata and migration
+        run: ./godot --headless --path . --script tests/v08_release_readiness_test.gd
       - name: Test full v0.6 run integration
         run: ./godot --headless --path . --script tests/v06_full_run_integration_test.gd
       - name: Test v0.6 content wiring
@@ -59,3 +59,7 @@ jobs:
         run: timeout 45s ./godot --headless --path . --script tests/tactical_power_runtime_test.gd
       - name: Test v0.7 tunnels, squads, heatmap, rooms and tutorial
         run: timeout 45s ./godot --headless --path . --script tests/v07_feature_runtime_test.gd
+      - name: Test v0.8 campaign systems
+        run: timeout 45s ./godot --headless --path . --script tests/v08_campaign_systems_test.gd
+      - name: Validate 100 deterministic campaign seeds
+        run: timeout 45s ./godot --headless --path . --script tests/v08_seed_stability_test.gd

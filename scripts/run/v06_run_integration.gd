@@ -11,6 +11,7 @@ var achievements := AchievementTracker.new()
 var run_seed := 0
 var run_tags: Array[String] = []
 var last_run_result: Dictionary = {}
+var v08 := V08CampaignRuntime.new()
 
 func _init(state_store: V06ProgressionStore = null) -> void:
     if state_store != null:
@@ -20,6 +21,12 @@ func begin_run(seed_value: int, tags: Array[String]) -> void:
     run_seed = seed_value
     run_tags = tags.duplicate()
     _restore(store.load_state())
+    v08.ensure_started(seed_value)
+    if v08.active_node.is_empty() and not v08.available_routes().is_empty():
+        v08.choose_route(String(v08.available_routes()[0].id))
+    for campaign_tag in v08.run_tags():
+        if not run_tags.has(campaign_tag):
+            run_tags.append(campaign_tag)
     events.active_events.clear()
     var picked := RunChallengeCatalog.new().pick(run_seed, 3)
     var challenge_ids: Array[String] = []
@@ -118,10 +125,11 @@ func finish_run(result: Dictionary) -> Dictionary:
     var completed_ids: Array[String] = []
     for challenge_id in challenges.completed:
         completed_ids.append(challenge_id)
-        var reward := challenges.claim(challenge_id)
-        if bool(reward.get("ok", false)):
-            challenge_rewards.gold += int(reward.gold)
-            challenge_rewards.essence += int(reward.essence)
+        if not v08.daily_active:
+            var reward := challenges.claim(challenge_id)
+            if bool(reward.get("ok", false)):
+                challenge_rewards.gold += int(reward.gold)
+                challenge_rewards.essence += int(reward.essence)
 
     var enriched := result.duplicate(true)
     if not enriched.has("biome"):
@@ -141,7 +149,9 @@ func finish_run(result: Dictionary) -> Dictionary:
         "captures": int(enriched.get("captures", 0)),
         "score": int(enriched.get("score", 0)),
     }
-    global_stats.record_run(enriched)
+    if not v08.daily_active:
+        global_stats.record_run(enriched)
+    var campaign_result := v08.finish_node(enriched)
     for tag in run_tags:
         var entry_id := _encyclopedia_id_for_tag(tag)
         if not entry_id.is_empty():
@@ -155,15 +165,17 @@ func finish_run(result: Dictionary) -> Dictionary:
     for room_id in enriched.get("room_ids", []):
         encyclopedia.record_use("room_%s" % String(room_id), bool(enriched.get("victory", false)))
     encyclopedia.record_use("biome_%s" % String(enriched.get("biome", "crypt")), bool(enriched.get("victory", false)))
-    achievements.add_progress("captures", int(enriched.get("captures", 0)))
-    if bool(enriched.get("victory", false)) and int(enriched.get("resources_lost", 0)) == 0:
-        achievements.add_progress("perfect_runs")
+    if not v08.daily_active:
+        achievements.add_progress("captures", int(enriched.get("captures", 0)))
+        if bool(enriched.get("victory", false)) and int(enriched.get("resources_lost", 0)) == 0:
+            achievements.add_progress("perfect_runs")
     _persist()
     return {
         "result": enriched,
         "challenge_rewards": challenge_rewards,
         "completed_challenges": completed_ids,
         "new_achievements": achievements.consume_notifications(),
+        "campaign": campaign_result,
     }
 
 func _discover_run_content() -> void:
@@ -187,6 +199,7 @@ func _restore(state: Dictionary) -> void:
     global_stats.from_dict(state.get("global_stats", {}))
     achievements.from_dict(state.get("achievements", {}))
     last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
+    v08.from_dict(state.get("v08_campaign", {}))
 
 func _persist() -> bool:
     var state := store.load_state()
@@ -197,5 +210,6 @@ func _persist() -> bool:
         "global_stats": global_stats.to_dict(),
         "achievements": achievements.to_dict(),
         "last_run_result": last_run_result.duplicate(true),
+        "v08_campaign": v08.to_dict(),
     }, true)
     return store.save_state(state)

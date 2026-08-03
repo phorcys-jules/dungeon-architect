@@ -1,13 +1,20 @@
 class_name RogueliteWorldMap
 extends RefCounted
 
-enum NodeType { COMBAT, ELITE, MERCHANT, BOSS }
+enum NodeType { COMBAT, ELITE, MERCHANT, EVENT, BOSS }
+
+const FACTIONS := {
+    &"sun_order": {"name": "Ordre solaire", "resistance": &"fire", "reward": "gold", "style": "formation"},
+    &"free_blades": {"name": "Lames libres", "resistance": &"fear", "reward": "stone", "style": "mobility"},
+    &"arcane_circle": {"name": "Cercle arcanique", "resistance": &"frost", "reward": "essence", "style": "dispel"},
+}
 
 var seed: int = 0
 var columns: Array[Array] = []
 var current_column := 0
 var current_node_id := ""
 var visited: Array[String] = []
+var decisions: Dictionary = {}
 
 func generate(run_seed: int, depth: int = 6, width: int = 3) -> void:
     seed = run_seed
@@ -15,6 +22,7 @@ func generate(run_seed: int, depth: int = 6, width: int = 3) -> void:
     current_column = 0
     current_node_id = ""
     visited.clear()
+    decisions.clear()
     var rng := RandomNumberGenerator.new()
     rng.seed = run_seed
     for column_index in depth:
@@ -27,6 +35,9 @@ func generate(run_seed: int, depth: int = 6, width: int = 3) -> void:
                 "column": column_index,
                 "row": row_index,
                 "type": node_type,
+                "act": mini(3, 1 + int(floor(float(column_index) / maxf(float(depth) / 3.0, 1.0)))),
+                "faction": _faction_for(run_seed, column_index, row_index),
+                "biome": _biome_for(column_index),
                 "next": [],
             })
         columns.append(column)
@@ -50,6 +61,7 @@ func choose(node_id: String) -> bool:
             current_node_id = node_id
             current_column = int(candidate.column) + 1
             visited.append(node_id)
+            decisions[node_id] = {"faction": candidate.faction, "type": candidate.type}
             return true
     return false
 
@@ -72,6 +84,7 @@ func to_dict() -> Dictionary:
         "current_column": current_column,
         "current_node_id": current_node_id,
         "visited": visited.duplicate(),
+        "decisions": decisions.duplicate(true),
     }
 
 func from_dict(data: Dictionary) -> void:
@@ -80,6 +93,7 @@ func from_dict(data: Dictionary) -> void:
     current_column = int(data.get("current_column", 0))
     current_node_id = String(data.get("current_node_id", ""))
     visited.assign(data.get("visited", []))
+    decisions = Dictionary(data.get("decisions", {})).duplicate(true)
 
 func _roll_type(rng: RandomNumberGenerator, column_index: int) -> NodeType:
     var roll := rng.randf()
@@ -87,7 +101,26 @@ func _roll_type(rng: RandomNumberGenerator, column_index: int) -> NodeType:
         return NodeType.ELITE
     if roll < 0.36:
         return NodeType.MERCHANT
+    if roll < 0.48:
+        return NodeType.EVENT
     return NodeType.COMBAT
+
+func faction_definition(faction_id: StringName) -> Dictionary:
+    return FACTIONS.get(faction_id, {}).duplicate(true)
+
+func route_preview(node_id: String) -> Dictionary:
+    var node := find_node(node_id)
+    if node.is_empty():
+        return {}
+    var faction := faction_definition(StringName(node.faction))
+    return {"id": node.id, "act": node.act, "type": node.type, "faction": faction, "biome": node.biome, "known": true}
+
+func _faction_for(run_seed: int, column_index: int, row_index: int) -> StringName:
+    var ids: Array[StringName] = [&"sun_order", &"free_blades", &"arcane_circle"]
+    return ids[abs(run_seed + column_index * 7 + row_index * 13) % ids.size()]
+
+func _biome_for(column_index: int) -> StringName:
+    return [&"crypt", &"mine", &"sewers"][mini(2, int(floor(float(column_index) / maxf(float(columns.size()) / 3.0, 1.0))))] if not columns.is_empty() else &"crypt"
 
 func _connect_columns(rng: RandomNumberGenerator) -> void:
     for column_index in columns.size() - 1:
