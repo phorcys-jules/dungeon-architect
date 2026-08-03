@@ -1,0 +1,27 @@
+name: Architect Context CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/narrative/architect_context.gd'
+      - 'tests/architect_context_test.gd'
+      - 'docs/design/architect-recontextualization-audit.md'
+      - '.github/workflows/architect-context.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y unzip
+      - name: Download Godot
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q Godot_v4.7.1-stable_linux.x86_64.zip
+          mv Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+      - name: Import project
+        run: timeout 60s ./godot --headless --path . --import
+      - name: Test architect context
+        run: timeout 45s ./godot --headless --path . --script tests/architect_context_test.gd
