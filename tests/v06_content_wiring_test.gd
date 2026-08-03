@@ -46,6 +46,16 @@ func _init() -> void:
     game._recycle_inspected_defense()
     assert(not game.traps.has(inspection_cell))
     assert(game.economy.current_gold > gold_before_recycle)
+    game.game_state = game.GameState.INVASION
+    game.tactical_powers.energy = 100.0
+    game._activate_tactical_power("hunt_order")
+    assert(game.hunt_order_time > 0.0)
+    assert(game.monster_behaviours.all(func(value): return value == PacmanLoopRules.Behaviour.CHASER))
+    var energy_before_trap: float = game.tactical_powers.energy
+    game._on_trap_triggered_for_power(40)
+    assert(game.tactical_powers.energy > energy_before_trap)
+    assert(game.tactical_power_buttons.size() == 3)
+    game.game_state = game.GameState.PREPARATION
     var combat_target: MobileMonster = game.mobile_monsters[0]
     combat_target.world_position = Vector2(game.ENTRANCE) * game.CELL_SIZE
     var previous_monster_health := combat_target.current_health

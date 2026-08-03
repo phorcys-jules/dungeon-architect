@@ -420,7 +420,7 @@ func _place_spike_trap(cell: Vector2i) -> void:
     trap.setup(cell)
     trap.configure(definition)
     _configure_trap(trap)
-    trap.triggered.connect(func(damage: int): run_stats.record_trap(damage); status_label.text = "%s déclenché : %d dégâts." % [trap.display_name, damage])
+    trap.triggered.connect(func(damage: int): run_stats.record_trap(damage); _on_trap_triggered_for_power(damage); status_label.text = "%s déclenché : %d dégâts." % [trap.display_name, damage])
     trap.status_applied.connect(_on_trap_status_applied)
     add_child(trap)
     traps[cell] = trap
@@ -468,6 +468,9 @@ func _recycle_inspected_defense() -> void:
 
 func _remove_evolved_wall(_cell: Vector2i) -> bool:
     return false
+
+func _on_trap_triggered_for_power(_damage: int) -> void:
+    pass
 
 func _trigger_trap_at(cell: Vector2i) -> void:
     if traps.has(cell):

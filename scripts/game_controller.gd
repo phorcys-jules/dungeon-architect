@@ -6,6 +6,7 @@ const AdventurerIntelligenceScript := preload("res://scripts/meta/adventurer_int
 const RetroSfxPlayerScript := preload("res://scripts/presentation/retro_sfx_player.gd")
 const ComboRuntimeScript := preload("res://scripts/combat/combo_runtime.gd")
 const DefenseEvolutionScript := preload("res://scripts/core/defense_evolution.gd")
+const TacticalPowerRuntimeScript := preload("res://scripts/run/tactical_power_runtime.gd")
 
 var run_end: RunEndController = RunEndControllerScript.new()
 var village_button: Button
@@ -45,6 +46,12 @@ var defense_evolution = DefenseEvolutionScript.new()
 var inspected_defense_cell := Vector2i(-1, -1)
 var defense_inspector: PanelContainer
 var defense_inspector_text: Label
+var tactical_powers = TacticalPowerRuntimeScript.new()
+var tactical_energy_label: Label
+var tactical_power_buttons: Dictionary = {}
+var emergency_lock_time := 0.0
+var hunt_order_time := 0.0
+var hunt_original_behaviours: Array[PacmanLoopRules.Behaviour] = []
 var pending_run_choice := false
 
 func _ready() -> void:
@@ -111,6 +118,7 @@ func _build_interface() -> void:
     event_banner.visible = false
     add_child(event_banner)
     _build_defense_inspector()
+    _build_tactical_power_ui()
     for index in 3:
         var choice_button := Button.new()
         choice_button.position = Vector2(32 + index * 160, 326)
@@ -149,6 +157,9 @@ func _begin_tracked_run() -> void:
     run_choice_modifiers.clear()
     current_choice_offer.clear()
     pending_run_choice = false
+    tactical_powers.reset()
+    emergency_lock_time = 0.0
+    hunt_order_time = 0.0
     loop_rules.door_cooldown = 2.0
     _set_choice_buttons_visible(false)
     run_end.begin_run(current_run_id)
@@ -353,6 +364,18 @@ func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, co
 
 func _process(delta: float) -> void:
     super._process(delta)
+    tactical_powers.tick(delta)
+    if emergency_lock_time > 0.0:
+        emergency_lock_time = maxf(emergency_lock_time - delta, 0.0)
+        if emergency_lock_time <= 0.0:
+            door_closed = false
+            _recalculate_path()
+    if hunt_order_time > 0.0:
+        hunt_order_time = maxf(hunt_order_time - delta, 0.0)
+        if hunt_order_time <= 0.0 and not hunt_original_behaviours.is_empty():
+            monster_behaviours = hunt_original_behaviours.duplicate()
+            hunt_original_behaviours.clear()
+    _refresh_tactical_power_ui()
     if game_state != GameState.INVASION:
         return
     var cell := _cell_from_world(adventurer_position)
@@ -385,12 +408,95 @@ func _apply_combo_state(state_id: String) -> Dictionary:
     var damage := int(combo.damage)
     adventurer_health.take_damage(damage)
     run_stats.total_damage += damage
+    tactical_powers.gain_from_combo(damage)
     var result_state := String(combo.get("result", ""))
     if not result_state.is_empty() and not combo_runtime.states.has(result_state):
         combo_runtime.states.append(result_state)
     status_label.text = "COMBO — %s : %d dégâts !" % [String(combo.name), damage]
     _spawn_combat_effect(&"splash", adventurer_position, adventurer_position, Color("ffd166"), 0.55)
     return combo
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        match event.keycode:
+            KEY_Q:
+                _activate_tactical_power("emergency_lock")
+                return
+            KEY_E:
+                _activate_tactical_power("hunt_order")
+                return
+            KEY_F:
+                _activate_tactical_power("trap_overcharge")
+                return
+    super._unhandled_input(event)
+
+func _build_tactical_power_ui() -> void:
+    tactical_energy_label = Label.new()
+    tactical_energy_label.name = "TacticalEnergyLabel"
+    tactical_energy_label.position = Vector2(772, 456)
+    tactical_energy_label.size = Vector2(152, 18)
+    tactical_energy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    tactical_energy_label.add_theme_font_size_override("font_size", 10)
+    add_child(tactical_energy_label)
+    var ids := ["emergency_lock", "hunt_order", "trap_overcharge"]
+    for index in ids.size():
+        var power_id: String = ids[index]
+        var power: Dictionary = TacticalPowerRuntimeScript.POWERS[power_id]
+        var button := Button.new()
+        button.position = Vector2(772, 476 + index * 29)
+        button.size = Vector2(152, 26)
+        button.text = "[%s] %s" % [String(power.shortcut), String(power.name)]
+        button.add_theme_font_size_override("font_size", 9)
+        button.pressed.connect(_activate_tactical_power.bind(power_id))
+        add_child(button)
+        tactical_power_buttons[power_id] = button
+    _refresh_tactical_power_ui()
+
+func _refresh_tactical_power_ui() -> void:
+    if tactical_energy_label == null:
+        return
+    tactical_energy_label.text = "PUISSANCE %.0f/%d" % [tactical_powers.energy, int(TacticalPowerRuntimeScript.MAX_ENERGY)]
+    tactical_energy_label.visible = game_state == GameState.INVASION
+    for power_id in tactical_power_buttons:
+        var button := tactical_power_buttons[power_id] as Button
+        button.visible = game_state == GameState.INVASION
+        button.disabled = tactical_powers.blocked_reason(power_id) != "Disponible."
+        button.tooltip_text = "%s Coût : %.0f." % [tactical_powers.blocked_reason(power_id), float(TacticalPowerRuntimeScript.POWERS[power_id].cost)]
+
+func _activate_tactical_power(power_id: String) -> void:
+    if game_state != GameState.INVASION:
+        status_label.text = "Les pouvoirs tactiques ne sont disponibles que pendant l'invasion."
+        return
+    var result := tactical_powers.activate(power_id)
+    if not bool(result.get("ok", false)):
+        status_label.text = tactical_powers.blocked_reason(power_id)
+        return
+    match power_id:
+        "emergency_lock":
+            door_closed = true
+            emergency_lock_time = float(result.duration)
+            _recalculate_path()
+        "hunt_order":
+            if hunt_original_behaviours.is_empty():
+                hunt_original_behaviours = monster_behaviours.duplicate()
+            for index in monster_behaviours.size():
+                monster_behaviours[index] = PacmanLoopRules.Behaviour.CHASER
+            hunt_order_time = float(result.duration)
+        "trap_overcharge":
+            var target_cell := Vector2i(-1, -1)
+            if traps.has(inspected_defense_cell):
+                target_cell = inspected_defense_cell
+            elif not traps.is_empty():
+                target_cell = Vector2i(traps.keys()[0])
+            if target_cell != Vector2i(-1, -1):
+                var trap := traps[target_cell] as SpikeTrap
+                trap.cooldown_left = 0.0
+                _spawn_combat_effect(&"splash", _world_from_cell(target_cell), _world_from_cell(target_cell), Color("ffe066"), 0.45)
+    status_label.text = "%s activé." % String(TacticalPowerRuntimeScript.POWERS[power_id].name)
+    _refresh_tactical_power_ui()
+
+func _on_trap_triggered_for_power(damage: int) -> void:
+    tactical_powers.gain_from_trap(damage)
 
 func _wave_reward_multiplier() -> float:
     return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))
