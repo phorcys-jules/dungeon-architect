@@ -266,6 +266,11 @@ func _spawn_mobile_monsters() -> void:
         monster.setup(MONSTER_HOME_CELLS[index], archetype.base_speed * _monster_speed_multiplier() * float(progression.speed), roundi(float(42 + archetype.base_damage * 2) * _monster_health_multiplier() * float(progression.health)))
         monster.world_position = Vector2(MONSTER_HOME_CELLS[index]) * CELL_SIZE
         mobile_monsters.append(monster)
+        # Ensure disguised state matches archetype (mimics start disguised)
+        if archetype.archetype_id == &"mimic":
+            monster.set_disguised(true)
+        else:
+            monster.set_disguised(false)
         monster_facings.append(1.0)
         monster_attack_flashes.append(0.0)
         monster_ability_flashes.append(0.0)
@@ -360,8 +365,13 @@ func _try_reveal_mimic(adventurer_cell: Vector2i, resume_route: bool = true) -> 
         var mimic := mobile_monsters[index]
         if not mimic.is_active() or mimic.cell != adventurer_cell:
             continue
+        var archetype := active_monster_archetypes[index]
+        var progression := _monster_progression_multipliers(archetype.archetype_id)
         monster_revealed[index] = true
         monster_ability_flashes[index] = 0.45
+        # reveal: stop disguise and set mimic to a slower attack speed
+        mimic.set_disguised(false)
+        mimic.move_speed = archetype.base_speed * 0.6 * _monster_speed_multiplier() * float(progression.speed)
         mimic.path.clear()
         mimic.path_index = 0
         status_label.text = "Le coffre ouvre une gueule pleine de crocs : c'était un mimic !"
@@ -378,6 +388,7 @@ func _disguise_mimic(index: int) -> void:
     monster_burst_available[index] = true
     mobile_monsters[index].path.clear()
     mobile_monsters[index].path_index = 0
+    mobile_monsters[index].set_disguised(true)
 
 func _try_adventurer_attack() -> bool:
     if adventurer_attack_cooldown > 0.0 or adventurer_health.is_dead:

@@ -6,6 +6,7 @@ var world_position := Vector2.ZERO
 var path: Array[Vector2i] = []
 var path_index := 0
 var move_speed := 120.0
+var disguised := false
 var home_cell := Vector2i.ZERO
 var max_health := 60
 var current_health := 60
@@ -41,7 +42,7 @@ func get_target_cell() -> Vector2i:
     return path[path_index]
 
 func tick_grid(delta: float, cell_size: float) -> bool:
-    if not is_active() or not has_path():
+    if disguised or not is_active() or not has_path():
         return false
 
     var target_cell := path[path_index]
@@ -70,6 +71,13 @@ func revive_at_home(cell_size: float) -> void:
 func hold_at_home(delay: float, cell_size: float) -> void:
     revive_at_home(cell_size)
     activation_delay_left = maxf(delay, 0.0)
+
+func set_disguised(value: bool) -> void:
+    disguised = value
+    if disguised:
+        path.clear()
+        path_index = 0
+
 
 func is_active() -> bool:
     return respawn_left <= 0.0 and activation_delay_left <= 0.0 and current_health > 0
