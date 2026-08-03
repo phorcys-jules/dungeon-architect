@@ -20,7 +20,7 @@ const BUILDING_TEXTURES := {
 }
 
 const BUILDING_LAYOUT := {
-    "den": {"label": "TANIÈRE", "subtitle": "Repaire des monstres", "position": Vector2(65, 180), "color": Color("6b4a8f")},
+    "den": {"label": "TANIÈRE", "subtitle": "Repaire des monstres", "position": Vector2(65, 210), "color": Color("6b4a8f")},
     "forge": {"label": "FORGE", "subtitle": "Pièges renforcés", "position": Vector2(370, 72), "color": Color("a95832")},
     "laboratory": {"label": "LABORATOIRE", "subtitle": "Effets prolongés", "position": Vector2(470, 235), "color": Color("467b82")},
     "graveyard": {"label": "CIMETIÈRE", "subtitle": "Retour des monstres", "position": Vector2(65, 390), "color": Color("58606f")},
@@ -716,8 +716,10 @@ func _show_market() -> void:
 
 func _on_upgrade_pressed() -> void:
     var den := save_store.load_den()
+    var upgraded := false
     if selected_building == "den":
         if den.upgrade():
+            upgraded = true
             save_store.save_den(den)
             monster_roster.capacity = mini(den.get_capacity(), 4)
             upgrade_requested.emit()
@@ -725,13 +727,17 @@ func _on_upgrade_pressed() -> void:
         var offer := _first_available_offer()
         var purchase := black_market.buy(String(offer.get("id", "")), den.soul_shards)
         if bool(purchase.get("ok", false)):
+            upgraded = true
             den.soul_shards += int(purchase.gold_delta)
             save_store.save_den(den)
     else:
         var purchase := progression_service.buy_building_level(StringName(selected_building), den.soul_shards)
         if bool(purchase.get("success", false)):
+            upgraded = true
             den.soul_shards = int(purchase.remaining)
             save_store.save_den(den)
+    if upgraded:
+        v08_campaign.guided_campaign.observe(&"upgrade_village")
     _persist_village_state()
     _refresh_building_progression_visuals()
     _refresh_module_controls()
@@ -754,7 +760,7 @@ func _build_campaign_controls() -> void:
     var panel := PanelContainer.new()
     panel.name = "CampaignV08Panel"
     panel.position = Vector2(12, 12)
-    panel.size = Vector2(330, 170)
+    panel.size = Vector2(330, 200)
     add_child(panel)
     var column := VBoxContainer.new()
     panel.add_child(column)
@@ -787,6 +793,24 @@ func _build_campaign_controls() -> void:
     custom_button.add_theme_font_size_override("font_size", 9)
     custom_button.pressed.connect(_start_custom_challenge)
     extension_row.add_child(custom_button)
+    var settings_row := HBoxContainer.new()
+    column.add_child(settings_row)
+    var language_button := Button.new()
+    language_button.text = "Langue : %s" % String(v08_campaign.localization.locale).to_upper()
+    language_button.add_theme_font_size_override("font_size", 9)
+    language_button.pressed.connect(_cycle_language.bind(language_button))
+    settings_row.add_child(language_button)
+    var difficulty_button := Button.new()
+    difficulty_button.text = "Difficulté : %s" % String(v08_campaign.difficulty.selected_profile).capitalize()
+    difficulty_button.add_theme_font_size_override("font_size", 9)
+    difficulty_button.pressed.connect(_cycle_difficulty.bind(difficulty_button))
+    settings_row.add_child(difficulty_button)
+    var guide_button := Button.new()
+    guide_button.text = "Guide"
+    guide_button.add_theme_font_size_override("font_size", 9)
+    guide_button.tooltip_text = "Suspendre ou rejouer la campagne guidée."
+    guide_button.pressed.connect(_toggle_guided_campaign.bind(guide_button))
+    settings_row.add_child(guide_button)
     _refresh_campaign_routes()
 
 func _refresh_campaign_routes() -> void:
@@ -807,6 +831,9 @@ func _refresh_campaign_routes() -> void:
             quest_lines.append("%s : %s %d/%d" % [String(resident).replace("_", " ").capitalize(), String(quest.id).replace("_", " "), int(quest.current), int(quest.target)])
     campaign_status.tooltip_text = "QUÊTES DU VILLAGE\n%s" % "\n".join(quest_lines)
     campaign_status.tooltip_text += "\n\nPrisonniers : %d/%d" % [v08_campaign.prisoners.prisoners.size(), v08_campaign.prisoners.capacity]
+    var tutorial_step := v08_campaign.guided_campaign.current()
+    if not tutorial_step.is_empty():
+        campaign_status.tooltip_text += "\n\nGUIDE : %s" % v08_campaign.localization.text(String(tutorial_step.text_key))
 
 func _choose_campaign_route() -> void:
     if campaign_route_selector.item_count == 0:
@@ -856,6 +883,32 @@ func _start_custom_challenge() -> void:
     _persist_village_state()
     _refresh_campaign_routes()
     status_label.text = "Défi personnalisé créé (score x%.2f). Code copié." % float(v08_campaign.custom_challenge.configuration.score_multiplier)
+
+func _cycle_language(button: Button) -> void:
+    var next: StringName = &"en" if v08_campaign.localization.locale == &"fr" else &"fr"
+    v08_campaign.localization.set_locale(next)
+    button.text = "Langue : %s" % String(next).to_upper()
+    _persist_village_state()
+    _refresh_campaign_routes()
+
+func _cycle_difficulty(button: Button) -> void:
+    var ids: Array[StringName] = [&"discovery", &"architect", &"ruthless"]
+    var index := posmod(ids.find(v08_campaign.difficulty.selected_profile) + 1, ids.size())
+    v08_campaign.difficulty.select_profile(ids[index])
+    button.text = "Difficulté : %s" % String(ids[index]).capitalize()
+    _persist_village_state()
+
+func _toggle_guided_campaign(button: Button) -> void:
+    if v08_campaign.guided_campaign.enabled and not v08_campaign.guided_campaign.is_complete():
+        v08_campaign.guided_campaign.skip()
+        button.text = "Rejouer guide"
+        status_label.text = "Campagne guidée suspendue."
+    else:
+        v08_campaign.guided_campaign.restart()
+        button.text = "Masquer guide"
+        status_label.text = v08_campaign.localization.text(String(v08_campaign.guided_campaign.current().text_key))
+    _persist_village_state()
+    _refresh_campaign_routes()
 
 func _building_data(building_id: String) -> VillageBuildingData:
     for building: VillageBuildingData in progression_service.catalog.buildings():

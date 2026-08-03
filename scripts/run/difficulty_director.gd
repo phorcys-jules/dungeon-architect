@@ -11,6 +11,13 @@ const PROFILES := {
 }
 
 const ELITE_AFFIXES := ["armored", "swift", "regenerating", "treasure_hunter"]
+const NAMED_PROFILES := {
+    &"discovery": {"level": Level.STORY, "starting_gold": 25, "mistake_tolerance": 2, "hidden_rules": false},
+    &"architect": {"level": Level.NORMAL, "starting_gold": 0, "mistake_tolerance": 1, "hidden_rules": false},
+    &"ruthless": {"level": Level.HARD, "starting_gold": -15, "mistake_tolerance": 0, "hidden_rules": false},
+}
+
+var selected_profile: StringName = &"architect"
 
 func profile(level: Level) -> Dictionary:
     return PROFILES.get(level, PROFILES[Level.NORMAL]).duplicate(true)
@@ -51,3 +58,42 @@ func boss_modifiers(phase: int) -> Dictionary:
             return {"damage": 1.2, "speed": 1.1, "summon_count": 2, "shield": false}
         _:
             return {"damage": 1.0, "speed": 1.0, "summon_count": 0, "shield": true}
+
+func select_profile(id: StringName) -> bool:
+    if not NAMED_PROFILES.has(id):
+        return false
+    selected_profile = id
+    return true
+
+func selected_rules() -> Dictionary:
+    return NAMED_PROFILES[selected_profile].duplicate(true)
+
+func balance_report(samples: Array[Dictionary]) -> Dictionary:
+    if samples.is_empty():
+        return {"ok": false, "alerts": ["no_samples"]}
+    var victories := samples.filter(func(sample: Dictionary): return bool(sample.get("victory", false))).size()
+    var insoluble := samples.filter(func(sample: Dictionary): return not bool(sample.get("solvable", true))).size()
+    var trap_ids := {}
+    var monster_ids := {}
+    for sample in samples:
+        for id in sample.get("trap_ids", []):
+            trap_ids[id] = int(trap_ids.get(id, 0)) + 1
+        for id in sample.get("monster_ids", []):
+            monster_ids[id] = int(monster_ids.get(id, 0)) + 1
+    var win_rate := float(victories) / float(samples.size())
+    var alerts: Array[String] = []
+    if insoluble > 0:
+        alerts.append("insoluble_seeds")
+    if win_rate < 0.15 or win_rate > 0.9:
+        alerts.append("win_rate_outlier")
+    if trap_ids.size() < 2:
+        alerts.append("trap_diversity_low")
+    if monster_ids.size() < 2:
+        alerts.append("monster_diversity_low")
+    return {"ok": alerts.is_empty(), "win_rate": win_rate, "insoluble": insoluble, "alerts": alerts}
+
+func to_dict() -> Dictionary:
+    return {"selected_profile": selected_profile}
+
+func from_dict(data: Dictionary) -> void:
+    select_profile(StringName(data.get("selected_profile", &"architect")))

@@ -157,6 +157,7 @@ func finish_run(result: Dictionary) -> Dictionary:
         global_stats.record_run(enriched)
     var campaign_result := v08.finish_node(enriched)
     v08.replay.record(float(enriched.get("duration_seconds", 0)), &"run_end", "campaign", Vector2i.ZERO, {"victory": enriched.get("victory", false), "score": enriched.get("score", 0)})
+    var debrief_result := v08.build_debrief(enriched)
     for tag in run_tags:
         var entry_id := _encyclopedia_id_for_tag(tag)
         if not entry_id.is_empty():
@@ -181,6 +182,7 @@ func finish_run(result: Dictionary) -> Dictionary:
         "completed_challenges": completed_ids,
         "new_achievements": achievements.consume_notifications(),
         "campaign": campaign_result,
+        "debrief": debrief_result,
     }
 
 func _discover_run_content() -> void:

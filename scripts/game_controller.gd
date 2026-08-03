@@ -220,7 +220,14 @@ func _prepare_current_wave() -> void:
     _configure_room_rules()
     _configure_v08_environment()
     _configure_v08_patrols()
+    _configure_v08_formations()
     _prepare_v08_sabotage()
+    v06_integration.v08.intents.announce("adventurer", &"steal", ENTRANCE, TREASURE, 12.0)
+    if not v06_integration.v08.rescue.active.is_empty():
+        var rescue_cell: Vector2i = v06_integration.v08.rescue.active.cell
+        v06_integration.v08.intents.announce("rescue_team", &"attack", ENTRANCE, rescue_cell, 8.0)
+        status_label.tooltip_text += "\nSAUVETAGE : défendez la cellule %s ou préparez un leurre." % rescue_cell
+    v06_integration.v08.guided_campaign.observe(&"start_wave")
     var faction_id := StringName(v06_integration.v08.active_node.get("faction", "sun_order"))
     v06_integration.v08.audio.configure(active_biome.active_biome_id, faction_id, {"music": v06_integration.v08.accessibility.audio.music, "muted": false, "reduced_sensory": v06_integration.v08.accessibility.reduced_motion})
     active_boss = int(v06_integration.v08.active_node.get("type", -1)) == RogueliteWorldMap.NodeType.BOSS and waves.current_wave == WaveManager.MAX_WAVES
@@ -237,7 +244,9 @@ func _prepare_current_wave() -> void:
         status_label.tooltip_text = "%s\nCodex : %s" % [String(hint.text), String(hint.codex)]
     _refresh_adventurer_intelligence()
     var village_health := 1.0 + float(village_modifiers.get("adventurer_health_multiplier", 0.0))
-    adventurer_health.max_health = maxi(1, roundi(float(waves.get_adventurer_health()) * v06_integration.adventurer_health_multiplier() * village_health))
+    var difficulty_level: DifficultyDirector.Level = v06_integration.v08.difficulty_rules().level
+    var difficulty_health := float(v06_integration.v08.difficulty.profile(difficulty_level).health)
+    adventurer_health.max_health = maxi(1, roundi(float(waves.get_adventurer_health()) * v06_integration.adventurer_health_multiplier() * village_health * difficulty_health))
     adventurer_health.reset()
     if not announcement.is_empty():
         status_label.text += "\nÉvénement : %s — %s" % [String(announcement.title), String(announcement.body)]
@@ -300,6 +309,9 @@ func _finish_campaign(victory: bool, message: String) -> void:
         result_summary.text += "\nCAMPAGNE 0.8 TERMINÉE"
     elif campaign_meta.has("routes"):
         result_summary.text += "\nRoutes de campagne disponibles : %d" % Array(campaign_meta.routes).size()
+    var debrief: Dictionary = meta.get("debrief", {})
+    for finding in debrief.get("findings", []):
+        result_summary.text += "\nConseil : %s" % v06_integration.v08.localization.text(String(finding.text_key))
     var experience_gain := maxi(completed_waves * 6 + captures_this_run * 12, 6)
     for archetype in active_monster_archetypes:
         monster_progression.grant_experience(archetype.archetype_id, experience_gain)
@@ -322,7 +334,9 @@ func _current_adventurer_speed_multiplier() -> float:
     var market_speed := 1.0 + float(village_modifiers.get("adventurer_speed_multiplier", 0.0))
     var environment_cost := v06_integration.v08.environment.movement_cost(_cell_from_world(adventurer_position), [])
     var environment_speed := 1.0 / (1.0 + environment_cost)
-    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed * environment_speed
+    var difficulty_level: DifficultyDirector.Level = v06_integration.v08.difficulty_rules().level
+    var difficulty_speed := float(v06_integration.v08.difficulty.profile(difficulty_level).speed)
+    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed * environment_speed * difficulty_speed
 
 func _configure_trap(trap: SpikeTrap) -> void:
     var run_bonus := float(run_choice_modifiers.get("trap_damage_multiplier", 0.0))
@@ -387,7 +401,7 @@ func _max_defenders() -> int:
     return village_den.get_capacity()
 
 func _starting_gold_adjustment() -> int:
-    return int(village_modifiers.get("starting_gold_adjustment", 0)) + roundi(active_biome.rule_value("starting_gold_adjustment", 0.0))
+    return int(village_modifiers.get("starting_gold_adjustment", 0)) + roundi(active_biome.rule_value("starting_gold_adjustment", 0.0)) + int(v06_integration.v08.difficulty_rules().starting_gold)
 
 func _monster_respawn_delay(base_delay: float) -> float:
     var speed_bonus := float(village_modifiers.get("monster_respawn_speed_multiplier", 0.0))
@@ -434,6 +448,7 @@ func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, co
 func _process(delta: float) -> void:
     super._process(delta)
     tactical_powers.tick(delta)
+    v06_integration.v08.formations.tick(delta)
     environment_tick_left = maxf(environment_tick_left - delta, 0.0)
     audio_update_left = maxf(audio_update_left - delta, 0.0)
     if emergency_lock_time > 0.0:
@@ -458,6 +473,8 @@ func _process(delta: float) -> void:
         var danger := 1.0 - clampf(distance / float(GRID_SIZE.x + GRID_SIZE.y), 0.0, 1.0)
         var boss_ratio := v06_integration.v08.boss_service.encounter.current_health / maxf(float(v06_integration.v08.boss_service.encounter.definition.get("max_health", 1)), 1.0) if active_boss else -1.0
         v06_integration.v08.audio.update(danger, boss_ratio)
+        if not v06_integration.v08.intents.update(0.25).is_empty():
+            queue_redraw()
     if environment_tick_left <= 0.0:
         environment_tick_left = 0.5
         var doors: Array[Vector2i] = [DOOR] if door_closed else []
@@ -531,6 +548,15 @@ func _unhandled_input(event: InputEvent) -> void:
                 return
             KEY_H:
                 _toggle_heatmap()
+                return
+            KEY_F6:
+                _issue_formation_order(&"hold", TREASURE)
+                return
+            KEY_F7:
+                _issue_formation_order(&"converge", _cell_from_world(adventurer_position))
+                return
+            KEY_F8:
+                _issue_formation_order(&"retreat", Vector2i(1, 1))
                 return
     if blueprint_placement_mode and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
         _place_run_blueprint(_cell_from_world(event.position))
@@ -614,6 +640,18 @@ func _configure_v08_patrols() -> void:
     var monster_ids := get_monster_ids()
     for index in monster_ids.size():
         v06_integration.v08.patrols.assign(monster_ids[index], zone_ids[index % zone_ids.size()])
+
+func _configure_v08_formations() -> void:
+    var monster_ids := get_monster_ids()
+    if monster_ids.is_empty():
+        return
+    var type: StringName = [&"escort", &"pack", &"ambush", &"treasure_guard"][posmod(waves.current_wave - 1, 4)]
+    v06_integration.v08.formations.configure("active_squad", type, monster_ids[0], monster_ids)
+    v06_integration.v08.guided_campaign.observe(&"assign_monster")
+
+func _issue_formation_order(order: StringName, target: Vector2i) -> void:
+    if v06_integration.v08.formations.issue_order("active_squad", order, target, 5.0):
+        status_label.text = "ORDRE [%s] — cible %s (5 s)." % [String(order).to_upper(), target]
 
 func _capture_run_blueprint() -> void:
     if game_state != GameState.PREPARATION:
@@ -811,16 +849,23 @@ func _draw() -> void:
         for zone in v06_integration.v08.patrols.zones.values():
             for cell in zone.cells:
                 draw_rect(Rect2(GRID_ORIGIN + Vector2(cell) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE)), colors.get(StringName(zone.type), Color.WHITE), true)
+    for intent in v06_integration.v08.intents.intents.values():
+        var origin := GRID_ORIGIN + (Vector2(intent.origin) + Vector2(0.5, 0.5)) * CELL_SIZE
+        var target := GRID_ORIGIN + (Vector2(intent.target) + Vector2(0.5, 0.5)) * CELL_SIZE
+        draw_dashed_line(origin, target, Color("ffcf5c"), 2.0, 6.0)
+        draw_circle(target, 7.0, Color("ff6b6b", 0.7), false, 2.0)
 
 func _wave_reward_multiplier() -> float:
     return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))
 
 func _on_trap_placed() -> void:
     v06_integration.record_trap_placed()
+    v06_integration.v08.guided_campaign.observe(&"place_trap")
     _refresh_v06_hud()
 
 func record_v06_wall_placed() -> void:
     v06_integration.record_wall_placed()
+    v06_integration.v08.guided_campaign.observe(&"place_wall")
     _refresh_v06_hud()
 
 func _offer_run_choices() -> void:

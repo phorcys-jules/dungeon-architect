@@ -181,6 +181,10 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
             var patrol_target := v06_integration.v08.patrols.target_for(monster_id, mobile_monsters[index].cell, adventurer_cell if mobile_monsters[index].cell.distance_to(adventurer_cell) <= 3.0 else Vector2i(-1, -1))
             if String(patrol_target.get("source", "idle")) != "idle":
                 targets[index] = Vector2i(patrol_target.target)
+            var leader_cell: Vector2i = mobile_monsters[0].cell if not mobile_monsters.is_empty() else targets[index]
+            var formation_target := v06_integration.v08.formations.target_for(monster_id, leader_cell, TREASURE)
+            if String(formation_target.get("source", "unassigned")) != "unassigned":
+                targets[index] = Vector2i(formation_target.target)
 
     for index in mobile_monsters.size():
         passage_cooldowns[index] = maxf(float(passage_cooldowns.get(index, 0.0)) - delta, 0.0)
