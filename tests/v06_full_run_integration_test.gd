@@ -32,6 +32,8 @@ func _init() -> void:
     assert(int(summary.result.resources.gold) >= 20)
     assert(bool(integration.last_run_result.victory))
     assert(integration.global_stats.total_runs == 1)
+    var balance_sample := integration.global_stats.balance_sample("crypt", "ghost")
+    assert(int(balance_sample.runs) == 1 and int(balance_sample.wins) == 1)
     assert(integration.encyclopedia.state_of("monster_ghost") == EncyclopediaCatalog.DiscoveryState.DISCOVERED)
     assert(integration.encyclopedia.state_of("monster_mimic") == EncyclopediaCatalog.DiscoveryState.DISCOVERED)
 

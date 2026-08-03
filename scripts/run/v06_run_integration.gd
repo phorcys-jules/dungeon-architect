@@ -124,6 +124,11 @@ func finish_run(result: Dictionary) -> Dictionary:
             challenge_rewards.essence += int(reward.essence)
 
     var enriched := result.duplicate(true)
+    if not enriched.has("biome"):
+        for tag in run_tags:
+            if tag.begins_with("biome:"):
+                enriched["biome"] = tag.trim_prefix("biome:")
+                break
     enriched["synergy_ids"] = synergies.discovered.duplicate()
     enriched["challenge_progress"] = completed_ids
     var resources: Dictionary = enriched.get("resources", {}).duplicate(true)
