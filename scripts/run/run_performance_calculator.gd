@@ -3,8 +3,11 @@ extends RefCounted
 
 const DIFFICULTY_MULTIPLIERS := {
     "easy": 0.8,
+    "discovery": 0.8,
     "normal": 1.0,
+    "architect": 1.0,
     "hard": 1.35,
+    "ruthless": 1.35,
 }
 
 func calculate(record: RunResultRecord) -> Dictionary:

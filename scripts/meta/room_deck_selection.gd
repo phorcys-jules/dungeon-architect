@@ -29,6 +29,17 @@ func room(room_id: String) -> RoomData:
         return null
     return load(String(ROOM_PATHS[room_id])) as RoomData
 
+func selected_tags() -> Array[StringName]:
+    var tags: Array[StringName] = []
+    for room_id in selected:
+        var definition := room(room_id)
+        if definition == null:
+            continue
+        for tag: StringName in definition.tags:
+            if not tags.has(tag):
+                tags.append(tag)
+    return tags
+
 func select(room_ids: Array[String]) -> Dictionary:
     if room_ids.is_empty():
         return {"ok": false, "reason": "empty_deck"}

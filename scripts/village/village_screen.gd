@@ -20,11 +20,11 @@ const BUILDING_TEXTURES := {
 }
 
 const BUILDING_LAYOUT := {
-    "den": {"label": "TANIÈRE", "subtitle": "Repaire des monstres", "position": Vector2(65, 210), "color": Color("6b4a8f")},
-    "forge": {"label": "FORGE", "subtitle": "Pièges renforcés", "position": Vector2(370, 72), "color": Color("a95832")},
-    "laboratory": {"label": "LABORATOIRE", "subtitle": "Effets prolongés", "position": Vector2(470, 235), "color": Color("467b82")},
-    "graveyard": {"label": "CIMETIÈRE", "subtitle": "Retour des monstres", "position": Vector2(65, 390), "color": Color("58606f")},
-    "market": {"label": "MARCHÉ NOIR", "subtitle": "Pouvoir contre malédiction", "position": Vector2(365, 430), "color": Color("7f315f")},
+    "den": {"label": "TANIÈRE", "subtitle": "Repaire des monstres", "position": Vector2(20, 365), "color": Color("6b4a8f")},
+    "forge": {"label": "FORGE", "subtitle": "Pièges renforcés", "position": Vector2(350, 78), "color": Color("a95832")},
+    "laboratory": {"label": "LABORATOIRE", "subtitle": "Effets prolongés", "position": Vector2(400, 225), "color": Color("467b82")},
+    "graveyard": {"label": "CIMETIÈRE", "subtitle": "Retour des monstres", "position": Vector2(30, 500), "color": Color("58606f")},
+    "market": {"label": "MARCHÉ NOIR", "subtitle": "Pouvoir contre malédiction", "position": Vector2(360, 470), "color": Color("7f315f")},
 }
 
 @onready var start_run_button: Button = %StartRunButton
@@ -63,9 +63,17 @@ var feedback_panel: PanelContainer
 var v08_campaign := V08CampaignRuntime.new()
 var campaign_route_selector: OptionButton
 var campaign_status: Label
+var campaign_route_preview: Label
+var campaign_merchant := MerchantInventory.new()
+var relic_catalog := RelicCatalog.new()
+var unlock_economy := UnlockEconomy.new()
+var integrated_run_history := RunHistory.new()
+var history_view := RunHistoryViewModel.new()
+var tutorial_progress := TutorialProgress.new()
 
 func _ready() -> void:
     super._ready()
+    _apply_village_identity()
     _load_village_state()
     _build_village_map()
     _build_village_residents()
@@ -80,6 +88,11 @@ func _ready() -> void:
     start_run_button.pressed.connect(_on_start_run_pressed)
     _select_building("den")
     _refresh_navigation()
+
+func _exit_tree() -> void:
+    if music_player != null:
+        music_player.stop()
+        music_player.stream = null
 
 func _load_village_state() -> void:
     var state := meta_store.load_state()
@@ -102,11 +115,18 @@ func _load_village_state() -> void:
     last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
     feedback_settings.apply(state.get("feedback_settings", {}))
     v08_campaign.from_dict(state.get("v08_campaign", {}))
+    campaign_merchant.from_dict(state.get("merchant_inventory", {}))
+    relic_catalog.from_dict(state.get("relics", {}))
+    unlock_economy.restore(state.get("unlock_economy", {}))
+    integrated_run_history.load_array(state.get("run_history", []))
+    tutorial_progress.restore(state.get("tutorial_progress", {}))
     v08_campaign.ensure_started(int(state.get("campaign_seed", Time.get_unix_time_from_system())))
     v08_campaign.accessibility.ensure_default_bindings()
     v08_campaign.accessibility.apply_bindings()
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
+    if campaign_merchant.stock.is_empty():
+        campaign_merchant.roll_stock(int(state.get("campaign_seed", Time.get_unix_time_from_system())))
 
 func _build_village_map() -> void:
     var background := TextureRect.new()
@@ -119,21 +139,64 @@ func _build_village_map() -> void:
     add_child(background)
     move_child(background, 0)
 
+    var atmosphere := ColorRect.new()
+    atmosphere.name = "VillageAtmosphere"
+    atmosphere.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    atmosphere.color = Color("100b1c", 0.16)
+    atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    add_child(atmosphere)
+    move_child(atmosphere, 1)
+
+    var header := PanelContainer.new()
+    header.name = "VillageHeader"
+    header.position = Vector2(12, 10)
+    header.size = Vector2(556, 48)
+    header.add_theme_stylebox_override("panel", _panel_style(Color("20162d", 0.94), Color("c98f4c")))
+    add_child(header)
+    var header_row := HBoxContainer.new()
+    header_row.add_theme_constant_override("separation", 10)
+    header.add_child(header_row)
+    var village_title := Label.new()
+    village_title.text = "✦  LE CONSEIL DU DONJON"
+    village_title.custom_minimum_size.x = 265
+    village_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    village_title.add_theme_font_size_override("font_size", 17)
+    village_title.add_theme_color_override("font_color", Color("ffd98a"))
+    header_row.add_child(village_title)
+    reaction_label = Label.new()
+    reaction_label.name = "VillageReaction"
+    reaction_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    reaction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    reaction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    reaction_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    reaction_label.add_theme_font_size_override("font_size", 11)
+    reaction_label.add_theme_color_override("font_color", Color("e6d7ef"))
+    reaction_label.text = _village_reaction_text()
+    header_row.add_child(reaction_label)
+
     var panel := get_node("Panel") as PanelContainer
-    (get_node("Panel/Margin/Content") as VBoxContainer).add_theme_constant_override("separation", 8)
+    (get_node("Panel/DetailsScroll/Margin/Content") as VBoxContainer).add_theme_constant_override("separation", 9)
     panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-    panel.offset_left = -305.0
-    panel.offset_top = -270.0
-    panel.offset_right = -20.0
-    panel.offset_bottom = 270.0
-    panel.modulate = Color(1, 1, 1, 0.96)
+    panel.offset_left = -380.0
+    panel.offset_top = -308.0
+    panel.offset_right = -12.0
+    panel.offset_bottom = 308.0
+    panel.add_theme_stylebox_override("panel", _panel_style(Color("171120", 0.97), Color("9f7147")))
+    title_label.add_theme_font_size_override("font_size", 20)
+    title_label.add_theme_color_override("font_color", Color("ffd98a"))
+    status_label.add_theme_color_override("font_color", Color("d9d2e5"))
+    upgrade_button.add_theme_stylebox_override("normal", _action_style(Color("74452e")))
+    upgrade_button.add_theme_stylebox_override("hover", _action_style(Color("9a5c35")))
+    start_run_button.add_theme_stylebox_override("normal", _action_style(Color("79602a")))
+    start_run_button.add_theme_stylebox_override("hover", _action_style(Color("a78337")))
+    start_run_button.add_theme_color_override("font_color", Color("fff1b8"))
 
     for building_id in BUILDING_LAYOUT:
         var definition: Dictionary = BUILDING_LAYOUT[building_id]
         var button := Button.new()
         button.name = "%sBuilding" % String(building_id).capitalize()
         button.position = definition.position
-        button.size = Vector2(180, 125)
+        button.size = Vector2(156, 112)
         button.toggle_mode = true
         button.tooltip_text = String(definition.subtitle)
         button.add_theme_stylebox_override("normal", _building_style(definition.color, 0.10))
@@ -143,8 +206,8 @@ func _build_village_map() -> void:
         var artwork := TextureRect.new()
         artwork.name = "Artwork"
         artwork.texture = BUILDING_TEXTURES[building_id]
-        artwork.position = Vector2(10, 0)
-        artwork.size = Vector2(160, 112)
+        artwork.position = Vector2(0, 0)
+        artwork.size = Vector2(156, 91)
         artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         artwork.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
         artwork.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -152,8 +215,8 @@ func _build_village_map() -> void:
         var label := Label.new()
         label.name = "BuildingName"
         label.text = String(definition.label)
-        label.position = Vector2(0, 96)
-        label.size = Vector2(180, 27)
+        label.position = Vector2(0, 84)
+        label.size = Vector2(156, 26)
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
         label.add_theme_font_size_override("font_size", 14)
@@ -193,22 +256,7 @@ func _refresh_building_progression_visuals() -> void:
         artwork.scale = Vector2.ONE * (1.0 + minf(float(level) * 0.012, 0.06))
 
 func _build_village_residents() -> void:
-    reaction_label = Label.new()
-    reaction_label.name = "VillageReaction"
-    reaction_label.position = Vector2(220, 18)
-    reaction_label.size = Vector2(410, 42)
-    reaction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    reaction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    reaction_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    reaction_label.add_theme_font_size_override("font_size", 13)
-    reaction_label.add_theme_color_override("font_color", Color("fff0b5"))
-    reaction_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-    reaction_label.add_theme_constant_override("shadow_offset_x", 2)
-    reaction_label.add_theme_constant_override("shadow_offset_y", 2)
-    reaction_label.text = _village_reaction_text()
-    add_child(reaction_label)
-
-    var monster_positions := [Vector2(52, 285), Vector2(105, 300), Vector2(158, 285), Vector2(211, 300)]
+    var monster_positions := [Vector2(320, 350), Vector2(370, 365), Vector2(420, 350), Vector2(470, 365)]
     for index in monster_roster.recruited.size():
         if index >= monster_positions.size():
             break
@@ -216,9 +264,9 @@ func _build_village_residents() -> void:
         if not MONSTER_TEXTURES.has(monster_id):
             continue
         _add_resident(monster_id.capitalize(), MONSTER_TEXTURES[monster_id], monster_positions[index], func(): _select_building("den"))
-    _add_resident("Forgeron", MONSTER_TEXTURES.mimic, Vector2(330, 196), func(): _select_building("forge"))
-    _add_resident("Archiviste", MONSTER_TEXTURES.ghost, Vector2(278, 312), _open_archives)
-    _add_resident("Marchand", MONSTER_TEXTURES.spider, Vector2(315, 420), func(): _select_building("market"))
+    _add_resident("Forgeron", MONSTER_TEXTURES.mimic, Vector2(330, 205), func(): _select_building("forge"))
+    _add_resident("Archiviste", MONSTER_TEXTURES.ghost, Vector2(245, 455), _open_archives)
+    _add_resident("Marchand", MONSTER_TEXTURES.spider, Vector2(535, 425), func(): _select_building("market"))
 
 func _add_resident(label: String, texture: Texture2D, position_value: Vector2, action: Callable) -> void:
     var button := Button.new()
@@ -250,6 +298,54 @@ func _village_reaction_text() -> String:
         return "Victoire ! Les habitants célèbrent %d capture(s) et renforcent le village." % int(last_run_result.get("captures", 0))
     return "Défaite à la vague %d… les monstres préparent déjà leur revanche." % int(last_run_result.get("wave", 0))
 
+func _apply_village_identity() -> void:
+    var village_theme := Theme.new()
+    village_theme.default_font_size = 12
+    village_theme.set_color("font_color", "Label", Color("e9e1ee"))
+    village_theme.set_color("font_color", "Button", Color("f4e8d2"))
+    village_theme.set_color("font_hover_color", "Button", Color("fff0b0"))
+    village_theme.set_color("font_pressed_color", "Button", Color("ffd477"))
+    village_theme.set_color("font_color", "OptionButton", Color("eee5f1"))
+    village_theme.set_stylebox("normal", "Button", _action_style(Color("292033")))
+    village_theme.set_stylebox("hover", "Button", _action_style(Color("43304b")))
+    village_theme.set_stylebox("pressed", "Button", _action_style(Color("5b3d4b")))
+    village_theme.set_stylebox("disabled", "Button", _action_style(Color("1c1820")))
+    village_theme.set_stylebox("normal", "OptionButton", _action_style(Color("241b2c")))
+    village_theme.set_stylebox("hover", "OptionButton", _action_style(Color("3b2942")))
+    theme = village_theme
+
+func _panel_style(background: Color, border: Color) -> StyleBoxFlat:
+    var style := StyleBoxFlat.new()
+    style.bg_color = background
+    style.border_color = border
+    style.set_border_width_all(2)
+    style.set_corner_radius_all(10)
+    style.shadow_color = Color(0, 0, 0, 0.72)
+    style.shadow_size = 8
+    style.content_margin_left = 12
+    style.content_margin_right = 12
+    style.content_margin_top = 9
+    style.content_margin_bottom = 9
+    return style
+
+func _action_style(background: Color) -> StyleBoxFlat:
+    var style := StyleBoxFlat.new()
+    style.bg_color = background
+    style.border_color = Color("7e654c")
+    style.set_border_width_all(1)
+    style.set_corner_radius_all(6)
+    style.content_margin_left = 9
+    style.content_margin_right = 9
+    style.content_margin_top = 6
+    style.content_margin_bottom = 6
+    return style
+
+func _style_section_heading(label: Label) -> void:
+    label.add_theme_font_size_override("font_size", 11)
+    label.add_theme_color_override("font_color", Color("d6a85e"))
+    label.add_theme_color_override("font_shadow_color", Color.BLACK)
+    label.add_theme_constant_override("shadow_offset_y", 1)
+
 func _building_style(color: Color, alpha: float) -> StyleBoxFlat:
     var style := StyleBoxFlat.new()
     style.bg_color = Color(color, alpha)
@@ -265,14 +361,15 @@ func _building_style(color: Color, alpha: float) -> StyleBoxFlat:
     return style
 
 func _build_roster_controls() -> void:
-    var content := get_node("Panel/Margin/Content") as VBoxContainer
+    var content := get_node("Panel/DetailsScroll/Margin/Content") as VBoxContainer
     var heading := Label.new()
     heading.text = "ÉQUIPE DE MONSTRES"
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _style_section_heading(heading)
     content.add_child(heading)
     content.move_child(heading, 2)
-    var row := HBoxContainer.new()
-    row.alignment = BoxContainer.ALIGNMENT_CENTER
+    var row := GridContainer.new()
+    row.columns = 2
     row.add_theme_constant_override("separation", 4)
     content.add_child(row)
     content.move_child(row, 3)
@@ -323,15 +420,16 @@ func _refresh_roster_controls() -> void:
         button.modulate = Color.WHITE if monster_roster.recruited.has(String(monster_id)) else Color("8b8b9b")
 
 func _build_module_controls() -> void:
-    var content := get_node("Panel/Margin/Content") as VBoxContainer
+    var content := get_node("Panel/DetailsScroll/Margin/Content") as VBoxContainer
     var heading := Label.new()
     heading.text = "MODULES DU LABYRINTHE — %d/%d" % [labyrinth_modules.complexity_used(), LabyrinthModuleLoadout.MAX_COMPLEXITY]
     heading.name = "LabyrinthModulesHeading"
     heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _style_section_heading(heading)
     content.add_child(heading)
     content.move_child(heading, 4)
-    var row := HBoxContainer.new()
-    row.alignment = BoxContainer.ALIGNMENT_CENTER
+    var row := GridContainer.new()
+    row.columns = 2
     row.add_theme_constant_override("separation", 3)
     content.add_child(row)
     content.move_child(row, 5)
@@ -341,6 +439,7 @@ func _build_module_controls() -> void:
         button.text = String(definition.name)
         button.toggle_mode = true
         button.custom_minimum_size = Vector2(56, 30)
+        button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         button.add_theme_font_size_override("font_size", 9)
         button.tooltip_text = "%s — complexité %d" % [String(definition.name), int(definition.cost)]
         button.pressed.connect(_toggle_labyrinth_module.bind(String(module_id)))
@@ -368,15 +467,16 @@ func _refresh_module_controls() -> void:
         var button := module_buttons[module_id] as Button
         button.button_pressed = labyrinth_modules.selected.has(String(module_id))
         button.disabled = not unlocked.has(String(module_id))
-    var heading := get_node_or_null("Panel/Margin/Content/LabyrinthModulesHeading") as Label
+    var heading := get_node_or_null("Panel/DetailsScroll/Margin/Content/LabyrinthModulesHeading") as Label
     if heading != null:
         heading.text = "MODULES DU LABYRINTHE — %d/%d" % [labyrinth_modules.complexity_used(), LabyrinthModuleLoadout.MAX_COMPLEXITY]
 
 func _build_room_deck_controls() -> void:
-    var content := get_node("Panel/Margin/Content") as VBoxContainer
+    var content := get_node("Panel/DetailsScroll/Margin/Content") as VBoxContainer
     biome_selector = OptionButton.new()
     biome_selector.name = "BiomeSelector"
     biome_selector.add_theme_font_size_override("font_size", 9)
+    biome_selector.fit_to_longest_item = false
     var catalog := BiomeCatalog.new()
     for biome_id in catalog.all_ids():
         var definition := catalog.get_biome(biome_id)
@@ -398,6 +498,7 @@ func _build_room_deck_controls() -> void:
     room_selector = OptionButton.new()
     room_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     room_selector.add_theme_font_size_override("font_size", 9)
+    room_selector.fit_to_longest_item = false
     for room_id in room_deck_selection.room_ids():
         var definition := room_deck_selection.room(room_id)
         room_selector.add_item("%s · %d or · R%d" % [definition.display_name, definition.build_cost, definition.rarity])
@@ -456,9 +557,9 @@ func _select_biome(index: int) -> void:
 func _build_archives() -> void:
     archives_button = Button.new()
     archives_button.name = "ArchivesButton"
-    archives_button.position = Vector2(20, 20)
-    archives_button.size = Vector2(190, 38)
-    archives_button.text = "ARCHIVES"
+    archives_button.position = Vector2(12, 330)
+    archives_button.size = Vector2(142, 34)
+    archives_button.text = "◆ ARCHIVES"
     var pending := encyclopedia.pending_notifications.size()
     if pending > 0:
         archives_button.text += " · %d nouveau(x)" % pending
@@ -473,6 +574,7 @@ func _build_archives() -> void:
     archives_panel.offset_top = -270.0
     archives_panel.offset_right = 330.0
     archives_panel.offset_bottom = 270.0
+    archives_panel.add_theme_stylebox_override("panel", _panel_style(Color("15101e", 0.99), Color("b48a5a")))
     archives_panel.visible = false
     add_child(archives_panel)
     var margin := MarginContainer.new()
@@ -532,6 +634,10 @@ func _refresh_archives(index: int) -> void:
             var progress := achievements.progress(achievement_id)
             var icon := "✓" if bool(progress.complete) else "○"
             lines.append("[b]%s %s[/b]  %d/%d" % [icon, String(definition.name), int(progress.current), int(progress.target)])
+        var history_summary := history_view.summary(integrated_run_history.to_array())
+        lines.append("[b]HISTORIQUE DES EXPÉDITIONS[/b]  %d runs · %d%% victoires · record %d" % [int(history_summary.runs), roundi(float(history_summary.win_rate) * 100.0), int(history_summary.best_score)])
+        for row in history_view.build_rows(integrated_run_history.to_array(), 5):
+            lines.append("%s · %s · %s · score %d · %s" % [String(row.result), String(row.difficulty), String(row.duration), int(row.score), String(row.rewards)])
     else:
         for raw_entry in encyclopedia_catalog.list_by_kind(category):
             var entry := encyclopedia.visible_entry(encyclopedia_catalog, String(raw_entry.id))
@@ -556,9 +662,9 @@ func _start_village_music() -> void:
 func _build_feedback_settings() -> void:
     feedback_button = Button.new()
     feedback_button.name = "FeedbackSettingsButton"
-    feedback_button.position = Vector2(20, 66)
-    feedback_button.size = Vector2(190, 32)
-    feedback_button.text = "OPTIONS AUDIO / VFX"
+    feedback_button.position = Vector2(162, 330)
+    feedback_button.size = Vector2(150, 34)
+    feedback_button.text = "⚙ OPTIONS"
     feedback_button.pressed.connect(func(): feedback_panel.visible = not feedback_panel.visible; feedback_panel.move_to_front())
     add_child(feedback_button)
     feedback_panel = PanelContainer.new()
@@ -568,6 +674,7 @@ func _build_feedback_settings() -> void:
     feedback_panel.offset_top = -190.0
     feedback_panel.offset_right = 210.0
     feedback_panel.offset_bottom = 190.0
+    feedback_panel.add_theme_stylebox_override("panel", _panel_style(Color("171120", 0.99), Color("8b6d90")))
     feedback_panel.visible = false
     add_child(feedback_panel)
     var margin := MarginContainer.new()
@@ -695,13 +802,20 @@ func _show_progression_building(building_id: String) -> void:
         upgrade_button.disabled = not den.currency.can_afford(cost)
 
 func _show_market() -> void:
+    var campaign_offer := _first_campaign_merchant_offer()
     var offer := _first_available_offer()
     var den := save_store.load_den()
     title_label.text = "Marché noir"
-    if offer.is_empty():
+    if campaign_offer.is_empty() and offer.is_empty():
         status_label.text = "Le marchand a épuisé son stock."
         upgrade_button.text = "Stock épuisé"
         upgrade_button.disabled = true
+        return
+    if not campaign_offer.is_empty():
+        var gold := int(unlock_economy.resources.get("gold", 0))
+        status_label.text = "%s\nType : %s\n\nReliques équipées : %s\nOr d'expédition : %d" % [String(campaign_offer.name), String(campaign_offer.kind).capitalize(), ", ".join(relic_catalog.active_labels()) if not relic_catalog.equipped.is_empty() else "aucune", gold]
+        upgrade_button.text = "Acheter (%d or)" % int(campaign_offer.price)
+        upgrade_button.disabled = not campaign_merchant.can_buy(String(campaign_offer.id), gold)
         return
     status_label.text = "%s\nRareté : %s\nEffet : %s\nContrepartie : %s\n\n%s : %s" % [
         String(offer.name),
@@ -724,12 +838,20 @@ func _on_upgrade_pressed() -> void:
             monster_roster.capacity = mini(den.get_capacity(), 4)
             upgrade_requested.emit()
     elif selected_building == "market":
-        var offer := _first_available_offer()
-        var purchase := black_market.buy(String(offer.get("id", "")), den.soul_shards)
-        if bool(purchase.get("ok", false)):
-            upgraded = true
-            den.soul_shards += int(purchase.gold_delta)
-            save_store.save_den(den)
+        var campaign_offer := _first_campaign_merchant_offer()
+        if not campaign_offer.is_empty():
+            var campaign_purchase := campaign_merchant.buy(String(campaign_offer.id), int(unlock_economy.resources.get("gold", 0)))
+            if bool(campaign_purchase.get("ok", false)):
+                upgraded = true
+                unlock_economy.add_resource("gold", int(campaign_purchase.gold_delta))
+                _apply_campaign_merchant_reward(campaign_purchase.reward)
+        else:
+            var offer := _first_available_offer()
+            var purchase := black_market.buy(String(offer.get("id", "")), den.soul_shards)
+            if bool(purchase.get("ok", false)):
+                upgraded = true
+                den.soul_shards += int(purchase.gold_delta)
+                save_store.save_den(den)
     else:
         var purchase := progression_service.buy_building_level(StringName(selected_building), den.soul_shards)
         if bool(purchase.get("success", false)):
@@ -738,6 +860,7 @@ func _on_upgrade_pressed() -> void:
             save_store.save_den(den)
     if upgraded:
         v08_campaign.guided_campaign.observe(&"upgrade_village")
+        tutorial_progress.complete("spend_rewards")
     _persist_village_state()
     _refresh_building_progression_visuals()
     _refresh_module_controls()
@@ -754,32 +877,82 @@ func _persist_village_state() -> void:
     state["feedback_settings"] = feedback_settings.serialize()
     state["v08_campaign"] = v08_campaign.to_dict()
     state["campaign_seed"] = v08_campaign.world_map.seed
+    state["merchant_inventory"] = campaign_merchant.to_dict()
+    state["relics"] = relic_catalog.to_dict()
+    state["unlock_economy"] = unlock_economy.serialize()
+    state["run_history"] = integrated_run_history.to_array()
+    state["tutorial_progress"] = tutorial_progress.serialize()
     meta_store.save_state(state)
+
+func _first_campaign_merchant_offer() -> Dictionary:
+    for offer in campaign_merchant.stock:
+        if not bool(offer.get("sold", false)):
+            return offer
+    return {}
+
+func _apply_campaign_merchant_reward(reward: Dictionary) -> void:
+    var reward_id := String(reward.get("id", ""))
+    match String(reward.get("kind", "")):
+        "relic":
+            if relic_catalog.grant(reward_id):
+                var equipped: Array[String] = relic_catalog.equipped.duplicate()
+                if equipped.size() < relic_catalog.equip_limit:
+                    equipped.append(reward_id)
+                    relic_catalog.equip(equipped)
+        "monster":
+            var monster_id := reward_id.trim_suffix("_recruit")
+            if not monster_roster.recruited.has(monster_id):
+                monster_roster.recruited.append(monster_id)
+        "upgrade":
+            unlock_economy.unlocked[reward_id] = true
 
 func _build_campaign_controls() -> void:
     var panel := PanelContainer.new()
     panel.name = "CampaignV08Panel"
-    panel.position = Vector2(12, 12)
-    panel.size = Vector2(330, 200)
+    panel.position = Vector2(12, 64)
+    panel.size = Vector2(300, 250)
+    panel.add_theme_stylebox_override("panel", _panel_style(Color("171120", 0.95), Color("76588f")))
     add_child(panel)
+    var margin := MarginContainer.new()
+    margin.add_theme_constant_override("margin_left", 8)
+    margin.add_theme_constant_override("margin_right", 8)
+    margin.add_theme_constant_override("margin_top", 6)
+    margin.add_theme_constant_override("margin_bottom", 6)
+    panel.add_child(margin)
     var column := VBoxContainer.new()
-    panel.add_child(column)
+    column.add_theme_constant_override("separation", 3)
+    margin.add_child(column)
     campaign_status = Label.new()
     campaign_status.add_theme_font_size_override("font_size", 11)
+    campaign_status.add_theme_color_override("font_color", Color("d7b3ff"))
     column.add_child(campaign_status)
     var row := HBoxContainer.new()
     column.add_child(row)
     campaign_route_selector = OptionButton.new()
-    campaign_route_selector.custom_minimum_size = Vector2(235, 30)
+    campaign_route_selector.custom_minimum_size = Vector2(170, 28)
+    campaign_route_selector.fit_to_longest_item = false
+    campaign_route_selector.item_selected.connect(_preview_campaign_route)
     row.add_child(campaign_route_selector)
     var choose := Button.new()
     choose.text = "Choisir"
     choose.pressed.connect(_choose_campaign_route)
     row.add_child(choose)
+    campaign_route_preview = Label.new()
+    campaign_route_preview.name = "CampaignRoutePreview"
+    campaign_route_preview.custom_minimum_size = Vector2(240, 48)
+    campaign_route_preview.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    campaign_route_preview.add_theme_font_size_override("font_size", 9)
+    column.add_child(campaign_route_preview)
     var daily_button := Button.new()
     daily_button.text = "Défi quotidien (sans récompense permanente)"
     daily_button.pressed.connect(_start_daily_challenge)
     column.add_child(daily_button)
+    var endless_button := CheckButton.new()
+    endless_button.text = "Mode sans fin"
+    endless_button.button_pressed = bool(meta_store.load_state().get("endless_active", false))
+    endless_button.tooltip_text = "Conserve le score et augmente la difficulté à chaque vague et à chaque expédition."
+    endless_button.toggled.connect(_toggle_endless_mode)
+    column.add_child(endless_button)
     var extension_row := HBoxContainer.new()
     column.add_child(extension_row)
     for decision in ["interrogate", "ransom", "release"]:
@@ -820,8 +993,10 @@ func _refresh_campaign_routes() -> void:
     var routes := v08_campaign.available_routes()
     for route in routes:
         var faction: Dictionary = route.faction
-        campaign_route_selector.add_item("Acte %d · %s · %s" % [int(route.act), String(faction.get("name", route.id)), String(route.biome).capitalize()])
+        var biome: Dictionary = route.biome_definition
+        campaign_route_selector.add_item("Acte %d · %s · %s" % [int(route.act), String(faction.get("name", route.id)), String(biome.get("name", route.biome))])
         campaign_route_selector.set_item_metadata(campaign_route_selector.item_count - 1, String(route.id))
+    _preview_campaign_route(campaign_route_selector.selected)
     var node_text := "Choisissez la prochaine route" if v08_campaign.active_node.is_empty() else "Étape : %s · acte %d" % [String(v08_campaign.active_node.get("faction", "inconnue")).replace("_", " ").capitalize(), int(v08_campaign.active_node.get("act", 1))]
     campaign_status.text = tr("CAMPAGNE 0.8 — %s") % node_text
     var quest_lines: Array[String] = []
@@ -834,6 +1009,31 @@ func _refresh_campaign_routes() -> void:
     var tutorial_step := v08_campaign.guided_campaign.current()
     if not tutorial_step.is_empty():
         campaign_status.tooltip_text += "\n\nGUIDE : %s" % v08_campaign.localization.text(String(tutorial_step.text_key))
+
+func _preview_campaign_route(index: int) -> void:
+    if campaign_route_preview == null or index < 0 or index >= campaign_route_selector.item_count:
+        if campaign_route_preview != null:
+            campaign_route_preview.text = "Campagne terminée : aucune route disponible."
+        return
+    var node_id := String(campaign_route_selector.get_item_metadata(index))
+    for route in v08_campaign.available_routes():
+        if String(route.id) == node_id:
+            campaign_route_preview.text = _campaign_route_preview_text(route)
+            campaign_route_preview.tooltip_text = campaign_route_preview.text
+            return
+
+func _campaign_route_preview_text(route: Dictionary) -> String:
+    var faction: Dictionary = route.faction
+    var biome: Dictionary = route.biome_definition
+    var rules: Dictionary = biome.get("rules", {})
+    var rule_labels: Array[String] = []
+    for key in rules:
+        var value := float(rules[key])
+        rule_labels.append("%s %+.0f%%" % [String(key).trim_suffix("_multiplier").replace("_", " "), (value - 1.0) * 100.0] if String(key).ends_with("_multiplier") else "%s %+d" % [String(key).replace("_", " "), roundi(value)])
+    var resistance := String(faction.get("resistance", "aucune")).replace("_", " ")
+    var reward := String(faction.get("reward", "or")).replace("_", " ")
+    var style := String(faction.get("style", "standard")).replace("_", " ")
+    return "%s · %s\n%s : résiste à %s · style %s · récompense %s\nBiome : %s" % [String(route.type_name), String(biome.get("name", route.biome)), String(faction.get("name", "Faction inconnue")), resistance, style, reward, ", ".join(rule_labels) if not rule_labels.is_empty() else "aucun modificateur"]
 
 func _choose_campaign_route() -> void:
     if campaign_route_selector.item_count == 0:
@@ -854,6 +1054,12 @@ func _start_daily_challenge() -> void:
     _persist_village_state()
     _refresh_campaign_routes()
     status_label.text = tr("Défi du %s : %s. Les récompenses permanentes sont désactivées.") % [date, String(challenge.modifier).replace("_", " ")]
+
+func _toggle_endless_mode(enabled: bool) -> void:
+    var state := meta_store.load_state()
+    state["endless_active"] = enabled
+    meta_store.save_state(state)
+    status_label.text = "Mode sans fin activé : le score continuera entre les expéditions." if enabled else "Mode sans fin désactivé."
 
 func _decide_first_prisoner(decision: String) -> void:
     var available := v08_campaign.prisoners.prisoners.keys().filter(func(id): return not bool(v08_campaign.prisoners.prisoners[id].resolved))

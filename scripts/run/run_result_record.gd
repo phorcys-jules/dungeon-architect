@@ -10,6 +10,9 @@ var monsters_lost := 0
 var treasure_protected := false
 var victory := false
 var difficulty_id := "normal"
+var score := 0
+var gold_reward := 0
+var essence_reward := 0
 
 func to_dict() -> Dictionary:
     return {
@@ -22,6 +25,9 @@ func to_dict() -> Dictionary:
         "treasure_protected": treasure_protected,
         "victory": victory,
         "difficulty_id": difficulty_id,
+        "score": score,
+        "gold_reward": gold_reward,
+        "essence_reward": essence_reward,
     }
 
 static func from_dict(data: Dictionary) -> RunResultRecord:
@@ -35,4 +41,7 @@ static func from_dict(data: Dictionary) -> RunResultRecord:
     record.treasure_protected = bool(data.get("treasure_protected", false))
     record.victory = bool(data.get("victory", false))
     record.difficulty_id = str(data.get("difficulty_id", "normal"))
+    record.score = maxi(int(data.get("score", data.get("damage_dealt", 0))), 0)
+    record.gold_reward = maxi(int(data.get("gold_reward", 0)), 0)
+    record.essence_reward = maxi(int(data.get("essence_reward", 0)), 0)
     return record

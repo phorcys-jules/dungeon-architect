@@ -12,6 +12,16 @@ var run_seed := 0
 var run_tags: Array[String] = []
 var last_run_result: Dictionary = {}
 var v08 := V08CampaignRuntime.new()
+var relics := RelicCatalog.new()
+var unlock_economy := UnlockEconomy.new()
+var merchant := MerchantInventory.new()
+var run_history := RunHistory.new()
+var performance := RunPerformanceCalculator.new()
+var end_summary := EndRunSummaryModel.new()
+var history_view := RunHistoryViewModel.new()
+var tutorial_progress := TutorialProgress.new()
+var endless := EndlessModeDirector.new()
+var endless_active := false
 
 func _init(state_store: V06ProgressionStore = null) -> void:
     if state_store != null:
@@ -21,6 +31,11 @@ func begin_run(seed_value: int, tags: Array[String]) -> void:
     run_seed = seed_value
     run_tags = tags.duplicate()
     _restore(store.load_state())
+    tutorial_progress.complete("prepare_dungeon")
+    if merchant.stock.is_empty():
+        merchant.roll_stock(seed_value, 3)
+    if endless_active and endless.wave == 0:
+        endless.start(seed_value, endless.best_score)
     v08.ensure_started(seed_value)
     v08.replay.begin(seed_value, GameVersion.VALUE)
     v08.replay.record(0.0, &"run_start", "dungeon_master", Vector2i.ZERO, {"tags": tags.duplicate()})
@@ -46,6 +61,9 @@ func begin_run(seed_value: int, tags: Array[String]) -> void:
     _discover_run_content()
 
 func start_wave(wave: int, biome_id: String) -> Dictionary:
+    tutorial_progress.complete("start_invasion")
+    if endless_active:
+        endless.next_wave()
     events.tick_stage()
     var event := events.roll(run_seed, wave, biome_id)
     v08.replay.record(float(wave), &"wave_start", "campaign", Vector2i.ZERO, {"wave": wave, "biome": biome_id, "event": event.get("id", "")})
@@ -147,6 +165,39 @@ func finish_run(result: Dictionary) -> Dictionary:
     resources["gold"] = int(resources.get("gold", 0)) + int(challenge_rewards.gold)
     resources["essence"] = int(resources.get("essence", 0)) + int(challenge_rewards.essence)
     enriched["resources"] = resources
+    var record := RunResultRecord.new()
+    record.run_id = "%d-%d" % [run_seed, int(enriched.get("duration_seconds", 0))]
+    record.duration_seconds = float(enriched.get("duration_seconds", 0.0))
+    record.waves_completed = int(enriched.get("wave", 0))
+    record.damage_dealt = int(enriched.get("score", 0))
+    record.traps_triggered = int(challenges.metrics.get("traps_placed", 0))
+    record.monsters_lost = int(challenges.metrics.get("monsters_lost", 0))
+    record.treasure_protected = bool(enriched.get("victory", false))
+    record.victory = bool(enriched.get("victory", false))
+    record.difficulty_id = String(v08.effective_difficulty_profile())
+    var performance_result := performance.calculate(record)
+    record.score = int(performance_result.score)
+    record.gold_reward = int(performance_result.gold)
+    record.essence_reward = int(performance_result.essence)
+    if not v08.is_non_persistent_mode():
+        resources["gold"] = int(resources.get("gold", 0)) + int(performance_result.gold)
+        resources["essence"] = int(resources.get("essence", 0)) + int(performance_result.essence)
+        enriched["resources"] = resources
+    if endless_active:
+        performance_result["endless_wave_score"] = endless.complete_wave(int(enriched.get("captures", 0)), 100 if record.treasure_protected else 0, record.duration_seconds)
+        performance_result["endless_total_score"] = endless.score
+        performance_result["endless_best_score"] = endless.best_score
+    run_history.add(record)
+    unlock_economy.add_resource("gold", int(resources.get("gold", 0)))
+    unlock_economy.add_resource("essence", int(resources.get("essence", 0)))
+    if record.victory:
+        tutorial_progress.complete("protect_treasure")
+        var relic_ids: Array = relics.definitions.keys()
+        relic_ids.sort()
+        if not relic_ids.is_empty():
+            relics.grant(String(relic_ids[posmod(run_seed, relic_ids.size())]))
+            if relics.equipped.is_empty():
+                relics.equip([String(relic_ids[posmod(run_seed, relic_ids.size())])])
     last_run_result = {
         "victory": bool(enriched.get("victory", false)),
         "wave": int(enriched.get("wave", 0)),
@@ -158,6 +209,10 @@ func finish_run(result: Dictionary) -> Dictionary:
     var campaign_result := v08.finish_node(enriched)
     v08.replay.record(float(enriched.get("duration_seconds", 0)), &"run_end", "campaign", Vector2i.ZERO, {"victory": enriched.get("victory", false), "score": enriched.get("score", 0)})
     var debrief_result := v08.build_debrief(enriched)
+    var summary_result := end_summary.build(enriched, global_stats, {
+        "incomplete_challenges": challenges.active,
+        "undiscovered_synergies": [],
+    })
     for tag in run_tags:
         var entry_id := _encyclopedia_id_for_tag(tag)
         if not entry_id.is_empty():
@@ -183,6 +238,10 @@ func finish_run(result: Dictionary) -> Dictionary:
         "new_achievements": achievements.consume_notifications(),
         "campaign": campaign_result,
         "debrief": debrief_result,
+        "performance": performance_result,
+        "summary": summary_result,
+        "history": history_view.build_rows(run_history.to_array()),
+        "relics": relics.active_labels(),
     }
 
 func _discover_run_content() -> void:
@@ -207,6 +266,13 @@ func _restore(state: Dictionary) -> void:
     achievements.from_dict(state.get("achievements", {}))
     last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
     v08.from_dict(state.get("v08_campaign", {}))
+    relics.from_dict(state.get("relics", {}))
+    unlock_economy.restore(state.get("unlock_economy", {}))
+    merchant.from_dict(state.get("merchant_inventory", {}))
+    run_history.load_array(state.get("run_history", []))
+    tutorial_progress.restore(state.get("tutorial_progress", {}))
+    endless.from_dict(state.get("endless_mode", {}))
+    endless_active = bool(state.get("endless_active", false))
 
 func _persist() -> bool:
     var state := store.load_state()
@@ -218,5 +284,12 @@ func _persist() -> bool:
         "achievements": achievements.to_dict(),
         "last_run_result": last_run_result.duplicate(true),
         "v08_campaign": v08.to_dict(),
+        "relics": relics.to_dict(),
+        "unlock_economy": unlock_economy.serialize(),
+        "merchant_inventory": merchant.to_dict(),
+        "run_history": run_history.to_array(),
+        "tutorial_progress": tutorial_progress.serialize(),
+        "endless_mode": endless.to_dict(),
+        "endless_active": endless_active,
     }, true)
     return store.save_state(state)

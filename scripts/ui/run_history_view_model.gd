@@ -8,11 +8,11 @@ func build_rows(records: Array, limit: int = 10) -> Array[Dictionary]:
         var record: Dictionary = records[index]
         rows.append({
             "result": "Victoire" if bool(record.get("victory", false)) else "Défaite",
-            "difficulty": String(record.get("difficulty", "Normal")),
+            "difficulty": String(record.get("difficulty", record.get("difficulty_id", "normal"))).capitalize(),
             "waves": maxi(int(record.get("waves_completed", 0)), 0),
-            "score": maxi(int(record.get("score", 0)), 0),
+            "score": maxi(int(record.get("score", record.get("damage_dealt", 0))), 0),
             "duration": _format_duration(maxf(float(record.get("duration_seconds", 0.0)), 0.0)),
-            "treasure": "Sauvé" if bool(record.get("treasure_safe", false)) else "Perdu",
+            "treasure": "Sauvé" if bool(record.get("treasure_safe", record.get("treasure_protected", false))) else "Perdu",
             "rewards": "%d or · %d essence" % [maxi(int(record.get("gold_reward", 0)), 0), maxi(int(record.get("essence_reward", 0)), 0)],
         })
     return rows

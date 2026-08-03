@@ -25,35 +25,41 @@ offset_bottom = 170.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Margin" type="MarginContainer" parent="Panel"]
+[node name="DetailsScroll" type="ScrollContainer" parent="Panel"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="Panel/DetailsScroll"]
 layout_mode = 2
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 24
 
-[node name="Content" type="VBoxContainer" parent="Panel/Margin"]
+[node name="Content" type="VBoxContainer" parent="Panel/DetailsScroll/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 16
+size_flags_horizontal = 3
 
-[node name="TitleLabel" type="Label" parent="Panel/Margin/Content"]
+[node name="TitleLabel" type="Label" parent="Panel/DetailsScroll/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Tanière"
 horizontal_alignment = 1
 
-[node name="StatusLabel" type="Label" parent="Panel/Margin/Content"]
+[node name="StatusLabel" type="Label" parent="Panel/DetailsScroll/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Capacité : 2 monstres\nRessources : 0"
 horizontal_alignment = 1
+autowrap_mode = 2
 
-[node name="UpgradeButton" type="Button" parent="Panel/Margin/Content"]
+[node name="UpgradeButton" type="Button" parent="Panel/DetailsScroll/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Améliorer"
 
-[node name="StartRunButton" type="Button" parent="Panel/Margin/Content"]
+[node name="StartRunButton" type="Button" parent="Panel/DetailsScroll/Margin/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Lancer une nouvelle run"

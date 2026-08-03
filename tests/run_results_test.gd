@@ -15,6 +15,13 @@ func _init() -> void:
     if int(reward.get("score", 0)) <= 0 or int(reward.get("gold", 0)) <= 0:
         quit(1)
         return
+    record.score = int(reward.score)
+    record.gold_reward = int(reward.gold)
+    record.essence_reward = int(reward.essence)
+    var serialized := RunResultRecord.from_dict(record.to_dict())
+    if serialized.score != record.score or serialized.gold_reward != record.gold_reward or serialized.essence_reward != record.essence_reward:
+        quit(1)
+        return
 
     var history := RunHistory.new()
     for index in range(25):

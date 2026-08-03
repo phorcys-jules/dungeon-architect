@@ -3,6 +3,7 @@
 - [x] Version Godot et `GameVersion` définies sur `v0.8.0-alpha`.
 - [x] Migration de sauvegarde v0.7 vers le format 6.
 - [x] Campagne, factions et boss reliés à la boucle principale.
+- [x] Conséquences des routes de campagne visibles avant leur sélection.
 - [x] Évolutions, mutations et némésis persistants.
 - [x] Environnement, plans et graines testés.
 - [x] Quêtes, accessibilité et défi quotidien sauvegardés.
@@ -13,6 +14,11 @@
 - [x] Guide, intentions, formations, sauvetages et débrief testés.
 - [x] Catalogues FR/EN complets et profils de difficulté sauvegardés.
 - [x] Couverture et paramètres des traductions FR/EN vérifiés en CI.
+- [x] Sprites dédiés des pièges et atlas de sols/murs pour les quatre biomes.
+- [x] Cycle du mimic testé : coffre immobile, interaction, révélation et embuscade.
+- [x] Métadonnées des exports Windows alignées sur `v0.8.0-alpha`.
+- [x] `gdlint` local sans erreur et 86 tests Godot validés.
+- [ ] Archive Windows produite par GitHub Actions (modèles d'export absents localement).
 - [ ] GitHub Actions vertes sur la PR.
 - [ ] Revue et fusion dans `main`.
 - [ ] Créer le tag et la release GitHub `v0.8.0-alpha`.

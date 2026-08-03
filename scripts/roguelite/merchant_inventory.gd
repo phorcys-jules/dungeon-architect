@@ -18,7 +18,11 @@ func roll_stock(seed: int, count: int = 3) -> Array[Dictionary]:
     rng.seed = seed
     var ids: Array[String] = []
     ids.assign(catalog.keys())
-    ids.shuffle()
+    for index in range(ids.size() - 1, 0, -1):
+        var swap_index := rng.randi_range(0, index)
+        var previous := ids[index]
+        ids[index] = ids[swap_index]
+        ids[swap_index] = previous
     stock.clear()
     for index in mini(count, ids.size()):
         var id := ids[index]

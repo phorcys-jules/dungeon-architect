@@ -17,6 +17,8 @@ func _init() -> void:
     var merchant := MerchantInventory.new()
     var stock := merchant.roll_stock(99, 3)
     assert(stock.size() == 3)
+    var same_stock := MerchantInventory.new().roll_stock(99, 3)
+    assert(same_stock == stock)
     var offer: Dictionary = stock[0]
     assert(not merchant.can_buy(String(offer.id), int(offer.price) - 1))
     var purchase := merchant.buy(String(offer.id), int(offer.price))

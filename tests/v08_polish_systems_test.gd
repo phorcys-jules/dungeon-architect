@@ -18,6 +18,9 @@ func _test_intents() -> void:
     assert(bool(result.ok))
     assert(String(result.intent.shape) == "diamond")
     assert(float(runtime.threat_cells()[Vector2i(4, 3)]) == 0.9)
+    var restored := TacticalIntentRuntime.new()
+    restored.from_dict(runtime.to_dict())
+    assert(float(restored.threat_cells()[Vector2i(4, 3)]) == 0.9)
     assert(runtime.update(1.0).is_empty())
     assert(runtime.update(1.0) == ["scout"])
 

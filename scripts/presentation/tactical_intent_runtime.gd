@@ -52,7 +52,33 @@ func _weight(type: StringName) -> float:
     return {&"steal": 1.0, &"sabotage": 0.9, &"attack": 0.75, &"chase": 0.5, &"flee": 0.2}.get(type, 0.0)
 
 func to_dict() -> Dictionary:
-    return {"intents": intents.duplicate(true)}
+    var serialized := {}
+    for actor_id in intents:
+        var intent: Dictionary = intents[actor_id]
+        var origin: Vector2i = intent.origin
+        var target: Vector2i = intent.target
+        serialized[actor_id] = {
+            "actor": String(intent.actor),
+            "type": String(intent.type),
+            "origin": [origin.x, origin.y],
+            "target": [target.x, target.y],
+            "delay": float(intent.delay),
+            "symbol": String(intent.symbol),
+            "shape": String(intent.shape),
+        }
+    return {"intents": serialized}
 
 func from_dict(data: Dictionary) -> void:
-    intents = Dictionary(data.get("intents", {})).duplicate(true)
+    intents.clear()
+    for actor_id in Dictionary(data.get("intents", {})):
+        var saved: Dictionary = data.intents[actor_id]
+        var origin_value: Variant = saved.get("origin", [])
+        var target_value: Variant = saved.get("target", [])
+        var type := StringName(saved.get("type", ""))
+        if not origin_value is Array or not target_value is Array or not TYPES.has(type):
+            continue
+        var origin: Array = origin_value
+        var target: Array = target_value
+        if origin.size() != 2 or target.size() != 2:
+            continue
+        announce(String(actor_id), type, Vector2i(int(origin[0]), int(origin[1])), Vector2i(int(target[0]), int(target[1])), maxf(float(saved.get("delay", 0.0)), 0.0))

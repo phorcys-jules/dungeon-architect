@@ -1,4 +1,4 @@
-name: Godot CI
+name: CI
 
 on:
   push:
@@ -10,11 +10,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  validate-test-build:
-    name: Validate, test and build
+  validate:
+    name: Lint, tests and Windows build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     env:
       GODOT_VERSION: 4.7.1
@@ -24,90 +28,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y unzip zip
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip zip
+          python -m pip install --requirement requirements-dev.txt
 
-      - name: Download Godot editor
+      - name: Lint GDScript
+        run: gdlint scripts tests
+
+      - name: Download Godot
         run: |
           curl --fail --location --retry 3 \
             --output godot.zip \
             "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
-          unzip godot.zip -d godot-bin
+          unzip -q godot.zip -d godot-bin
           mv "godot-bin/Godot_v${GODOT_RELEASE}_linux.x86_64" godot
           chmod +x godot
           ./godot --version
 
-      - name: Import project and validate resources
-        run: timeout 60s ./godot --headless --path . --import
+      - name: Import and validate project
+        run: timeout 90s ./godot --headless --path . --import
 
-      - name: Run smoke test
-        run: timeout 45s ./godot --headless --path . --script tests/smoke_test.gd
-
-      - name: Run health component test
-        run: timeout 45s ./godot --headless --path . --script tests/health_component_test.gd
-
-      - name: Run spike trap test
-        run: timeout 45s ./godot --headless --path . --script tests/spike_trap_test.gd
-
-      - name: Run defender test
-        run: timeout 45s ./godot --headless --path . --script tests/defender_test.gd
-
-      - name: Run result statistics test
-        run: timeout 45s ./godot --headless --path . --script tests/run_stats_test.gd
-
-      - name: Run economy test
-        run: timeout 45s ./godot --headless --path . --script tests/economy_test.gd
-
-      - name: Run wave progression test
-        run: timeout 45s ./godot --headless --path . --script tests/wave_manager_test.gd
-
-      - name: Run content resources test
-        run: timeout 45s ./godot --headless --path . --script tests/content_resources_test.gd
-
-      - name: Run damage resolver test
-        run: timeout 45s ./godot --headless --path . --script tests/damage_resolver_test.gd
-
-      - name: Run collectible route test
-        run: timeout 45s ./godot --headless --path . --script tests/collectible_route_test.gd
-
-      - name: Run mobile monster test
-        run: timeout 45s ./godot --headless --path . --script tests/mobile_monster_test.gd
-
-      - name: Run Pac-Man loop rules test
-        run: timeout 45s ./godot --headless --path . --script tests/pacman_loop_rules_test.gd
-
-      - name: Run Pac-Man round state test
-        run: timeout 45s ./godot --headless --path . --script tests/pacman_round_state_test.gd
-
-      - name: Run loot ledger test
-        run: timeout 45s ./godot --headless --path . --script tests/run_loot_ledger_test.gd
-
-      - name: Run procedural labyrinth test
-        run: timeout 45s ./godot --headless --path . --script tests/labyrinth_generator_test.gd
-
-      - name: Run room deck test
-        run: timeout 45s ./godot --headless --path . --script tests/room_deck_test.gd
-
-      - name: Run room loadout labyrinth test
-        run: timeout 45s ./godot --headless --path . --script tests/room_loadout_labyrinth_test.gd
-
-      - name: Run village save persistence test
-        run: timeout 45s ./godot --headless --path . --script tests/village_save_store_test.gd
-
-      - name: Run village den screen integration test
-        run: timeout 45s ./godot --headless --path . --script tests/village_den_screen_integration_test.gd
-
-      - name: Run permanent reward test
-        run: timeout 45s ./godot --headless --path . --script tests/run_reward_service_test.gd
-
-      - name: Run roguelite synergy build test
-        run: timeout 45s ./godot --headless --path . --script tests/roguelite_synergy_build_test.gd
-
-      - name: Run end flow test
-        run: timeout 45s ./godot --headless --path . --script tests/run_end_controller_test.gd
-
-      - name: Run village navigation test
-        run: timeout 45s ./godot --headless --path . --script tests/village_navigation_test.gd
+      - name: Run all tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r test_file; do
+            echo "::group::$test_file"
+            timeout 45s ./godot --headless --path . --script "$test_file"
+            echo "::endgroup::"
+          done < <(find tests -maxdepth 1 -name '*_test.gd' -print | sort)
 
       - name: Install export templates
         run: |
@@ -115,7 +66,7 @@ jobs:
             --output templates.tpz \
             "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          unzip templates.tpz -d templates-unpacked
+          unzip -q templates.tpz -d templates-unpacked
           cp -R templates-unpacked/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
 
       - name: Export Windows build
@@ -124,12 +75,8 @@ jobs:
           timeout 120s ./godot --headless --path . --export-release "Windows Desktop" build/windows/dungeon-architect.exe
           test -s build/windows/dungeon-architect.exe
           test -s build/windows/dungeon-architect.pck
-
-      - name: Package Windows build
-        run: |
           cd build/windows
           zip -9 ../dungeon-architect-windows.zip dungeon-architect.exe dungeon-architect.pck
-          test -s ../dungeon-architect-windows.zip
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4

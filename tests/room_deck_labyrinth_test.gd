@@ -1,0 +1,23 @@
+extends SceneTree
+
+func _init() -> void:
+    var selection := RoomDeckSelection.new()
+    if not bool(selection.select(["corridor", "crossroads", "treasure_hall"]).ok):
+        quit(1)
+        return
+    var generator := LabyrinthGenerator.new()
+    var profile := DeckLabyrinthProfile.new()
+    var required: Array[Vector2i] = [Vector2i(2, 2), Vector2i(12, 8)]
+    var first := profile.generate(generator, 3030, required, selection.selected_tags())
+    var second := profile.generate(generator, 3030, required, selection.selected_tags())
+    if not generator.is_valid(first, required):
+        quit(1)
+        return
+    if generator.fingerprint(first) != generator.fingerprint(second):
+        quit(1)
+        return
+    if not (first.get("room_tags", []) as Array).has(&"junction"):
+        quit(1)
+        return
+    print("Room deck labyrinth test passed")
+    quit(0)
