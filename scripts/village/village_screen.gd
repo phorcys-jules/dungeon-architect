@@ -5,6 +5,12 @@ signal run_requested
 const VillageBackground := preload("res://assets/backgrounds/monster_village.png")
 const VillageMusic := preload("res://assets/audio/music/village_night.wav")
 const VillageAmbientAnimatorScript := preload("res://scripts/village/village_ambient_animator.gd")
+const MONSTER_TEXTURES := {
+    "ghost": preload("res://assets/sprites/characters/animations/monster_ghost_walk.png"),
+    "slime": preload("res://assets/sprites/characters/animations/monster_slime_walk.png"),
+    "mimic": preload("res://assets/sprites/characters/animations/monster_mimic_walk.png"),
+    "spider": preload("res://assets/sprites/characters/animations/monster_spider_walk.png"),
+}
 const BUILDING_TEXTURES := {
     "den": preload("res://assets/sprites/buildings/den.png"),
     "forge": preload("res://assets/sprites/buildings/forge.png"),
@@ -48,15 +54,23 @@ var archives_panel: PanelContainer
 var archives_category: OptionButton
 var archives_text: RichTextLabel
 var archives_stats: Label
+var last_run_result: Dictionary = {}
+var village_residents: Array[Control] = []
+var reaction_label: Label
+var feedback_settings := GameFeedbackSettings.new()
+var feedback_button: Button
+var feedback_panel: PanelContainer
 
 func _ready() -> void:
     super._ready()
     _load_village_state()
     _build_village_map()
+    _build_village_residents()
     _build_roster_controls()
     _build_module_controls()
     _build_room_deck_controls()
     _build_archives()
+    _build_feedback_settings()
     _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
@@ -81,6 +95,8 @@ func _load_village_state() -> void:
     encyclopedia.from_dict(state.get("encyclopedia", {}))
     global_stats.from_dict(state.get("global_stats", {}))
     achievements.from_dict(state.get("achievements", {}))
+    last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
+    feedback_settings.apply(state.get("feedback_settings", {}))
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
 
@@ -141,6 +157,90 @@ func _build_village_map() -> void:
         button.add_child(label)
         add_child(button)
         building_buttons[building_id] = button
+    _refresh_building_progression_visuals()
+
+func _refresh_building_progression_visuals() -> void:
+    var den := save_store.load_den()
+    for building_id in building_buttons:
+        var button := building_buttons[building_id] as Button
+        var level := den.level if building_id == "den" else int(progression_service.state.buildings.get(building_id, 0))
+        if building_id == "market":
+            level = black_market.purchased_ids.size()
+        var badge := button.get_node_or_null("ProgressBadge") as Label
+        if badge == null:
+            badge = Label.new()
+            badge.name = "ProgressBadge"
+            button.add_child(badge)
+        badge.text = "NIV. %d" % level if building_id != "market" else "%d PACTE(S)" % level
+        badge.position = Vector2(8, 7)
+        badge.size = Vector2(92, 20)
+        badge.add_theme_font_size_override("font_size", 10)
+        badge.add_theme_color_override("font_color", Color("fff0a8"))
+        badge.add_theme_color_override("font_shadow_color", Color.BLACK)
+        badge.add_theme_constant_override("shadow_offset_x", 1)
+        badge.add_theme_constant_override("shadow_offset_y", 1)
+        badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var artwork := button.get_node("Artwork") as TextureRect
+        artwork.modulate = Color.WHITE.lerp(Color("ffd782"), minf(float(level) * 0.08, 0.32))
+        artwork.scale = Vector2.ONE * (1.0 + minf(float(level) * 0.012, 0.06))
+
+func _build_village_residents() -> void:
+    reaction_label = Label.new()
+    reaction_label.name = "VillageReaction"
+    reaction_label.position = Vector2(220, 18)
+    reaction_label.size = Vector2(410, 42)
+    reaction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    reaction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    reaction_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    reaction_label.add_theme_font_size_override("font_size", 13)
+    reaction_label.add_theme_color_override("font_color", Color("fff0b5"))
+    reaction_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+    reaction_label.add_theme_constant_override("shadow_offset_x", 2)
+    reaction_label.add_theme_constant_override("shadow_offset_y", 2)
+    reaction_label.text = _village_reaction_text()
+    add_child(reaction_label)
+
+    var monster_positions := [Vector2(52, 285), Vector2(105, 300), Vector2(158, 285), Vector2(211, 300)]
+    for index in monster_roster.recruited.size():
+        if index >= monster_positions.size():
+            break
+        var monster_id := String(monster_roster.recruited[index])
+        if not MONSTER_TEXTURES.has(monster_id):
+            continue
+        _add_resident(monster_id.capitalize(), MONSTER_TEXTURES[monster_id], monster_positions[index], func(): _select_building("den"))
+    _add_resident("Forgeron", MONSTER_TEXTURES.mimic, Vector2(330, 196), func(): _select_building("forge"))
+    _add_resident("Archiviste", MONSTER_TEXTURES.ghost, Vector2(278, 312), _open_archives)
+    _add_resident("Marchand", MONSTER_TEXTURES.spider, Vector2(315, 420), func(): _select_building("market"))
+
+func _add_resident(label: String, texture: Texture2D, position_value: Vector2, action: Callable) -> void:
+    var button := Button.new()
+    button.name = "%sResident" % label.replace(" ", "")
+    button.position = position_value
+    button.size = Vector2(48, 48)
+    button.flat = true
+    button.icon = _first_animation_frame(texture)
+    button.expand_icon = true
+    button.tooltip_text = "%s — cliquer pour ouvrir sa fonction." % label
+    button.pressed.connect(action)
+    add_child(button)
+    village_residents.append(button)
+    var tween := create_tween().set_loops()
+    tween.tween_property(button, "position:y", position_value.y - 4.0, 0.65).set_trans(Tween.TRANS_SINE)
+    tween.tween_property(button, "position:y", position_value.y, 0.65).set_trans(Tween.TRANS_SINE)
+
+func _first_animation_frame(texture: Texture2D) -> AtlasTexture:
+    var atlas := AtlasTexture.new()
+    atlas.atlas = texture
+    var frame_width := maxi(1, texture.get_width() / 4)
+    atlas.region = Rect2(0, 0, frame_width, texture.get_height())
+    return atlas
+
+func _village_reaction_text() -> String:
+    if last_run_result.is_empty():
+        return "Le village attend les ordres de son architecte."
+    if bool(last_run_result.get("victory", false)):
+        return "Victoire ! Les habitants célèbrent %d capture(s) et renforcent le village." % int(last_run_result.get("captures", 0))
+    return "Défaite à la vague %d… les monstres préparent déjà leur revanche." % int(last_run_result.get("wave", 0))
 
 func _building_style(color: Color, alpha: float) -> StyleBoxFlat:
     var style := StyleBoxFlat.new()
@@ -440,10 +540,87 @@ func _start_village_music() -> void:
     var looped_stream := VillageMusic.duplicate() as AudioStreamWAV
     looped_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
     music_player.stream = looped_stream
-    music_player.volume_db = -36.0
+    music_player.volume_db = -60.0
     add_child(music_player)
     music_player.play()
-    create_tween().tween_property(music_player, "volume_db", -19.0, 1.8)
+    create_tween().tween_property(music_player, "volume_db", _village_music_db(), 1.8)
+
+func _build_feedback_settings() -> void:
+    feedback_button = Button.new()
+    feedback_button.name = "FeedbackSettingsButton"
+    feedback_button.position = Vector2(20, 66)
+    feedback_button.size = Vector2(190, 32)
+    feedback_button.text = "OPTIONS AUDIO / VFX"
+    feedback_button.pressed.connect(func(): feedback_panel.visible = not feedback_panel.visible; feedback_panel.move_to_front())
+    add_child(feedback_button)
+    feedback_panel = PanelContainer.new()
+    feedback_panel.name = "FeedbackSettingsPanel"
+    feedback_panel.set_anchors_preset(Control.PRESET_CENTER)
+    feedback_panel.offset_left = -210.0
+    feedback_panel.offset_top = -190.0
+    feedback_panel.offset_right = 210.0
+    feedback_panel.offset_bottom = 190.0
+    feedback_panel.visible = false
+    add_child(feedback_panel)
+    var margin := MarginContainer.new()
+    margin.add_theme_constant_override("margin_left", 20)
+    margin.add_theme_constant_override("margin_top", 18)
+    margin.add_theme_constant_override("margin_right", 20)
+    margin.add_theme_constant_override("margin_bottom", 18)
+    feedback_panel.add_child(margin)
+    var column := VBoxContainer.new()
+    column.add_theme_constant_override("separation", 10)
+    margin.add_child(column)
+    var heading := Label.new()
+    heading.text = "AUDIO ET EFFETS"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    heading.add_theme_font_size_override("font_size", 18)
+    column.add_child(heading)
+    _add_feedback_slider(column, "Volume général", feedback_settings.master_volume, "master_volume")
+    _add_feedback_slider(column, "Musique", feedback_settings.music_volume, "music_volume")
+    _add_feedback_slider(column, "Effets sonores", feedback_settings.effects_volume, "effects_volume")
+    _add_feedback_slider(column, "Secousses", feedback_settings.screen_shake_strength, "screen_shake_strength")
+    var particles := CheckButton.new()
+    particles.text = "Particules et flashs"
+    particles.button_pressed = feedback_settings.particles_enabled
+    particles.toggled.connect(func(value: bool): _set_feedback_option("particles_enabled", value))
+    column.add_child(particles)
+    var reduced_motion := CheckButton.new()
+    reduced_motion.text = "Réduire les mouvements"
+    reduced_motion.button_pressed = feedback_settings.reduced_motion
+    reduced_motion.toggled.connect(func(value: bool): _set_feedback_option("reduced_motion", value))
+    column.add_child(reduced_motion)
+    var close_button := Button.new()
+    close_button.text = "Fermer"
+    close_button.pressed.connect(func(): feedback_panel.visible = false)
+    column.add_child(close_button)
+
+func _add_feedback_slider(parent: VBoxContainer, label_text: String, value: float, key: String) -> void:
+    var row := HBoxContainer.new()
+    var label := Label.new()
+    label.text = label_text
+    label.custom_minimum_size.x = 145
+    row.add_child(label)
+    var slider := HSlider.new()
+    slider.name = "%sSlider" % key.capitalize().replace("_", "")
+    slider.min_value = 0.0
+    slider.max_value = 1.0
+    slider.step = 0.05
+    slider.value = value
+    slider.custom_minimum_size.x = 190
+    slider.value_changed.connect(func(new_value: float): _set_feedback_option(key, new_value))
+    row.add_child(slider)
+    parent.add_child(row)
+
+func _set_feedback_option(key: String, value: Variant) -> void:
+    feedback_settings.apply({key: value})
+    _persist_village_state()
+    if music_player != null:
+        music_player.volume_db = _village_music_db()
+
+func _village_music_db() -> float:
+    var linear_volume := feedback_settings.master_volume * feedback_settings.music_volume * 0.14
+    return linear_to_db(linear_volume) if linear_volume > 0.001 else -80.0
 
 func _start_village_animations() -> void:
     ambient_animator = VillageAmbientAnimatorScript.new()
@@ -548,6 +725,7 @@ func _on_upgrade_pressed() -> void:
             den.soul_shards = int(purchase.remaining)
             save_store.save_den(den)
     _persist_village_state()
+    _refresh_building_progression_visuals()
     _refresh_module_controls()
     _select_building(selected_building)
 
@@ -559,6 +737,7 @@ func _persist_village_state() -> void:
     state["labyrinth_modules"] = labyrinth_modules.to_dict()
     state["room_deck_selection"] = room_deck_selection.to_dict()
     state["encyclopedia"] = encyclopedia.to_dict()
+    state["feedback_settings"] = feedback_settings.serialize()
     meta_store.save_state(state)
 
 func _building_data(building_id: String) -> VillageBuildingData:

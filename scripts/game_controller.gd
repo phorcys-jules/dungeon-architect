@@ -3,6 +3,7 @@ class_name GameController
 
 const RunEndControllerScript := preload("res://scripts/core/run_end_controller.gd")
 const AdventurerIntelligenceScript := preload("res://scripts/meta/adventurer_intelligence.gd")
+const RetroSfxPlayerScript := preload("res://scripts/presentation/retro_sfx_player.gd")
 
 var run_end: RunEndController = RunEndControllerScript.new()
 var village_button: Button
@@ -34,6 +35,8 @@ var choice_buttons: Array[Button] = []
 var current_choice_offer: Array[Dictionary] = []
 var selected_choice_ids: Array[StringName] = []
 var run_choice_modifiers: Dictionary = {}
+var feedback_settings := GameFeedbackSettings.new()
+var sfx_player: Node
 var pending_run_choice := false
 
 func _ready() -> void:
@@ -49,6 +52,9 @@ func _ready() -> void:
 
 func _build_interface() -> void:
     super._build_interface()
+    sfx_player = RetroSfxPlayerScript.new()
+    sfx_player.name = "RetroSfxPlayer"
+    add_child(sfx_player)
     intelligence_label = Label.new()
     intelligence_label.position = Vector2(772, 104)
     intelligence_label.size = Vector2(152, 98)
@@ -243,6 +249,7 @@ func _configure_defender(defender: Defender) -> void:
 
 func _load_village_progression() -> void:
     var state := v06_integration.store.load_state()
+    feedback_settings.apply(state.get("feedback_settings", {}))
     village_progression = V04ProgressionService.new(state.get("v04_progression", {}))
     black_market.from_dict(state.get("black_market", {}))
     if state.has("monster_roster"):
@@ -323,6 +330,14 @@ func _monster_specific_damage_multiplier(archetype_id: String) -> float:
 
 func _effect_duration_multiplier() -> float:
     return (1.0 + float(village_modifiers.get("effect_duration_multiplier", 0.0))) * active_biome.rule_value("effect_duration_multiplier", 1.0)
+
+func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, color: Color, duration: float) -> void:
+    if not feedback_settings.particles_enabled:
+        return
+    if sfx_player != null:
+        sfx_player.call("play_event", String(kind), feedback_settings)
+    var adjusted_duration := duration * (0.45 if feedback_settings.reduced_motion else 1.0)
+    super._spawn_combat_effect(kind, origin, target, color, adjusted_duration)
 
 func _wave_reward_multiplier() -> float:
     return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))

@@ -133,6 +133,11 @@ func _init() -> void:
     game._refresh_v06_hud()
     assert(game.effect_rows.any(func(row: Button): return row.text == "Modificateurs actifs" and not row.tooltip_text.is_empty()))
     assert(game.history_button != null and game.history_button.text.begins_with("HISTORIQUE"))
+    var effect_count: int = game.combat_effects.size()
+    game.feedback_settings.particles_enabled = false
+    game._spawn_combat_effect(&"splash", Vector2.ZERO, Vector2.ONE, Color.WHITE, 0.3)
+    assert(game.combat_effects.size() == effect_count)
+    game.feedback_settings.particles_enabled = true
     game.v06_integration.events.active_events.clear()
     game.v06_integration.synergies.active = previous_synergies
     var previous_modifiers: Dictionary = game.village_modifiers.duplicate(true)

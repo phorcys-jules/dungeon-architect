@@ -56,6 +56,19 @@ func _init() -> void:
         if artwork == null or artwork.texture == null:
             quit(1)
             return
+        if building_button.get_node_or_null("ProgressBadge") == null:
+            quit(1)
+            return
+    if screen.village_residents.size() < 7 or screen.reaction_label == null:
+        quit(1)
+        return
+    if screen.feedback_button == null or screen.feedback_panel == null:
+        quit(1)
+        return
+    screen._set_feedback_option("music_volume", 0.35)
+    if not is_equal_approx(float(meta_store.load_state().feedback_settings.music_volume), 0.35):
+        quit(1)
+        return
     screen.transition_in_progress = false
     screen._select_building("forge")
     if not String(screen.title_label.text).contains("Forge"):
@@ -69,6 +82,9 @@ func _init() -> void:
         quit(1)
         return
     if not String(screen.status_label.text).contains("Fosse de poix"):
+        quit(1)
+        return
+    if not String((screen.building_buttons.forge as Button).get_node("ProgressBadge").text).contains("1"):
         quit(1)
         return
     den_store.delete_save()

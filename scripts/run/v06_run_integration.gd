@@ -10,6 +10,7 @@ var global_stats := GlobalRunStats.new()
 var achievements := AchievementTracker.new()
 var run_seed := 0
 var run_tags: Array[String] = []
+var last_run_result: Dictionary = {}
 
 func _init(state_store: V06ProgressionStore = null) -> void:
     if state_store != null:
@@ -129,6 +130,12 @@ func finish_run(result: Dictionary) -> Dictionary:
     resources["gold"] = int(resources.get("gold", 0)) + int(challenge_rewards.gold)
     resources["essence"] = int(resources.get("essence", 0)) + int(challenge_rewards.essence)
     enriched["resources"] = resources
+    last_run_result = {
+        "victory": bool(enriched.get("victory", false)),
+        "wave": int(enriched.get("wave", 0)),
+        "captures": int(enriched.get("captures", 0)),
+        "score": int(enriched.get("score", 0)),
+    }
     global_stats.record_run(enriched)
     for tag in run_tags:
         var entry_id := _encyclopedia_id_for_tag(tag)
@@ -174,6 +181,7 @@ func _restore(state: Dictionary) -> void:
     encyclopedia.from_dict(state.get("encyclopedia", {}))
     global_stats.from_dict(state.get("global_stats", {}))
     achievements.from_dict(state.get("achievements", {}))
+    last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
 
 func _persist() -> bool:
     var state := store.load_state()
@@ -183,5 +191,6 @@ func _persist() -> bool:
         "encyclopedia": encyclopedia.to_dict(),
         "global_stats": global_stats.to_dict(),
         "achievements": achievements.to_dict(),
+        "last_run_result": last_run_result.duplicate(true),
     }, true)
     return store.save_state(state)
