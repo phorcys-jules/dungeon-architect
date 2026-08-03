@@ -560,6 +560,10 @@ func _toggle_door() -> void:
             return
         door_closed = not door_closed
         astar.set_point_solid(DOOR, door_closed)
+        # Visual feedback: splash effect at the door when toggled
+        var door_world := _world_from_cell(DOOR)
+        var color := Color("b64d55") if door_closed else Color("5fbf82")
+        _spawn_combat_effect(&"splash", door_world, door_world, color, 0.45)
         _recalculate_path()
         status_label.text = "Porte fermée pendant l'invasion." if door_closed else "Porte ouverte pendant l'invasion."
         _refresh_door_ui()

@@ -510,6 +510,9 @@ func _toggle_door() -> void:
         door_purchased = true
     door_closed = not door_closed
     astar.set_point_solid(DOOR, door_closed)
+    var door_world := _world_from_cell(DOOR)
+    var color := Color("b64d55") if door_closed else Color("5fbf82")
+    _spawn_combat_effect(&"splash", door_world, door_world, color, 0.45)
     status_label.text = "Porte verrouillée." if door_closed else "Porte ouverte."
     _refresh_all_ui()
     queue_redraw()
