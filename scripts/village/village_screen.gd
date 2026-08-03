@@ -60,6 +60,9 @@ var reaction_label: Label
 var feedback_settings := GameFeedbackSettings.new()
 var feedback_button: Button
 var feedback_panel: PanelContainer
+var v08_campaign := V08CampaignRuntime.new()
+var campaign_route_selector: OptionButton
+var campaign_status: Label
 
 func _ready() -> void:
     super._ready()
@@ -71,6 +74,7 @@ func _ready() -> void:
     _build_room_deck_controls()
     _build_archives()
     _build_feedback_settings()
+    _build_campaign_controls()
     _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
@@ -97,6 +101,10 @@ func _load_village_state() -> void:
     achievements.from_dict(state.get("achievements", {}))
     last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
     feedback_settings.apply(state.get("feedback_settings", {}))
+    v08_campaign.from_dict(state.get("v08_campaign", {}))
+    v08_campaign.ensure_started(int(state.get("campaign_seed", Time.get_unix_time_from_system())))
+    v08_campaign.accessibility.ensure_default_bindings()
+    v08_campaign.accessibility.apply_bindings()
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
 
@@ -738,7 +746,73 @@ func _persist_village_state() -> void:
     state["room_deck_selection"] = room_deck_selection.to_dict()
     state["encyclopedia"] = encyclopedia.to_dict()
     state["feedback_settings"] = feedback_settings.serialize()
+    state["v08_campaign"] = v08_campaign.to_dict()
+    state["campaign_seed"] = v08_campaign.world_map.seed
     meta_store.save_state(state)
+
+func _build_campaign_controls() -> void:
+    var panel := PanelContainer.new()
+    panel.name = "CampaignV08Panel"
+    panel.position = Vector2(12, 12)
+    panel.size = Vector2(330, 138)
+    add_child(panel)
+    var column := VBoxContainer.new()
+    panel.add_child(column)
+    campaign_status = Label.new()
+    campaign_status.add_theme_font_size_override("font_size", 11)
+    column.add_child(campaign_status)
+    var row := HBoxContainer.new()
+    column.add_child(row)
+    campaign_route_selector = OptionButton.new()
+    campaign_route_selector.custom_minimum_size = Vector2(235, 30)
+    row.add_child(campaign_route_selector)
+    var choose := Button.new()
+    choose.text = "Choisir"
+    choose.pressed.connect(_choose_campaign_route)
+    row.add_child(choose)
+    var daily_button := Button.new()
+    daily_button.text = "Défi quotidien (sans récompense permanente)"
+    daily_button.pressed.connect(_start_daily_challenge)
+    column.add_child(daily_button)
+    _refresh_campaign_routes()
+
+func _refresh_campaign_routes() -> void:
+    if campaign_route_selector == null:
+        return
+    campaign_route_selector.clear()
+    var routes := v08_campaign.available_routes()
+    for route in routes:
+        var faction: Dictionary = route.faction
+        campaign_route_selector.add_item("Acte %d · %s · %s" % [int(route.act), String(faction.get("name", route.id)), String(route.biome).capitalize()])
+        campaign_route_selector.set_item_metadata(campaign_route_selector.item_count - 1, String(route.id))
+    var node_text := "Choisissez la prochaine route" if v08_campaign.active_node.is_empty() else "Étape : %s · acte %d" % [String(v08_campaign.active_node.get("faction", "inconnue")).replace("_", " ").capitalize(), int(v08_campaign.active_node.get("act", 1))]
+    campaign_status.text = "CAMPAGNE 0.8 — %s" % node_text
+    var quest_lines: Array[String] = []
+    for resident in VillageQuestRuntime.CHAINS:
+        var quest := v08_campaign.quests.current_quest(resident)
+        if not quest.is_empty():
+            quest_lines.append("%s : %s %d/%d" % [String(resident).replace("_", " ").capitalize(), String(quest.id).replace("_", " "), int(quest.current), int(quest.target)])
+    campaign_status.tooltip_text = "QUÊTES DU VILLAGE\n%s" % "\n".join(quest_lines)
+
+func _choose_campaign_route() -> void:
+    if campaign_route_selector.item_count == 0:
+        status_label.text = "Aucune route disponible."
+        return
+    var node_id := String(campaign_route_selector.get_item_metadata(campaign_route_selector.selected))
+    var result := v08_campaign.choose_route(node_id)
+    if not bool(result.ok):
+        status_label.text = "Cette route n'est plus disponible."
+        return
+    _persist_village_state()
+    _refresh_campaign_routes()
+    status_label.text = "Route choisie : %s." % String(result.faction.name)
+
+func _start_daily_challenge() -> void:
+    var date := Time.get_date_string_from_system()
+    var challenge := v08_campaign.start_daily(date, GameVersion.VALUE)
+    _persist_village_state()
+    _refresh_campaign_routes()
+    status_label.text = "Défi du %s : %s. Les récompenses permanentes sont désactivées." % [date, String(challenge.modifier).replace("_", " ")]
 
 func _building_data(building_id: String) -> VillageBuildingData:
     for building: VillageBuildingData in progression_service.catalog.buildings():
@@ -785,6 +859,9 @@ func _on_start_run_pressed() -> void:
     if not bool(deck_validation.ok):
         status_label.text = room_deck_selection.rejection_message(deck_validation)
         _refresh_room_deck_controls()
+        return
+    if v08_campaign.active_node.is_empty():
+        status_label.text = "Choisissez une route de campagne avant de lancer la run."
         return
     transition_in_progress = true
     _refresh_navigation()

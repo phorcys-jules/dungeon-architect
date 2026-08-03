@@ -2,6 +2,12 @@ class_name MonsterProgression
 extends RefCounted
 
 const MAX_LEVEL := 10
+const MUTATIONS := {
+    "volatile": {"damage": 1.3, "health": 0.8, "ability": "death_burst"},
+    "armored": {"health": 1.35, "speed": 0.8, "ability": "brace"},
+    "phaseborn": {"speed": 1.2, "damage": 0.9, "ability": "wall_phase"},
+    "voracious": {"damage": 1.15, "health": 1.1, "ability": "consume_status"},
+}
 
 var monsters: Dictionary = {}
 
@@ -20,6 +26,8 @@ func ensure_monster(monster_id: String, family: String, personality: String = ""
         "personality": generated_traits[0] if not generated_traits.is_empty() else "cautious",
         "traits": generated_traits,
         "evolution": "base",
+        "mutation": "",
+        "actions": {},
     }
 
 func experience_required(level: int) -> int:
@@ -50,6 +58,41 @@ func choose_evolution(monster_id: String, evolution_id: String) -> bool:
     monsters[monster_id] = entry
     return true
 
+func record_action(monster_id: String, action: String, amount := 1) -> void:
+    if not monsters.has(monster_id):
+        return
+    var entry: Dictionary = monsters[monster_id]
+    entry.actions[action] = int(entry.actions.get(action, 0)) + amount
+    monsters[monster_id] = entry
+
+func choose_mutation(monster_id: String, mutation_id: String) -> bool:
+    if not monsters.has(monster_id) or not MUTATIONS.has(mutation_id):
+        return false
+    var entry: Dictionary = monsters[monster_id]
+    if int(entry.level) < 7 or not String(entry.get("mutation", "")).is_empty():
+        return false
+    entry.mutation = mutation_id
+    monsters[monster_id] = entry
+    return true
+
+func reset_evolution(monster_id: String, available_essence: int) -> Dictionary:
+    const RESET_COST := 30
+    if not monsters.has(monster_id) or available_essence < RESET_COST:
+        return {"ok": false, "cost": RESET_COST}
+    monsters[monster_id].evolution = "base"
+    monsters[monster_id].mutation = ""
+    return {"ok": true, "cost": RESET_COST}
+
+func gameplay_profile(monster_id: String) -> Dictionary:
+    if not monsters.has(monster_id):
+        return {}
+    var entry: Dictionary = monsters[monster_id]
+    var mutation: Dictionary = MUTATIONS.get(String(entry.get("mutation", "")), {})
+    return {"evolution": entry.evolution, "mutation": entry.get("mutation", ""), "ability": mutation.get("ability", _evolution_ability(String(entry.evolution))), "multipliers": stat_multipliers(monster_id)}
+
+func _evolution_ability(evolution: String) -> String:
+    return {"wraith": "phase_dash", "poltergeist": "throw_debris", "alpha": "pack_roar", "stalker": "web_ambush", "corrosive": "acid_pool", "replicating": "split", "bulwark": "body_block", "sentinel": "ranged_guard"}.get(evolution, "base_attack")
+
 func available_evolutions(family: String) -> Array[String]:
     match family:
         "spectral": return ["wraith", "poltergeist"]
@@ -72,6 +115,10 @@ func stat_multipliers(monster_id: String) -> Dictionary:
         "sentinel":
             result.health = float(result.health) * 1.2
             result.damage = float(result.damage) * 1.15
+    var mutation: Dictionary = MUTATIONS.get(String(entry.get("mutation", "")), {})
+    result.health = float(result.health) * float(mutation.get("health", 1.0))
+    result.damage = float(result.damage) * float(mutation.get("damage", 1.0))
+    result.speed = float(result.speed) * float(mutation.get("speed", 1.0))
     var traits: Array[String] = []
     for trait_id in entry.get("traits", [entry.get("personality", "cautious")]):
         traits.append(String(trait_id))
@@ -90,4 +137,8 @@ func from_dict(data: Dictionary) -> void:
         var entry: Dictionary = monsters[monster_id]
         if not entry.has("traits"):
             entry["traits"] = [String(entry.get("personality", "cautious"))]
+        if not entry.has("mutation"):
+            entry["mutation"] = ""
+        if not entry.has("actions"):
+            entry["actions"] = {}
         monsters[monster_id] = entry

@@ -8,7 +8,7 @@ La direction produit se trouve dans [docs/VISION.md](docs/VISION.md). Les docume
 
 ## Version actuelle
 
-La branche de développement prépare `v0.7.0-alpha` :
+La branche de développement prépare `v0.8.0-alpha` :
 
 - campagne de cinq vagues et labyrinthe procédural ;
 - construction de murs, pièges, portes et défenseurs ;
@@ -22,6 +22,10 @@ La branche de développement prépare `v0.7.0-alpha` :
 - combos entre pièges, monstres et terrain, défenses améliorables et pouvoirs tactiques ;
 - tunnels bidirectionnels, escouades d'aventuriers, règles locales de salles et objectifs secondaires ;
 - carte tactique de circulation et tutoriel contextuel sauvegardé.
+- campagne ramifiée en trois actes avec factions et boss architecturaux ;
+- évolutions, mutations et rivaux persistants ;
+- flux environnementaux, plans de construction et graines partageables ;
+- quêtes fonctionnelles du village, accessibilité étendue et défi quotidien.
 
 ## Prérequis
 

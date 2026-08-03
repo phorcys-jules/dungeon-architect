@@ -43,7 +43,7 @@ func _init() -> void:
     assert(restored.synergies.discovered.has("ghost_fog"))
 
     var legacy := SaveMigrator.new().migrate({"version": 3, "resources": {"gold": 12}, "run_history": [{"victory": false}]})
-    assert(int(legacy.version) == 4)
+    assert(int(legacy.version) == GameVersion.SAVE_VERSION)
     assert(int(legacy.resources.gold) == 12)
     assert(legacy.run_history.size() == 1)
     restored.record_capture()

@@ -63,6 +63,10 @@ var room_rules = RoomRuleRuntimeScript.new()
 var contextual_tutorial = ContextualTutorialScript.new()
 var heatmap_visible := false
 var heatmap_button: Button
+var environment_tick_left := 0.0
+var active_boss := false
+var blueprint_placement_mode := false
+var blueprint_button: Button
 
 func _ready() -> void:
     village_den = village_den_store.load_den()
@@ -136,6 +140,13 @@ func _build_interface() -> void:
     heatmap_button.tooltip_text = "Affiche la circulation de la vague précédente."
     heatmap_button.pressed.connect(_toggle_heatmap)
     add_child(heatmap_button)
+    blueprint_button = Button.new()
+    blueprint_button.position = Vector2(772, 598)
+    blueprint_button.size = Vector2(152, 26)
+    blueprint_button.text = "[B/G] Plan"
+    blueprint_button.tooltip_text = "B : enregistrer les constructions · G : placer le plan"
+    blueprint_button.pressed.connect(_capture_run_blueprint)
+    add_child(blueprint_button)
     for index in 3:
         var choice_button := Button.new()
         choice_button.position = Vector2(32 + index * 160, 326)
@@ -205,6 +216,16 @@ func _prepare_current_wave() -> void:
     adventurer_squad.configure(waves.current_wave)
     tactical_heatmap.finish_wave()
     _configure_room_rules()
+    _configure_v08_environment()
+    active_boss = int(v06_integration.v08.active_node.get("type", -1)) == RogueliteWorldMap.NodeType.BOSS and waves.current_wave == WaveManager.MAX_WAVES
+    if active_boss:
+        var boss_id := v06_integration.v08.boss_service.catalog.select_for_seed(v06_integration.v08.world_map.seed)
+        var definition := v06_integration.v08.boss_service.catalog.get_boss(boss_id)
+        v06_integration.v08.boss_service.encounter.start(boss_id, definition)
+        adventurer_health.max_health = int(definition.get("max_health", adventurer_health.max_health))
+        adventurer_health.reset()
+        var boss_intent := v06_integration.v08.boss_service.encounter.consume_phase_intent()
+        status_label.text = "BOSS — %s\nIntention : %s · contre : %s" % [String(definition.get("name", boss_id)), String(boss_intent.get("text", "")), String(boss_intent.get("counter", ""))]
     var hint := contextual_tutorial.next_hint(&"start_wave")
     if not hint.is_empty():
         status_label.tooltip_text = "%s\nCodex : %s" % [String(hint.text), String(hint.codex)]
@@ -239,8 +260,8 @@ func _finish_campaign(victory: bool, message: String) -> void:
     relics_protected_this_run = collectible_route.get_remaining_count()
     super._finish_campaign(victory, message)
     var completed_waves := waves.current_wave if victory else maxi(waves.current_wave - 1, 0)
-    var reward := run_end.finish(completed_waves, captures_this_run, relics_protected_this_run, victory)
-    result_summary.text += "\n\n" + run_end.reward_service.calculator.summary(reward)
+    var reward := {"claimed": false, "total": 0, "currency_id": VillageCurrency.ID, "currency_name": VillageCurrency.DISPLAY_NAME} if v06_integration.v08.daily_active else run_end.finish(completed_waves, captures_this_run, relics_protected_this_run, victory)
+    result_summary.text += "\n\nDéfi quotidien : aucune récompense permanente." if v06_integration.v08.daily_active else "\n\n" + run_end.reward_service.calculator.summary(reward)
     var meta := v06_integration.finish_run({
         "victory": victory,
         "wave": waves.current_wave,
@@ -258,6 +279,9 @@ func _finish_campaign(victory: bool, message: String) -> void:
         "tactical_heatmap": tactical_heatmap.snapshot(),
         "room_rule_stats": room_rules.stats(),
         "squad_roles": adventurer_squad.members.map(func(member): return String(member.role)),
+        "stole_treasure": not victory,
+        "adventurer_id": String(waves.get_adventurer_data().id),
+        "adventurer_name": waves.get_adventurer_name(),
     })
     var challenge_rewards: Dictionary = meta.challenge_rewards
     result_summary.text += "\nDéfis : +%d or, +%d essence" % [int(challenge_rewards.gold), int(challenge_rewards.essence)]
@@ -265,6 +289,11 @@ func _finish_campaign(victory: bool, message: String) -> void:
         result_summary.text += "\nDéfis réussis : %s" % ", ".join(meta.completed_challenges)
     if not meta.new_achievements.is_empty():
         result_summary.text += "\nSuccès : %s" % ", ".join(meta.new_achievements)
+    var campaign_meta: Dictionary = meta.get("campaign", {})
+    if bool(campaign_meta.get("campaign_complete", false)):
+        result_summary.text += "\nCAMPAGNE 0.8 TERMINÉE"
+    elif campaign_meta.has("routes"):
+        result_summary.text += "\nRoutes de campagne disponibles : %d" % Array(campaign_meta.routes).size()
     var experience_gain := maxi(completed_waves * 6 + captures_this_run * 12, 6)
     for archetype in active_monster_archetypes:
         monster_progression.grant_experience(archetype.archetype_id, experience_gain)
@@ -285,7 +314,9 @@ func _start_new_campaign() -> void:
 
 func _current_adventurer_speed_multiplier() -> float:
     var market_speed := 1.0 + float(village_modifiers.get("adventurer_speed_multiplier", 0.0))
-    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed
+    var environment_cost := v06_integration.v08.environment.movement_cost(_cell_from_world(adventurer_position), [])
+    var environment_speed := 1.0 / (1.0 + environment_cost)
+    return super._current_adventurer_speed_multiplier() * v06_integration.adventurer_speed_multiplier() * active_biome.rule_value("movement_speed_multiplier", 1.0) * market_speed * environment_speed
 
 func _configure_trap(trap: SpikeTrap) -> void:
     var run_bonus := float(run_choice_modifiers.get("trap_damage_multiplier", 0.0))
@@ -315,6 +346,10 @@ func _load_village_progression() -> void:
     room_deck_selection.from_dict(state.get("room_deck_selection", {}))
     adventurer_intelligence.from_dict(state.get("adventurer_intelligence", {}))
     contextual_tutorial.restore(state.get("contextual_tutorial", {}))
+    v06_integration.v08.accessibility.ensure_default_bindings()
+    v06_integration.v08.accessibility.apply_bindings()
+    feedback_settings.reduced_motion = v06_integration.v08.accessibility.reduced_motion
+    feedback_settings.particles_enabled = v06_integration.v08.accessibility.flashes_enabled
     var labyrinth_modifiers := labyrinth_modules.generator_modifiers()
     labyrinth_generator.wall_density = clampf(0.34 + float(labyrinth_modifiers.density), 0.18, 0.48)
     labyrinth_generator.minimum_loops = 4 + int(labyrinth_modifiers.loops)
@@ -393,6 +428,7 @@ func _spawn_combat_effect(kind: StringName, origin: Vector2, target: Vector2, co
 func _process(delta: float) -> void:
     super._process(delta)
     tactical_powers.tick(delta)
+    environment_tick_left = maxf(environment_tick_left - delta, 0.0)
     if emergency_lock_time > 0.0:
         emergency_lock_time = maxf(emergency_lock_time - delta, 0.0)
         if emergency_lock_time <= 0.0:
@@ -409,6 +445,12 @@ func _process(delta: float) -> void:
     var cell := _cell_from_world(adventurer_position)
     tactical_heatmap.record(&"traffic", cell)
     adventurer_squad.tick(delta)
+    if environment_tick_left <= 0.0:
+        environment_tick_left = 0.5
+        var doors: Array[Vector2i] = [DOOR] if door_closed else []
+        var flow_result := v06_integration.v08.environment.step(GRID_SIZE, walls, doors)
+        for interaction in flow_result.interactions:
+            _apply_combo_state(String(interaction.name))
     if cell == combo_zone_cell:
         return
     combo_zone_cell = cell
@@ -447,6 +489,13 @@ func _apply_combo_state(state_id: String) -> Dictionary:
     return combo
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event.is_action_pressed(&"capture_blueprint"):
+        _capture_run_blueprint()
+        return
+    if event.is_action_pressed(&"place_blueprint"):
+        blueprint_placement_mode = true
+        status_label.text = "Cliquez sur la case d'ancrage du plan."
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         match event.keycode:
             KEY_Q:
@@ -461,7 +510,58 @@ func _unhandled_input(event: InputEvent) -> void:
             KEY_H:
                 _toggle_heatmap()
                 return
+    if blueprint_placement_mode and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+        _place_run_blueprint(_cell_from_world(event.position))
+        return
     super._unhandled_input(event)
+
+func _capture_run_blueprint() -> void:
+    if game_state != GameState.PREPARATION:
+        status_label.text = "Les plans se créent pendant la préparation."
+        return
+    var placements: Array[Dictionary] = []
+    var origin := Vector2i(999, 999)
+    for cell in traps:
+        var trap := traps[cell] as SpikeTrap
+        placements.append({"cell": cell, "kind": "trap", "content_id": String(trap.trap_id), "cost": int(TrapCatalogScript.definition(trap.trap_id).cost)})
+        origin = Vector2i(mini(origin.x, cell.x), mini(origin.y, cell.y))
+    for cell in defenders:
+        placements.append({"cell": cell, "kind": "defender", "content_id": "defender", "cost": DEFENDER_COST})
+        origin = Vector2i(mini(origin.x, cell.x), mini(origin.y, cell.y))
+    var build_runtime: Variant = get("dungeon_build") if has_method("_try_place_free_wall") else null
+    if build_runtime != null:
+        for cell in build_runtime.planner.placed_walls:
+            placements.append({"cell": cell, "kind": "wall", "content_id": "wall", "cost": DungeonBuildRuntime.WALL_COST})
+            origin = Vector2i(mini(origin.x, cell.x), mini(origin.y, cell.y))
+    if placements.is_empty() or not v06_integration.v08.blueprints.capture("quick_plan", placements, origin):
+        status_label.text = "Placez au moins une construction avant d'enregistrer un plan."
+        return
+    var state := v06_integration.store.load_state()
+    state["v08_campaign"] = v06_integration.v08.to_dict()
+    v06_integration.store.save_state(state)
+    status_label.text = "Plan enregistré. Appuyez sur G pour le placer."
+
+func _place_run_blueprint(origin: Vector2i) -> void:
+    blueprint_placement_mode = false
+    var preview := v06_integration.v08.blueprints.preview("quick_plan", origin, 0, false, walls + Array(traps.keys()) + Array(defenders.keys()))
+    var unlocked: Array[String] = ["wall", "defender"]
+    for trap_id in unlocked_trap_ids:
+        unlocked.append(String(trap_id))
+    var validation := v06_integration.v08.blueprints.validate_purchase(preview, economy.current_gold, bool(preview.get("ok", false)), unlocked)
+    if not bool(validation.ok):
+        status_label.text = "Plan refusé : %s." % String(validation.reason).replace("_", " ")
+        return
+    for entry in preview.placements:
+        match String(entry.kind):
+            "trap":
+                selected_trap_id = StringName(entry.content_id)
+                _place_spike_trap(Vector2i(entry.cell))
+            "defender":
+                _place_defender(Vector2i(entry.cell))
+            "wall":
+                if has_method("_try_place_free_wall"):
+                    call("_try_place_free_wall", Vector2i(entry.cell))
+    status_label.text = "Plan placé pour %d or." % int(validation.cost)
 
 func _build_tactical_power_ui() -> void:
     tactical_energy_label = Label.new()
@@ -532,6 +632,57 @@ func _on_trap_triggered_for_power(damage: int) -> void:
     tactical_powers.gain_from_trap(damage)
     tactical_heatmap.record(&"triggers", _cell_from_world(adventurer_position))
     tactical_heatmap.record(&"damage", _cell_from_world(adventurer_position), damage)
+
+func _on_adventurer_damaged(amount: int, current_health: int) -> void:
+    super._on_adventurer_damaged(amount, current_health)
+    if not active_boss:
+        return
+    var encounter := v06_integration.v08.boss_service.encounter
+    var previous_phase: int = encounter.current_phase
+    encounter.take_damage(amount)
+    if encounter.current_phase != previous_phase:
+        var intent := encounter.consume_phase_intent()
+        status_label.text = "INTENTION DU BOSS — %s · contre : %s" % [String(intent.get("text", "")), String(intent.get("counter", ""))]
+        _apply_boss_architecture_intent(intent)
+
+func _apply_boss_architecture_intent(intent: Dictionary) -> void:
+    match String(intent.get("architecture", "")):
+        "breach_wall":
+            for wall in walls.duplicate():
+                if wall != DOOR and wall != TREASURE and wall != ENTRANCE:
+                    walls.erase(wall)
+                    astar.set_point_solid(wall, false)
+                    _recalculate_path()
+                    break
+        "seal_crossroad":
+            door_closed = true
+            _recalculate_path()
+        "purify_room":
+            if not v06_integration.v08.environment.cells.is_empty():
+                v06_integration.v08.environment.cells.erase(v06_integration.v08.environment.cells.keys()[0])
+        "seal_portal":
+            status_label.text += "\nLes portails sont scellés pour cette phase."
+        "disable_trap":
+            if not traps.is_empty():
+                (traps[traps.keys()[0]] as SpikeTrap).cooldown_left = 6.0
+        "mark_defender":
+            if not defenders.is_empty():
+                (defenders[defenders.keys()[0]] as Defender).cooldown += 0.4
+
+func _configure_v08_environment() -> void:
+    var environment := v06_integration.v08.environment
+    environment.cells.clear()
+    match active_biome.active_biome_id:
+        BiomeCatalog.SEWERS:
+            environment.seed(Vector2i(4, 5), &"water", 3)
+            environment.seed(Vector2i(10, 5), &"corruption", 2)
+        BiomeCatalog.MINE:
+            environment.seed(Vector2i(6, 5), &"fire", 3)
+            environment.seed(Vector2i(8, 5), &"smoke", 2)
+        BiomeCatalog.CASTLE:
+            environment.seed(Vector2i(7, 5), &"frost", 3)
+        _:
+            environment.seed(Vector2i(7, 5), &"corruption", 2)
 
 func _toggle_heatmap() -> void:
     heatmap_visible = not heatmap_visible
