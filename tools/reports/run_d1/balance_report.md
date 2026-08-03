@@ -1,0 +1,111 @@
+# Balance simulation report
+
+Generated: 2026-08-03T17:03:58.368099Z
+
+- Total runs: 100
+- Victories: 41 (win rate: 0.41)
+- Avg duration: 59.42
+- Avg damage: 59.21
+
+## Runs
+
+- seed: 1 — victory: True — duration: 48.0 — damage: 64 — traps: 5
+- seed: 2 — victory: False — duration: 48.0 — damage: 47 — traps: 4
+- seed: 3 — victory: True — duration: 48.0 — damage: 30 — traps: 4
+- seed: 4 — victory: False — duration: 49.0 — damage: 14 — traps: 3
+- seed: 5 — victory: True — duration: 49.0 — damage: 117 — traps: 2
+- seed: 6 — victory: False — duration: 49.0 — damage: 100 — traps: 1
+- seed: 7 — victory: True — duration: 49.0 — damage: 83 — traps: 5
+- seed: 8 — victory: False — duration: 50.0 — damage: 66 — traps: 5
+- seed: 9 — victory: True — duration: 50.0 — damage: 49 — traps: 4
+- seed: 10 — victory: False — duration: 50.0 — damage: 32 — traps: 3
+- seed: 11 — victory: True — duration: 50.0 — damage: 16 — traps: 2
+- seed: 12 — victory: False — duration: 51.0 — damage: 119 — traps: 1
+- seed: 13 — victory: True — duration: 51.0 — damage: 102 — traps: 1
+- seed: 14 — victory: False — duration: 51.0 — damage: 85 — traps: 5
+- seed: 15 — victory: True — duration: 51.0 — damage: 68 — traps: 4
+- seed: 16 — victory: False — duration: 51.0 — damage: 51 — traps: 3
+- seed: 17 — victory: True — duration: 52.0 — damage: 35 — traps: 3
+- seed: 18 — victory: True — duration: 52.0 — damage: 18 — traps: 2
+- seed: 19 — victory: True — duration: 52.0 — damage: 1 — traps: 1
+- seed: 20 — victory: True — duration: 52.0 — damage: 104 — traps: 5
+- seed: 21 — victory: True — duration: 53.0 — damage: 87 — traps: 4
+- seed: 22 — victory: True — duration: 53.0 — damage: 70 — traps: 4
+- seed: 23 — victory: True — duration: 53.0 — damage: 53 — traps: 3
+- seed: 24 — victory: True — duration: 53.0 — damage: 37 — traps: 2
+- seed: 25 — victory: True — duration: 54.0 — damage: 20 — traps: 1
+- seed: 26 — victory: True — duration: 54.0 — damage: 3 — traps: 5
+- seed: 27 — victory: True — duration: 54.0 — damage: 106 — traps: 5
+- seed: 28 — victory: True — duration: 54.0 — damage: 89 — traps: 4
+- seed: 29 — victory: True — duration: 54.0 — damage: 72 — traps: 3
+- seed: 30 — victory: True — duration: 55.0 — damage: 55 — traps: 2
+- seed: 31 — victory: True — duration: 55.0 — damage: 39 — traps: 1
+- seed: 32 — victory: True — duration: 55.0 — damage: 22 — traps: 1
+- seed: 33 — victory: True — duration: 55.0 — damage: 5 — traps: 5
+- seed: 34 — victory: True — duration: 56.0 — damage: 108 — traps: 4
+- seed: 35 — victory: True — duration: 56.0 — damage: 91 — traps: 3
+- seed: 36 — victory: True — duration: 56.0 — damage: 74 — traps: 2
+- seed: 37 — victory: False — duration: 56.0 — damage: 58 — traps: 2
+- seed: 38 — victory: True — duration: 57.0 — damage: 41 — traps: 1
+- seed: 39 — victory: False — duration: 57.0 — damage: 24 — traps: 5
+- seed: 40 — victory: True — duration: 57.0 — damage: 7 — traps: 4
+- seed: 41 — victory: False — duration: 57.0 — damage: 110 — traps: 3
+- seed: 42 — victory: True — duration: 57.0 — damage: 93 — traps: 3
+- seed: 43 — victory: True — duration: 58.0 — damage: 76 — traps: 2
+- seed: 44 — victory: False — duration: 58.0 — damage: 60 — traps: 1
+- seed: 45 — victory: False — duration: 58.0 — damage: 43 — traps: 5
+- seed: 46 — victory: False — duration: 58.0 — damage: 26 — traps: 4
+- seed: 47 — victory: False — duration: 59.0 — damage: 9 — traps: 4
+- seed: 48 — victory: False — duration: 59.0 — damage: 112 — traps: 3
+- seed: 49 — victory: False — duration: 59.0 — damage: 95 — traps: 2
+- seed: 50 — victory: False — duration: 59.0 — damage: 78 — traps: 1
+- seed: 51 — victory: False — duration: 60.0 — damage: 62 — traps: 5
+- seed: 52 — victory: False — duration: 60.0 — damage: 45 — traps: 5
+- seed: 53 — victory: False — duration: 60.0 — damage: 28 — traps: 4
+- seed: 54 — victory: False — duration: 60.0 — damage: 11 — traps: 3
+- seed: 55 — victory: False — duration: 60.0 — damage: 114 — traps: 2
+- seed: 56 — victory: False — duration: 61.0 — damage: 97 — traps: 1
+- seed: 57 — victory: False — duration: 61.0 — damage: 80 — traps: 1
+- seed: 58 — victory: False — duration: 61.0 — damage: 64 — traps: 5
+- seed: 59 — victory: False — duration: 61.0 — damage: 47 — traps: 4
+- seed: 60 — victory: False — duration: 62.0 — damage: 30 — traps: 3
+- seed: 61 — victory: False — duration: 62.0 — damage: 13 — traps: 2
+- seed: 62 — victory: False — duration: 62.0 — damage: 116 — traps: 2
+- seed: 63 — victory: False — duration: 62.0 — damage: 99 — traps: 1
+- seed: 64 — victory: False — duration: 63.0 — damage: 83 — traps: 5
+- seed: 65 — victory: False — duration: 63.0 — damage: 66 — traps: 4
+- seed: 66 — victory: True — duration: 63.0 — damage: 49 — traps: 4
+- seed: 67 — victory: False — duration: 63.0 — damage: 32 — traps: 3
+- seed: 68 — victory: True — duration: 63.0 — damage: 15 — traps: 2
+- seed: 69 — victory: False — duration: 64.0 — damage: 118 — traps: 1
+- seed: 70 — victory: True — duration: 64.0 — damage: 101 — traps: 5
+- seed: 71 — victory: False — duration: 64.0 — damage: 85 — traps: 5
+- seed: 72 — victory: True — duration: 64.0 — damage: 68 — traps: 4
+- seed: 73 — victory: False — duration: 65.0 — damage: 51 — traps: 3
+- seed: 74 — victory: False — duration: 65.0 — damage: 34 — traps: 2
+- seed: 75 — victory: False — duration: 65.0 — damage: 17 — traps: 1
+- seed: 76 — victory: False — duration: 65.0 — damage: 0 — traps: 1
+- seed: 77 — victory: False — duration: 66.0 — damage: 103 — traps: 5
+- seed: 78 — victory: False — duration: 66.0 — damage: 87 — traps: 4
+- seed: 79 — victory: False — duration: 66.0 — damage: 70 — traps: 3
+- seed: 80 — victory: False — duration: 66.0 — damage: 53 — traps: 2
+- seed: 81 — victory: False — duration: 66.0 — damage: 36 — traps: 2
+- seed: 82 — victory: False — duration: 67.0 — damage: 19 — traps: 1
+- seed: 83 — victory: False — duration: 67.0 — damage: 2 — traps: 5
+- seed: 84 — victory: False — duration: 67.0 — damage: 105 — traps: 4
+- seed: 85 — victory: False — duration: 67.0 — damage: 89 — traps: 3
+- seed: 86 — victory: False — duration: 68.0 — damage: 72 — traps: 3
+- seed: 87 — victory: False — duration: 68.0 — damage: 55 — traps: 2
+- seed: 88 — victory: False — duration: 68.0 — damage: 38 — traps: 1
+- seed: 89 — victory: False — duration: 68.0 — damage: 21 — traps: 5
+- seed: 90 — victory: False — duration: 69.0 — damage: 4 — traps: 4
+- seed: 91 — victory: True — duration: 69.0 — damage: 108 — traps: 4
+- seed: 92 — victory: False — duration: 69.0 — damage: 91 — traps: 3
+- seed: 93 — victory: True — duration: 69.0 — damage: 74 — traps: 2
+- seed: 94 — victory: False — duration: 69.0 — damage: 57 — traps: 1
+- seed: 95 — victory: True — duration: 70.0 — damage: 40 — traps: 5
+- seed: 96 — victory: False — duration: 70.0 — damage: 23 — traps: 5
+- seed: 97 — victory: True — duration: 70.0 — damage: 6 — traps: 4
+- seed: 98 — victory: False — duration: 70.0 — damage: 110 — traps: 3
+- seed: 99 — victory: True — duration: 71.0 — damage: 93 — traps: 2
+- seed: 100 — victory: False — duration: 71.0 — damage: 76 — traps: 1

@@ -1,0 +1,8 @@
+{
+  "date": "2026-08-03",
+  "seed": 20260803,
+  "rules": {
+    "no_permanent_rewards": true,
+    "mutator": "tougher_monsters"
+  }
+}

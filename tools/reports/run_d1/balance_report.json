@@ -1,0 +1,811 @@
+{
+  "summary": {
+    "total": 100,
+    "victories": 41,
+    "win_rate": 0.41,
+    "avg_duration": 59.42,
+    "avg_damage": 59.21
+  },
+  "results": [
+    {
+      "seed": 1,
+      "victory": true,
+      "duration": 48.0,
+      "damage": 64,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 2,
+      "victory": false,
+      "duration": 48.0,
+      "damage": 47,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 3,
+      "victory": true,
+      "duration": 48.0,
+      "damage": 30,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 4,
+      "victory": false,
+      "duration": 49.0,
+      "damage": 14,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 5,
+      "victory": true,
+      "duration": 49.0,
+      "damage": 117,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 6,
+      "victory": false,
+      "duration": 49.0,
+      "damage": 100,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 7,
+      "victory": true,
+      "duration": 49.0,
+      "damage": 83,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 8,
+      "victory": false,
+      "duration": 50.0,
+      "damage": 66,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 9,
+      "victory": true,
+      "duration": 50.0,
+      "damage": 49,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 10,
+      "victory": false,
+      "duration": 50.0,
+      "damage": 32,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 11,
+      "victory": true,
+      "duration": 50.0,
+      "damage": 16,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 12,
+      "victory": false,
+      "duration": 51.0,
+      "damage": 119,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 13,
+      "victory": true,
+      "duration": 51.0,
+      "damage": 102,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 14,
+      "victory": false,
+      "duration": 51.0,
+      "damage": 85,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 15,
+      "victory": true,
+      "duration": 51.0,
+      "damage": 68,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 16,
+      "victory": false,
+      "duration": 51.0,
+      "damage": 51,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 17,
+      "victory": true,
+      "duration": 52.0,
+      "damage": 35,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 18,
+      "victory": true,
+      "duration": 52.0,
+      "damage": 18,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 19,
+      "victory": true,
+      "duration": 52.0,
+      "damage": 1,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 20,
+      "victory": true,
+      "duration": 52.0,
+      "damage": 104,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 21,
+      "victory": true,
+      "duration": 53.0,
+      "damage": 87,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 22,
+      "victory": true,
+      "duration": 53.0,
+      "damage": 70,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 23,
+      "victory": true,
+      "duration": 53.0,
+      "damage": 53,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 24,
+      "victory": true,
+      "duration": 53.0,
+      "damage": 37,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 25,
+      "victory": true,
+      "duration": 54.0,
+      "damage": 20,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 26,
+      "victory": true,
+      "duration": 54.0,
+      "damage": 3,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 27,
+      "victory": true,
+      "duration": 54.0,
+      "damage": 106,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 28,
+      "victory": true,
+      "duration": 54.0,
+      "damage": 89,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 29,
+      "victory": true,
+      "duration": 54.0,
+      "damage": 72,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 30,
+      "victory": true,
+      "duration": 55.0,
+      "damage": 55,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 31,
+      "victory": true,
+      "duration": 55.0,
+      "damage": 39,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 32,
+      "victory": true,
+      "duration": 55.0,
+      "damage": 22,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 33,
+      "victory": true,
+      "duration": 55.0,
+      "damage": 5,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 34,
+      "victory": true,
+      "duration": 56.0,
+      "damage": 108,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 35,
+      "victory": true,
+      "duration": 56.0,
+      "damage": 91,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 36,
+      "victory": true,
+      "duration": 56.0,
+      "damage": 74,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 37,
+      "victory": false,
+      "duration": 56.0,
+      "damage": 58,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 38,
+      "victory": true,
+      "duration": 57.0,
+      "damage": 41,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 39,
+      "victory": false,
+      "duration": 57.0,
+      "damage": 24,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 40,
+      "victory": true,
+      "duration": 57.0,
+      "damage": 7,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 41,
+      "victory": false,
+      "duration": 57.0,
+      "damage": 110,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 42,
+      "victory": true,
+      "duration": 57.0,
+      "damage": 93,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 43,
+      "victory": true,
+      "duration": 58.0,
+      "damage": 76,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 44,
+      "victory": false,
+      "duration": 58.0,
+      "damage": 60,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 45,
+      "victory": false,
+      "duration": 58.0,
+      "damage": 43,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 46,
+      "victory": false,
+      "duration": 58.0,
+      "damage": 26,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 47,
+      "victory": false,
+      "duration": 59.0,
+      "damage": 9,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 48,
+      "victory": false,
+      "duration": 59.0,
+      "damage": 112,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 49,
+      "victory": false,
+      "duration": 59.0,
+      "damage": 95,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 50,
+      "victory": false,
+      "duration": 59.0,
+      "damage": 78,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 51,
+      "victory": false,
+      "duration": 60.0,
+      "damage": 62,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 52,
+      "victory": false,
+      "duration": 60.0,
+      "damage": 45,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 53,
+      "victory": false,
+      "duration": 60.0,
+      "damage": 28,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 54,
+      "victory": false,
+      "duration": 60.0,
+      "damage": 11,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 55,
+      "victory": false,
+      "duration": 60.0,
+      "damage": 114,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 56,
+      "victory": false,
+      "duration": 61.0,
+      "damage": 97,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 57,
+      "victory": false,
+      "duration": 61.0,
+      "damage": 80,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 58,
+      "victory": false,
+      "duration": 61.0,
+      "damage": 64,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 59,
+      "victory": false,
+      "duration": 61.0,
+      "damage": 47,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 60,
+      "victory": false,
+      "duration": 62.0,
+      "damage": 30,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 61,
+      "victory": false,
+      "duration": 62.0,
+      "damage": 13,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 62,
+      "victory": false,
+      "duration": 62.0,
+      "damage": 116,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 63,
+      "victory": false,
+      "duration": 62.0,
+      "damage": 99,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 64,
+      "victory": false,
+      "duration": 63.0,
+      "damage": 83,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 65,
+      "victory": false,
+      "duration": 63.0,
+      "damage": 66,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 66,
+      "victory": true,
+      "duration": 63.0,
+      "damage": 49,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 67,
+      "victory": false,
+      "duration": 63.0,
+      "damage": 32,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 68,
+      "victory": true,
+      "duration": 63.0,
+      "damage": 15,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 69,
+      "victory": false,
+      "duration": 64.0,
+      "damage": 118,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 70,
+      "victory": true,
+      "duration": 64.0,
+      "damage": 101,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 71,
+      "victory": false,
+      "duration": 64.0,
+      "damage": 85,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 72,
+      "victory": true,
+      "duration": 64.0,
+      "damage": 68,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 73,
+      "victory": false,
+      "duration": 65.0,
+      "damage": 51,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 74,
+      "victory": false,
+      "duration": 65.0,
+      "damage": 34,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 75,
+      "victory": false,
+      "duration": 65.0,
+      "damage": 17,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 76,
+      "victory": false,
+      "duration": 65.0,
+      "damage": 0,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 77,
+      "victory": false,
+      "duration": 66.0,
+      "damage": 103,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 78,
+      "victory": false,
+      "duration": 66.0,
+      "damage": 87,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 79,
+      "victory": false,
+      "duration": 66.0,
+      "damage": 70,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 80,
+      "victory": false,
+      "duration": 66.0,
+      "damage": 53,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 81,
+      "victory": false,
+      "duration": 66.0,
+      "damage": 36,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 82,
+      "victory": false,
+      "duration": 67.0,
+      "damage": 19,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 83,
+      "victory": false,
+      "duration": 67.0,
+      "damage": 2,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 84,
+      "victory": false,
+      "duration": 67.0,
+      "damage": 105,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 85,
+      "victory": false,
+      "duration": 67.0,
+      "damage": 89,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 86,
+      "victory": false,
+      "duration": 68.0,
+      "damage": 72,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 87,
+      "victory": false,
+      "duration": 68.0,
+      "damage": 55,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 88,
+      "victory": false,
+      "duration": 68.0,
+      "damage": 38,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 89,
+      "victory": false,
+      "duration": 68.0,
+      "damage": 21,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 90,
+      "victory": false,
+      "duration": 69.0,
+      "damage": 4,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 91,
+      "victory": true,
+      "duration": 69.0,
+      "damage": 108,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 92,
+      "victory": false,
+      "duration": 69.0,
+      "damage": 91,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 93,
+      "victory": true,
+      "duration": 69.0,
+      "damage": 74,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 94,
+      "victory": false,
+      "duration": 69.0,
+      "damage": 57,
+      "traps_used": 1,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 95,
+      "victory": true,
+      "duration": 70.0,
+      "damage": 40,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 96,
+      "victory": false,
+      "duration": 70.0,
+      "damage": 23,
+      "traps_used": 5,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 97,
+      "victory": true,
+      "duration": 70.0,
+      "damage": 6,
+      "traps_used": 4,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 98,
+      "victory": false,
+      "duration": 70.0,
+      "damage": 110,
+      "traps_used": 3,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 99,
+      "victory": true,
+      "duration": 71.0,
+      "damage": 93,
+      "traps_used": 2,
+      "difficulty": 1.0
+    },
+    {
+      "seed": 100,
+      "victory": false,
+      "duration": 71.0,
+      "damage": 76,
+      "traps_used": 1,
+      "difficulty": 1.0
+    }
+  ]
+}
