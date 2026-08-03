@@ -32,6 +32,10 @@ func migrate(payload: Dictionary) -> Dictionary:
         result["blueprints"] = result.get("blueprints", {})
         result["village_quests"] = result.get("village_quests", {})
         result["accessibility_v08"] = result.get("accessibility_v08", {})
+        result["prisoners_v08"] = result.get("prisoners_v08", {})
+        result["patrols_v08"] = result.get("patrols_v08", {})
+        result["last_replay_v08"] = result.get("last_replay_v08", {})
+        result["custom_challenge_v08"] = result.get("custom_challenge_v08", {})
         version = 5
 
     result["version"] = CURRENT_VERSION

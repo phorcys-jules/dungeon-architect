@@ -175,6 +175,12 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
     if door_closed:
         blocked.append(DOOR)
     var targets := monster_ai.assign_targets(occupied, monster_behaviours, adventurer_cell, adventurer_direction, TREASURE, active_route_target, blocked)
+    if not loop_rules.is_panicking():
+        for index in mini(targets.size(), active_monster_archetypes.size()):
+            var monster_id := String(active_monster_archetypes[index].archetype_id)
+            var patrol_target := v06_integration.v08.patrols.target_for(monster_id, mobile_monsters[index].cell, adventurer_cell if mobile_monsters[index].cell.distance_to(adventurer_cell) <= 3.0 else Vector2i(-1, -1))
+            if String(patrol_target.get("source", "idle")) != "idle":
+                targets[index] = Vector2i(patrol_target.target)
 
     for index in mobile_monsters.size():
         passage_cooldowns[index] = maxf(float(passage_cooldowns.get(index, 0.0)) - delta, 0.0)

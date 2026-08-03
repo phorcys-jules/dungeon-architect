@@ -26,6 +26,8 @@ La branche de développement prépare `v0.8.0-alpha` :
 - évolutions, mutations et rivaux persistants ;
 - flux environnementaux, plans de construction et graines partageables ;
 - quêtes fonctionnelles du village, accessibilité étendue et défi quotidien.
+- prisonniers, contre-espionnage, sabotages annoncés et zones de patrouille ;
+- replay tactique, ambiance réactive et défis personnalisés partageables.
 
 ## Prérequis
 
@@ -60,6 +62,8 @@ La scène principale est `res://scenes/main.tscn`.
 - boutons du résultat : retourner au village ou commencer une nouvelle run.
 - `Q`, `E`, `F` : pouvoirs tactiques ;
 - `H` : afficher ou masquer la carte tactique de la vague précédente.
+- `P` : afficher ou masquer les zones de patrouille ;
+- `J` : avancer jusqu'au prochain événement du replay tactique.
 
 ## Tests locaux
 

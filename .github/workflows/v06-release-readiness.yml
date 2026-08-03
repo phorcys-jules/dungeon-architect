@@ -63,3 +63,7 @@ jobs:
         run: timeout 45s ./godot --headless --path . --script tests/v08_campaign_systems_test.gd
       - name: Validate 100 deterministic campaign seeds
         run: timeout 45s ./godot --headless --path . --script tests/v08_seed_stability_test.gd
+      - name: Test v0.8 prisoner, sabotage, patrol, replay, audio and custom challenges
+        run: timeout 45s ./godot --headless --path . --script tests/v08_extension_systems_test.gd
+      - name: Validate 100 custom challenge configurations
+        run: timeout 45s ./godot --headless --path . --script tests/v08_custom_challenge_matrix_test.gd

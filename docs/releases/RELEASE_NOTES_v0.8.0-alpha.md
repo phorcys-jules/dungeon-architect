@@ -29,3 +29,12 @@ La v0.8 transforme les runs en campagne tactique persistante. Les choix du villa
 - Compilation Godot 4.7.1 headless.
 - Tests unitaires et d'intégration des huit systèmes 0.8.
 - Validation déterministe et de solvabilité sur 100 graines de campagne.
+
+## Extensions de gameplay
+
+- Les aventuriers capturés peuvent devenir des prisonniers à interroger, rançonner ou libérer.
+- Les factions annoncent des sabotages déterministes avec cible, certitude et contre-mesure.
+- Les monstres reçoivent des zones de garde, patrouille, embuscade et repli visibles avec `P`.
+- Une chronologie compacte enregistre les événements majeurs ; `J` permet de les parcourir.
+- La direction audio calcule des couches réactives au biome, à la faction, au danger et au boss.
+- Des défis personnalisés combinent mutateurs, restrictions, score et code partageable avec checksum.
