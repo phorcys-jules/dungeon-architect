@@ -10,6 +10,7 @@ var base_walls: Array[Vector2i] = []
 var wall_button: Button
 var remove_wall_button: Button
 var passage_cooldowns: Dictionary = {}
+var adventurer_passage_cooldown := 0.0
 
 func _build_level() -> void:
     super._build_level()
@@ -44,7 +45,22 @@ func _start_new_campaign() -> void:
         if astar.region.size != Vector2i.ZERO:
             _synchronize_wall_pathfinding()
     construction_mode = ConstructionMode.DEFENCES
+    adventurer_passage_cooldown = 0.0
     super._start_new_campaign()
+
+func _process(delta: float) -> void:
+    super._process(delta)
+    adventurer_passage_cooldown = maxf(adventurer_passage_cooldown - delta, 0.0)
+    if game_state != GameState.INVASION or adventurer_passage_cooldown > 0.0:
+        return
+    var cell := _cell_from_world(adventurer_position)
+    var destination := dungeon_build.resolve_adventurer_passage(cell)
+    if destination == cell:
+        return
+    adventurer_position = GRID_ORIGIN + Vector2(destination) * CELL_SIZE + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
+    adventurer_passage_cooldown = 1.0
+    _recalculate_path()
+    status_label.text = "L'équipe emprunte un tunnel vers %s." % destination
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
@@ -108,6 +124,7 @@ func _try_place_free_wall(cell: Vector2i) -> void:
         return
     economy.spend(-int(result.gold_delta))
     walls.append(cell)
+    _on_defense_placed(cell, "wall", DungeonBuildRuntime.WALL_COST, self)
     record_v06_wall_placed()
     astar.set_point_solid(cell, true)
     _recalculate_path()
@@ -127,6 +144,15 @@ func _try_remove_free_wall(cell: Vector2i) -> void:
     status_label.text = "Mur retiré : +%d or." % int(result.gold_delta)
     _refresh_build_ui()
     queue_redraw()
+
+func _remove_evolved_wall(cell: Vector2i) -> bool:
+    var result := dungeon_build.try_remove_wall(cell)
+    if not bool(result.ok):
+        return false
+    walls.erase(cell)
+    astar.set_point_solid(cell, false)
+    _recalculate_path()
+    return true
 
 func _synchronize_wall_pathfinding() -> void:
     for x in GRID_SIZE.x:

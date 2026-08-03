@@ -5,6 +5,12 @@ signal run_requested
 const VillageBackground := preload("res://assets/backgrounds/monster_village.png")
 const VillageMusic := preload("res://assets/audio/music/village_night.wav")
 const VillageAmbientAnimatorScript := preload("res://scripts/village/village_ambient_animator.gd")
+const MONSTER_TEXTURES := {
+    "ghost": preload("res://assets/sprites/characters/animations/monster_ghost_walk.png"),
+    "slime": preload("res://assets/sprites/characters/animations/monster_slime_walk.png"),
+    "mimic": preload("res://assets/sprites/characters/animations/monster_mimic_walk.png"),
+    "spider": preload("res://assets/sprites/characters/animations/monster_spider_walk.png"),
+}
 const BUILDING_TEXTURES := {
     "den": preload("res://assets/sprites/buildings/den.png"),
     "forge": preload("res://assets/sprites/buildings/forge.png"),
@@ -35,13 +41,36 @@ var monster_roster := MonsterRoster.new()
 var roster_buttons: Dictionary = {}
 var labyrinth_modules := LabyrinthModuleLoadout.new()
 var module_buttons: Dictionary = {}
+var room_deck_selection := RoomDeckSelection.new()
+var biome_selector: OptionButton
+var room_selector: OptionButton
+var room_deck_label: Label
+var encyclopedia := EncyclopediaProgress.new()
+var encyclopedia_catalog := EncyclopediaCatalog.new()
+var global_stats := GlobalRunStats.new()
+var achievements := AchievementTracker.new()
+var archives_button: Button
+var archives_panel: PanelContainer
+var archives_category: OptionButton
+var archives_text: RichTextLabel
+var archives_stats: Label
+var last_run_result: Dictionary = {}
+var village_residents: Array[Control] = []
+var reaction_label: Label
+var feedback_settings := GameFeedbackSettings.new()
+var feedback_button: Button
+var feedback_panel: PanelContainer
 
 func _ready() -> void:
     super._ready()
     _load_village_state()
     _build_village_map()
+    _build_village_residents()
     _build_roster_controls()
     _build_module_controls()
+    _build_room_deck_controls()
+    _build_archives()
+    _build_feedback_settings()
     _start_village_animations()
     _start_village_music()
     start_run_button.pressed.connect(_on_start_run_pressed)
@@ -62,6 +91,12 @@ func _load_village_state() -> void:
     if monster_roster.selected_team.size() > monster_roster.capacity:
         monster_roster.selected_team = monster_roster.selected_team.slice(0, monster_roster.capacity)
     labyrinth_modules.from_dict(state.get("labyrinth_modules", {}), progression_service.state.buildings)
+    room_deck_selection.from_dict(state.get("room_deck_selection", {}))
+    encyclopedia.from_dict(state.get("encyclopedia", {}))
+    global_stats.from_dict(state.get("global_stats", {}))
+    achievements.from_dict(state.get("achievements", {}))
+    last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
+    feedback_settings.apply(state.get("feedback_settings", {}))
     if black_market.stock.is_empty():
         black_market.refresh(int(Time.get_unix_time_from_system()))
 
@@ -77,6 +112,7 @@ func _build_village_map() -> void:
     move_child(background, 0)
 
     var panel := get_node("Panel") as PanelContainer
+    (get_node("Panel/Margin/Content") as VBoxContainer).add_theme_constant_override("separation", 8)
     panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
     panel.offset_left = -305.0
     panel.offset_top = -270.0
@@ -121,6 +157,90 @@ func _build_village_map() -> void:
         button.add_child(label)
         add_child(button)
         building_buttons[building_id] = button
+    _refresh_building_progression_visuals()
+
+func _refresh_building_progression_visuals() -> void:
+    var den := save_store.load_den()
+    for building_id in building_buttons:
+        var button := building_buttons[building_id] as Button
+        var level := den.level if building_id == "den" else int(progression_service.state.buildings.get(building_id, 0))
+        if building_id == "market":
+            level = black_market.purchased_ids.size()
+        var badge := button.get_node_or_null("ProgressBadge") as Label
+        if badge == null:
+            badge = Label.new()
+            badge.name = "ProgressBadge"
+            button.add_child(badge)
+        badge.text = "NIV. %d" % level if building_id != "market" else "%d PACTE(S)" % level
+        badge.position = Vector2(8, 7)
+        badge.size = Vector2(92, 20)
+        badge.add_theme_font_size_override("font_size", 10)
+        badge.add_theme_color_override("font_color", Color("fff0a8"))
+        badge.add_theme_color_override("font_shadow_color", Color.BLACK)
+        badge.add_theme_constant_override("shadow_offset_x", 1)
+        badge.add_theme_constant_override("shadow_offset_y", 1)
+        badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        var artwork := button.get_node("Artwork") as TextureRect
+        artwork.modulate = Color.WHITE.lerp(Color("ffd782"), minf(float(level) * 0.08, 0.32))
+        artwork.scale = Vector2.ONE * (1.0 + minf(float(level) * 0.012, 0.06))
+
+func _build_village_residents() -> void:
+    reaction_label = Label.new()
+    reaction_label.name = "VillageReaction"
+    reaction_label.position = Vector2(220, 18)
+    reaction_label.size = Vector2(410, 42)
+    reaction_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    reaction_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    reaction_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    reaction_label.add_theme_font_size_override("font_size", 13)
+    reaction_label.add_theme_color_override("font_color", Color("fff0b5"))
+    reaction_label.add_theme_color_override("font_shadow_color", Color.BLACK)
+    reaction_label.add_theme_constant_override("shadow_offset_x", 2)
+    reaction_label.add_theme_constant_override("shadow_offset_y", 2)
+    reaction_label.text = _village_reaction_text()
+    add_child(reaction_label)
+
+    var monster_positions := [Vector2(52, 285), Vector2(105, 300), Vector2(158, 285), Vector2(211, 300)]
+    for index in monster_roster.recruited.size():
+        if index >= monster_positions.size():
+            break
+        var monster_id := String(monster_roster.recruited[index])
+        if not MONSTER_TEXTURES.has(monster_id):
+            continue
+        _add_resident(monster_id.capitalize(), MONSTER_TEXTURES[monster_id], monster_positions[index], func(): _select_building("den"))
+    _add_resident("Forgeron", MONSTER_TEXTURES.mimic, Vector2(330, 196), func(): _select_building("forge"))
+    _add_resident("Archiviste", MONSTER_TEXTURES.ghost, Vector2(278, 312), _open_archives)
+    _add_resident("Marchand", MONSTER_TEXTURES.spider, Vector2(315, 420), func(): _select_building("market"))
+
+func _add_resident(label: String, texture: Texture2D, position_value: Vector2, action: Callable) -> void:
+    var button := Button.new()
+    button.name = "%sResident" % label.replace(" ", "")
+    button.position = position_value
+    button.size = Vector2(48, 48)
+    button.flat = true
+    button.icon = _first_animation_frame(texture)
+    button.expand_icon = true
+    button.tooltip_text = "%s — cliquer pour ouvrir sa fonction." % label
+    button.pressed.connect(action)
+    add_child(button)
+    village_residents.append(button)
+    var tween := create_tween().set_loops()
+    tween.tween_property(button, "position:y", position_value.y - 4.0, 0.65).set_trans(Tween.TRANS_SINE)
+    tween.tween_property(button, "position:y", position_value.y, 0.65).set_trans(Tween.TRANS_SINE)
+
+func _first_animation_frame(texture: Texture2D) -> AtlasTexture:
+    var atlas := AtlasTexture.new()
+    atlas.atlas = texture
+    var frame_width := maxi(1, texture.get_width() / 4)
+    atlas.region = Rect2(0, 0, frame_width, texture.get_height())
+    return atlas
+
+func _village_reaction_text() -> String:
+    if last_run_result.is_empty():
+        return "Le village attend les ordres de son architecte."
+    if bool(last_run_result.get("victory", false)):
+        return "Victoire ! Les habitants célèbrent %d capture(s) et renforcent le village." % int(last_run_result.get("captures", 0))
+    return "Défaite à la vague %d… les monstres préparent déjà leur revanche." % int(last_run_result.get("wave", 0))
 
 func _building_style(color: Color, alpha: float) -> StyleBoxFlat:
     var style := StyleBoxFlat.new()
@@ -244,16 +364,263 @@ func _refresh_module_controls() -> void:
     if heading != null:
         heading.text = "MODULES DU LABYRINTHE — %d/%d" % [labyrinth_modules.complexity_used(), LabyrinthModuleLoadout.MAX_COMPLEXITY]
 
+func _build_room_deck_controls() -> void:
+    var content := get_node("Panel/Margin/Content") as VBoxContainer
+    biome_selector = OptionButton.new()
+    biome_selector.name = "BiomeSelector"
+    biome_selector.add_theme_font_size_override("font_size", 9)
+    var catalog := BiomeCatalog.new()
+    for biome_id in catalog.all_ids():
+        var definition := catalog.get_biome(biome_id)
+        biome_selector.add_item("Biome : %s" % String(definition.name))
+        biome_selector.set_item_metadata(biome_selector.item_count - 1, biome_id)
+        if biome_id == room_deck_selection.biome_id:
+            biome_selector.select(biome_selector.item_count - 1)
+    biome_selector.item_selected.connect(_select_biome)
+    content.add_child(biome_selector)
+    room_deck_label = Label.new()
+    room_deck_label.name = "RoomDeckLabel"
+    room_deck_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    room_deck_label.add_theme_font_size_override("font_size", 9)
+    room_deck_label.tooltip_text = "Le générateur place exactement ces pièces, dans un ordre déterminé par la seed."
+    content.add_child(room_deck_label)
+    var row := HBoxContainer.new()
+    row.add_theme_constant_override("separation", 4)
+    content.add_child(row)
+    room_selector = OptionButton.new()
+    room_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    room_selector.add_theme_font_size_override("font_size", 9)
+    for room_id in room_deck_selection.room_ids():
+        var definition := room_deck_selection.room(room_id)
+        room_selector.add_item("%s · %d or · R%d" % [definition.display_name, definition.build_cost, definition.rarity])
+        room_selector.set_item_metadata(room_selector.item_count - 1, room_id)
+        room_selector.set_item_tooltip(room_selector.item_count - 1, "Tags : %s · connexions : %d · copies max : %d" % [", ".join(definition.tags), definition.connections.size(), definition.max_copies])
+    row.add_child(room_selector)
+    var add_button := Button.new()
+    add_button.text = "+"
+    add_button.tooltip_text = "Ajouter la pièce sélectionnée au deck."
+    add_button.pressed.connect(_add_selected_room)
+    row.add_child(add_button)
+    var remove_button := Button.new()
+    remove_button.text = "−"
+    remove_button.tooltip_text = "Retirer la dernière pièce du deck."
+    remove_button.pressed.connect(_remove_last_room)
+    row.add_child(remove_button)
+    _refresh_room_deck_controls()
+
+func _add_selected_room() -> void:
+    if room_selector.selected < 0:
+        return
+    var room_id := String(room_selector.get_item_metadata(room_selector.selected))
+    var result := room_deck_selection.add(room_id)
+    if not bool(result.ok):
+        status_label.text = room_deck_selection.rejection_message(result)
+    else:
+        _persist_village_state()
+        status_label.text = "%s ajoutée au deck." % room_deck_selection.room(room_id).display_name
+    _refresh_room_deck_controls()
+
+func _remove_last_room() -> void:
+    var result := room_deck_selection.remove_last()
+    if not bool(result.ok):
+        status_label.text = room_deck_selection.rejection_message(result)
+    else:
+        _persist_village_state()
+    _refresh_room_deck_controls()
+
+func _refresh_room_deck_controls() -> void:
+    if room_deck_label != null:
+        room_deck_label.text = "DECK DE PIÈCES %d/%d\n%s" % [room_deck_selection.selected.size(), RoomDeckSelection.MAX_ROOMS, room_deck_selection.display_summary()]
+        var validation := room_deck_selection.validate_for_biome()
+        room_deck_label.modulate = Color.WHITE if bool(validation.ok) else Color("ff9f80")
+        room_deck_label.tooltip_text = "Deck valide pour ce biome." if bool(validation.ok) else room_deck_selection.rejection_message(validation)
+
+func _select_biome(index: int) -> void:
+    var result := room_deck_selection.set_biome(String(biome_selector.get_item_metadata(index)))
+    if not bool(result.ok):
+        status_label.text = room_deck_selection.rejection_message(result)
+    else:
+        _persist_village_state()
+        var validation := room_deck_selection.validate_for_biome()
+        status_label.text = "Biome sélectionné." if bool(validation.ok) else room_deck_selection.rejection_message(validation)
+    _refresh_room_deck_controls()
+
+func _build_archives() -> void:
+    archives_button = Button.new()
+    archives_button.name = "ArchivesButton"
+    archives_button.position = Vector2(20, 20)
+    archives_button.size = Vector2(190, 38)
+    archives_button.text = "ARCHIVES"
+    var pending := encyclopedia.pending_notifications.size()
+    if pending > 0:
+        archives_button.text += " · %d nouveau(x)" % pending
+    archives_button.tooltip_text = "Encyclopédie, statistiques globales, records et succès."
+    archives_button.pressed.connect(_open_archives)
+    add_child(archives_button)
+
+    archives_panel = PanelContainer.new()
+    archives_panel.name = "ArchivesPanel"
+    archives_panel.set_anchors_preset(Control.PRESET_CENTER)
+    archives_panel.offset_left = -330.0
+    archives_panel.offset_top = -270.0
+    archives_panel.offset_right = 330.0
+    archives_panel.offset_bottom = 270.0
+    archives_panel.visible = false
+    add_child(archives_panel)
+    var margin := MarginContainer.new()
+    margin.add_theme_constant_override("margin_left", 20)
+    margin.add_theme_constant_override("margin_top", 16)
+    margin.add_theme_constant_override("margin_right", 20)
+    margin.add_theme_constant_override("margin_bottom", 16)
+    archives_panel.add_child(margin)
+    var column := VBoxContainer.new()
+    column.add_theme_constant_override("separation", 8)
+    margin.add_child(column)
+    var heading := Label.new()
+    heading.text = "ARCHIVES DU MAÎTRE DU DONJON"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    heading.add_theme_font_size_override("font_size", 20)
+    column.add_child(heading)
+    archives_stats = Label.new()
+    archives_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    archives_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    column.add_child(archives_stats)
+    archives_category = OptionButton.new()
+    for category in ["monster", "adventurer", "room", "biome", "synergy", "achievement"]:
+        archives_category.add_item({"monster": "Monstres", "adventurer": "Aventuriers", "room": "Pièces", "biome": "Biomes", "synergy": "Synergies", "achievement": "Succès"}[category])
+        archives_category.set_item_metadata(archives_category.item_count - 1, category)
+    archives_category.item_selected.connect(_refresh_archives)
+    column.add_child(archives_category)
+    archives_text = RichTextLabel.new()
+    archives_text.bbcode_enabled = true
+    archives_text.fit_content = false
+    archives_text.custom_minimum_size = Vector2(600, 350)
+    archives_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    column.add_child(archives_text)
+    var close_button := Button.new()
+    close_button.text = "Fermer"
+    close_button.pressed.connect(func(): archives_panel.visible = false)
+    column.add_child(close_button)
+
+func _open_archives() -> void:
+    archives_panel.visible = true
+    archives_panel.move_to_front()
+    var notifications := encyclopedia.consume_notifications()
+    if not notifications.is_empty():
+        status_label.text = "%d nouvelle(s) découverte(s) ajoutée(s) aux Archives." % notifications.size()
+        _persist_village_state()
+    archives_button.text = "ARCHIVES"
+    _refresh_archives(archives_category.selected)
+
+func _refresh_archives(index: int) -> void:
+    var favorite_monster := global_stats.most_used(global_stats.favorite_monsters)
+    var favorite_synergy := global_stats.most_used(global_stats.favorite_synergies)
+    archives_stats.text = "Runs : %d · Victoires : %d%% · Record : %d · Vague max : %d · Favoris : %s / %s" % [global_stats.total_runs, roundi(global_stats.win_rate() * 100.0), global_stats.best_score, global_stats.best_wave, favorite_monster if not favorite_monster.is_empty() else "—", favorite_synergy if not favorite_synergy.is_empty() else "—"]
+    var category := String(archives_category.get_item_metadata(index))
+    var lines: Array[String] = []
+    if category == "achievement":
+        for achievement_id in achievements.definitions:
+            var definition: Dictionary = achievements.definitions[achievement_id]
+            var progress := achievements.progress(achievement_id)
+            var icon := "✓" if bool(progress.complete) else "○"
+            lines.append("[b]%s %s[/b]  %d/%d" % [icon, String(definition.name), int(progress.current), int(progress.target)])
+    else:
+        for raw_entry in encyclopedia_catalog.list_by_kind(category):
+            var entry := encyclopedia.visible_entry(encyclopedia_catalog, String(raw_entry.id))
+            var state_label: String = ["INCONNU", "APERÇU", "DÉCOUVERT"][int(entry.state)]
+            var line := "[b]%s[/b]  [color=#9aa8bf]%s[/color]\n%s" % [String(entry.name), state_label, String(entry.description)]
+            if entry.has("stats"):
+                line += " · Utilisations : %d · Victoires : %d" % [int(entry.stats.uses), int(entry.stats.wins)]
+            lines.append(line)
+    archives_text.text = "\n\n".join(lines)
+
 func _start_village_music() -> void:
     music_player = AudioStreamPlayer.new()
     music_player.name = "VillageAmbience"
     var looped_stream := VillageMusic.duplicate() as AudioStreamWAV
     looped_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
     music_player.stream = looped_stream
-    music_player.volume_db = -36.0
+    music_player.volume_db = -60.0
     add_child(music_player)
     music_player.play()
-    create_tween().tween_property(music_player, "volume_db", -19.0, 1.8)
+    create_tween().tween_property(music_player, "volume_db", _village_music_db(), 1.8)
+
+func _build_feedback_settings() -> void:
+    feedback_button = Button.new()
+    feedback_button.name = "FeedbackSettingsButton"
+    feedback_button.position = Vector2(20, 66)
+    feedback_button.size = Vector2(190, 32)
+    feedback_button.text = "OPTIONS AUDIO / VFX"
+    feedback_button.pressed.connect(func(): feedback_panel.visible = not feedback_panel.visible; feedback_panel.move_to_front())
+    add_child(feedback_button)
+    feedback_panel = PanelContainer.new()
+    feedback_panel.name = "FeedbackSettingsPanel"
+    feedback_panel.set_anchors_preset(Control.PRESET_CENTER)
+    feedback_panel.offset_left = -210.0
+    feedback_panel.offset_top = -190.0
+    feedback_panel.offset_right = 210.0
+    feedback_panel.offset_bottom = 190.0
+    feedback_panel.visible = false
+    add_child(feedback_panel)
+    var margin := MarginContainer.new()
+    margin.add_theme_constant_override("margin_left", 20)
+    margin.add_theme_constant_override("margin_top", 18)
+    margin.add_theme_constant_override("margin_right", 20)
+    margin.add_theme_constant_override("margin_bottom", 18)
+    feedback_panel.add_child(margin)
+    var column := VBoxContainer.new()
+    column.add_theme_constant_override("separation", 10)
+    margin.add_child(column)
+    var heading := Label.new()
+    heading.text = "AUDIO ET EFFETS"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    heading.add_theme_font_size_override("font_size", 18)
+    column.add_child(heading)
+    _add_feedback_slider(column, "Volume général", feedback_settings.master_volume, "master_volume")
+    _add_feedback_slider(column, "Musique", feedback_settings.music_volume, "music_volume")
+    _add_feedback_slider(column, "Effets sonores", feedback_settings.effects_volume, "effects_volume")
+    _add_feedback_slider(column, "Secousses", feedback_settings.screen_shake_strength, "screen_shake_strength")
+    var particles := CheckButton.new()
+    particles.text = "Particules et flashs"
+    particles.button_pressed = feedback_settings.particles_enabled
+    particles.toggled.connect(func(value: bool): _set_feedback_option("particles_enabled", value))
+    column.add_child(particles)
+    var reduced_motion := CheckButton.new()
+    reduced_motion.text = "Réduire les mouvements"
+    reduced_motion.button_pressed = feedback_settings.reduced_motion
+    reduced_motion.toggled.connect(func(value: bool): _set_feedback_option("reduced_motion", value))
+    column.add_child(reduced_motion)
+    var close_button := Button.new()
+    close_button.text = "Fermer"
+    close_button.pressed.connect(func(): feedback_panel.visible = false)
+    column.add_child(close_button)
+
+func _add_feedback_slider(parent: VBoxContainer, label_text: String, value: float, key: String) -> void:
+    var row := HBoxContainer.new()
+    var label := Label.new()
+    label.text = label_text
+    label.custom_minimum_size.x = 145
+    row.add_child(label)
+    var slider := HSlider.new()
+    slider.name = "%sSlider" % key.capitalize().replace("_", "")
+    slider.min_value = 0.0
+    slider.max_value = 1.0
+    slider.step = 0.05
+    slider.value = value
+    slider.custom_minimum_size.x = 190
+    slider.value_changed.connect(func(new_value: float): _set_feedback_option(key, new_value))
+    row.add_child(slider)
+    parent.add_child(row)
+
+func _set_feedback_option(key: String, value: Variant) -> void:
+    feedback_settings.apply({key: value})
+    _persist_village_state()
+    if music_player != null:
+        music_player.volume_db = _village_music_db()
+
+func _village_music_db() -> float:
+    var linear_volume := feedback_settings.master_volume * feedback_settings.music_volume * 0.14
+    return linear_to_db(linear_volume) if linear_volume > 0.001 else -80.0
 
 func _start_village_animations() -> void:
     ambient_animator = VillageAmbientAnimatorScript.new()
@@ -358,6 +725,7 @@ func _on_upgrade_pressed() -> void:
             den.soul_shards = int(purchase.remaining)
             save_store.save_den(den)
     _persist_village_state()
+    _refresh_building_progression_visuals()
     _refresh_module_controls()
     _select_building(selected_building)
 
@@ -367,6 +735,9 @@ func _persist_village_state() -> void:
     state["black_market"] = black_market.to_dict()
     state["monster_roster"] = monster_roster.to_dict()
     state["labyrinth_modules"] = labyrinth_modules.to_dict()
+    state["room_deck_selection"] = room_deck_selection.to_dict()
+    state["encyclopedia"] = encyclopedia.to_dict()
+    state["feedback_settings"] = feedback_settings.serialize()
     meta_store.save_state(state)
 
 func _building_data(building_id: String) -> VillageBuildingData:
@@ -409,6 +780,11 @@ func _first_available_offer() -> Dictionary:
 
 func _on_start_run_pressed() -> void:
     if transition_in_progress:
+        return
+    var deck_validation := room_deck_selection.validate_for_biome()
+    if not bool(deck_validation.ok):
+        status_label.text = room_deck_selection.rejection_message(deck_validation)
+        _refresh_room_deck_controls()
         return
     transition_in_progress = true
     _refresh_navigation()

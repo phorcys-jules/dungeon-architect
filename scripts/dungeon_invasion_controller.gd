@@ -72,6 +72,8 @@ var blessing_available := true
 var last_adventurer_cell := ENTRANCE
 var adventurer_direction := Vector2i.RIGHT
 var room_deck := RoomDeck.new()
+var configured_room_deck: Array[StringName] = DEFAULT_ROOM_DECK.duplicate()
+var configured_biome_id := ""
 var placed_rooms: Dictionary = {}
 var active_biome := BiomeRuntime.new()
 var adventurer_attack_cooldown := 0.0
@@ -90,10 +92,24 @@ func _build_interface() -> void:
     round_state_label.add_theme_color_override("font_color", Color("f4d35e"))
     add_child(round_state_label)
 
+func _draw_grid() -> void:
+    var biome := active_biome.catalog.get_biome(active_biome.active_biome_id)
+    var palette: Dictionary = biome.get("palette", {})
+    var floor_a := Color(String(palette.get("floor_a", "252a3a")))
+    var floor_b := Color(String(palette.get("floor_b", "212635")))
+    var grid_color := Color(String(palette.get("grid", "3b4358")))
+    for y in GRID_SIZE.y:
+        for x in GRID_SIZE.x:
+            var rect := Rect2(GRID_ORIGIN + Vector2(x, y) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE))
+            draw_rect(rect, floor_a if (x + y) % 2 == 0 else floor_b)
+            draw_rect(rect, grid_color, false, 1.0)
+
 func _build_level() -> void:
-    active_biome.select_for_zone(campaign_seed, 0)
+    if configured_biome_id.is_empty() or not active_biome.set_active(configured_biome_id):
+        active_biome.select_for_zone(campaign_seed, 0)
     room_deck.configure(ROOM_RESOURCES)
-    room_deck.select(DEFAULT_ROOM_DECK)
+    if not room_deck.select(configured_room_deck):
+        room_deck.select(DEFAULT_ROOM_DECK)
     room_deck.shuffle(campaign_seed)
     placed_rooms.clear()
     var room_cells: Array[Vector2i] = []
@@ -266,6 +282,7 @@ func _update_mobile_monsters(delta: float, adventurer_cell: Vector2i) -> void:
                 var attack_origin := GRID_ORIGIN + monster.world_position + Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
                 _play_monster_attack(archetype.archetype_id, attack_origin)
                 adventurer_health.take_damage(damage)
+                _on_monster_hit_adventurer(archetype.archetype_id, archetype.has_ability(&"first_hit_burst") and monster_burst_available[index])
                 if archetype.has_ability(&"first_hit_burst") and monster_burst_available[index]:
                     monster_burst_available[index] = false
                     monster_ability_flashes[index] = 0.35
@@ -355,6 +372,9 @@ func _play_monster_attack(archetype_id: StringName, attack_origin: Vector2) -> v
             _play_clash(attack_origin, &"web", Color("e4d3ff"))
         _:
             _play_clash(attack_origin, &"slash", Color("ff9f68"))
+
+func _on_monster_hit_adventurer(_archetype_id: StringName, _was_ambush: bool) -> void:
+    pass
 
 func _apply_monster_zone_ability(index: int, archetype: MonsterArchetypeData, previous_cell: Vector2i, current_cell: Vector2i) -> void:
     if archetype.has_ability(&"slow_trail"):
@@ -498,7 +518,8 @@ func _current_adventurer_speed_multiplier() -> float:
 func _refresh_round_state(resolved: bool = false) -> void:
     round_state.update(collectible_route.get_remaining_count(), loop_rules.panic_time_left, resolved)
     if round_state_label:
-        round_state_label.text = round_state.label()
+        var biome := active_biome.catalog.get_biome(active_biome.active_biome_id)
+        round_state_label.text = "%s · %s" % [String(biome.get("name", active_biome.active_biome_id)), round_state.label()]
 
 func get_run_tags() -> Array[String]:
     var tags: Array[String] = ["biome:%s" % active_biome.active_biome_id]
@@ -526,6 +547,23 @@ func set_monster_team(monster_ids: Array[String]) -> void:
         if selected.size() >= MONSTER_HOME_CELLS.size():
             break
     active_monster_archetypes = selected if not selected.is_empty() else MONSTER_ARCHETYPES.duplicate()
+
+func set_room_deck(room_ids: Array[String]) -> bool:
+    var typed_ids: Array[StringName] = []
+    for room_id in room_ids:
+        typed_ids.append(StringName(room_id))
+    var validator := RoomDeck.new()
+    validator.configure(ROOM_RESOURCES)
+    if typed_ids.is_empty() or typed_ids.size() > ROOM_ANCHORS.size() or not validator.select(typed_ids):
+        return false
+    configured_room_deck = typed_ids
+    return true
+
+func set_biome(biome_id: String) -> bool:
+    if not active_biome.set_active(biome_id):
+        return false
+    configured_biome_id = biome_id
+    return true
 
 func _monster_respawn_delay(base_delay: float) -> float:
     return base_delay
@@ -561,6 +599,10 @@ func _effect_duration_multiplier() -> float:
     return 1.0
 
 func _draw_level_objects() -> void:
+    var biome := active_biome.catalog.get_biome(active_biome.active_biome_id)
+    var palette: Dictionary = biome.get("palette", {})
+    var wall_fill := Color(String(palette.get("wall", "58446f")))
+    var wall_accent := Color(String(palette.get("accent", "b995d6")))
     super._draw_level_objects()
     for cell: Vector2i in placed_rooms:
         var room: RoomData = placed_rooms[cell]
@@ -569,8 +611,8 @@ func _draw_level_objects() -> void:
         if texture != null:
             draw_texture_rect(texture, rect, false)
         else:
-            draw_rect(rect, Color("58446f"), true)
-        draw_rect(rect, Color("b995d6"), false, 1.5)
+            draw_rect(rect, wall_fill, true)
+        draw_rect(rect, wall_accent, false, 1.5)
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
     return super._is_valid_build_cell(cell) and cell != BLESSING_CELL and not MONSTER_HOME_CELLS.has(cell) and not placed_rooms.has(cell)

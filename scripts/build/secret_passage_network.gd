@@ -3,7 +3,7 @@ extends RefCounted
 
 var passages: Array[Dictionary] = []
 
-func add_passage(entry: Vector2i, exit: Vector2i, allowed_tags: Array[String]) -> bool:
+func add_passage(entry: Vector2i, exit: Vector2i, allowed_tags: Array[String], traversal_cost := 1.0) -> bool:
     if entry == exit or allowed_tags.is_empty():
         return false
     if get_passage(entry) != null:
@@ -12,6 +12,7 @@ func add_passage(entry: Vector2i, exit: Vector2i, allowed_tags: Array[String]) -
         "entry": entry,
         "exit": exit,
         "allowed_tags": allowed_tags.duplicate(),
+        "cost": maxf(traversal_cost, 0.1),
     })
     return true
 
@@ -47,5 +48,5 @@ func navigation_edges(actor_tags: Array[String]) -> Array[Dictionary]:
     var result: Array[Dictionary] = []
     for passage in passages:
         if can_traverse(passage.entry, actor_tags):
-            result.append({"from": passage.entry, "to": passage.exit})
+            result.append({"from": passage.entry, "to": passage.exit, "cost": passage.cost})
     return result

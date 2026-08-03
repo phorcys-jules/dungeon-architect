@@ -12,6 +12,8 @@ var total_ectoplasm := 0
 var total_resources := {"gold": 0, "essence": 0, "stone": 0, "bones": 0}
 var favorite_monsters: Dictionary = {}
 var favorite_synergies: Dictionary = {}
+var balance_samples: Dictionary = {}
+var combo_triggers: Dictionary = {}
 
 func record_run(result: Dictionary) -> void:
     total_runs += 1
@@ -31,9 +33,12 @@ func record_run(result: Dictionary) -> void:
     for monster_id in result.get("monster_ids", []):
         var id := String(monster_id)
         favorite_monsters[id] = int(favorite_monsters.get(id, 0)) + 1
+        _record_balance_sample(String(result.get("biome", "unknown")), id, result)
     for synergy_id in result.get("synergy_ids", []):
         var id := String(synergy_id)
         favorite_synergies[id] = int(favorite_synergies.get(id, 0)) + 1
+    for combo_id in Dictionary(result.get("combo_counts", {})):
+        combo_triggers[combo_id] = int(combo_triggers.get(combo_id, 0)) + int(result.combo_counts[combo_id])
 
 func win_rate() -> float:
     return 0.0 if total_runs == 0 else float(victories) / float(total_runs)
@@ -51,6 +56,18 @@ func most_used(source: Dictionary) -> String:
             best_count = count
     return best_id
 
+func balance_sample(biome_id: String, monster_id: String) -> Dictionary:
+    return Dictionary(balance_samples.get("%s:%s" % [biome_id, monster_id], {"runs": 0, "wins": 0, "duration_seconds": 0.0, "score": 0})).duplicate(true)
+
+func _record_balance_sample(biome_id: String, monster_id: String, result: Dictionary) -> void:
+    var key := "%s:%s" % [biome_id, monster_id]
+    var sample: Dictionary = balance_sample(biome_id, monster_id)
+    sample.runs = int(sample.runs) + 1
+    sample.wins = int(sample.wins) + (1 if bool(result.get("victory", false)) else 0)
+    sample.duration_seconds = float(sample.duration_seconds) + float(result.get("duration_seconds", 0.0))
+    sample.score = int(sample.score) + int(result.get("score", 0))
+    balance_samples[key] = sample
+
 func to_dict() -> Dictionary:
     return {
         "total_runs": total_runs,
@@ -64,6 +81,8 @@ func to_dict() -> Dictionary:
         "total_resources": total_resources.duplicate(true),
         "favorite_monsters": favorite_monsters.duplicate(true),
         "favorite_synergies": favorite_synergies.duplicate(true),
+        "balance_samples": balance_samples.duplicate(true),
+        "combo_triggers": combo_triggers.duplicate(true),
     }
 
 func from_dict(data: Dictionary) -> void:
@@ -78,3 +97,5 @@ func from_dict(data: Dictionary) -> void:
     total_resources = data.get("total_resources", total_resources).duplicate(true)
     favorite_monsters = data.get("favorite_monsters", {}).duplicate(true)
     favorite_synergies = data.get("favorite_synergies", {}).duplicate(true)
+    balance_samples = data.get("balance_samples", {}).duplicate(true)
+    combo_triggers = data.get("combo_triggers", {}).duplicate(true)

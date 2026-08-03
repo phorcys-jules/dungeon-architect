@@ -32,6 +32,30 @@ func _init() -> void:
     trap_key.pressed = true
     game._unhandled_input(trap_key)
     assert(game.selected_trap_id == &"fire_rune")
+    var inspection_cell := Vector2i(1, 1)
+    while not game._is_valid_build_cell(inspection_cell):
+        inspection_cell.x += 1
+    game._place_spike_trap(inspection_cell)
+    assert(game.traps.has(inspection_cell))
+    game._inspect_defense(inspection_cell)
+    assert(game.defense_inspector.visible)
+    var original_damage := int((game.traps[inspection_cell] as SpikeTrap).damage)
+    game._upgrade_inspected_defense("power")
+    assert(int((game.traps[inspection_cell] as SpikeTrap).damage) > original_damage)
+    var gold_before_recycle: int = game.economy.current_gold
+    game._recycle_inspected_defense()
+    assert(not game.traps.has(inspection_cell))
+    assert(game.economy.current_gold > gold_before_recycle)
+    game.game_state = game.GameState.INVASION
+    game.tactical_powers.energy = 100.0
+    game._activate_tactical_power("hunt_order")
+    assert(game.hunt_order_time > 0.0)
+    assert(game.monster_behaviours.all(func(value): return value == PacmanLoopRules.Behaviour.CHASER))
+    var energy_before_trap: float = game.tactical_powers.energy
+    game._on_trap_triggered_for_power(40)
+    assert(game.tactical_powers.energy > energy_before_trap)
+    assert(game.tactical_power_buttons.size() == 3)
+    game.game_state = game.GameState.PREPARATION
     var combat_target: MobileMonster = game.mobile_monsters[0]
     combat_target.world_position = Vector2(game.ENTRANCE) * game.CELL_SIZE
     var previous_monster_health := combat_target.current_health
@@ -122,7 +146,7 @@ func _init() -> void:
         game.v06_integration.synergies.catalog.get_entry("mimic_treasure"),
     ]
     game.v06_integration.synergies.active = runtime_synergies
-    assert(is_equal_approx(game._monster_speed_multiplier(), 0.8))
+    assert(is_equal_approx(game._monster_speed_multiplier(), 0.8 * 1.1))
     assert(is_equal_approx(game._monster_evasion(&"ghost"), 0.2))
     assert(is_equal_approx(game._monster_ambush_multiplier(&"mimic", true), 1.35))
     assert(is_equal_approx(game._slime_slow_multiplier(0.72), 0.54))
@@ -132,6 +156,18 @@ func _init() -> void:
     assert(is_equal_approx(accelerated_trap.cooldown_duration, 1.5 * 0.65))
     game._refresh_v06_hud()
     assert(game.effect_rows.any(func(row: Button): return row.text == "Modificateurs actifs" and not row.tooltip_text.is_empty()))
+    assert(game.history_button != null and game.history_button.text.begins_with("HISTORIQUE"))
+    var effect_count: int = game.combat_effects.size()
+    game.feedback_settings.particles_enabled = false
+    game._spawn_combat_effect(&"splash", Vector2.ZERO, Vector2.ONE, Color.WHITE, 0.3)
+    assert(game.combat_effects.size() == effect_count)
+    game.feedback_settings.particles_enabled = true
+    game.combo_runtime.clear()
+    game.adventurer_health.reset()
+    var combo_health: int = game.adventurer_health.current_health
+    assert(game._apply_combo_state("tarred").is_empty())
+    assert(String(game._apply_combo_state("burning").id) == "inferno_tar")
+    assert(game.adventurer_health.current_health < combo_health)
     game.v06_integration.events.active_events.clear()
     game.v06_integration.synergies.active = previous_synergies
     var previous_modifiers: Dictionary = game.village_modifiers.duplicate(true)

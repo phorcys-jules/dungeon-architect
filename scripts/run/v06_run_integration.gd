@@ -10,6 +10,7 @@ var global_stats := GlobalRunStats.new()
 var achievements := AchievementTracker.new()
 var run_seed := 0
 var run_tags: Array[String] = []
+var last_run_result: Dictionary = {}
 
 func _init(state_store: V06ProgressionStore = null) -> void:
     if state_store != null:
@@ -73,7 +74,9 @@ func hud_snapshot() -> Dictionary:
     var challenge_labels: Array[String] = []
     for challenge_id in challenges.active:
         var progress := challenges.progress(challenge_id)
-        challenge_labels.append("%s%s" % [String(progress.get("name", challenge_id)), " ✓" if bool(progress.get("completed", false)) else ""])
+        var definition := challenges.catalog.get_definition(challenge_id)
+        var reward: Dictionary = definition.get("reward", {})
+        challenge_labels.append("%s %d/%d%s · +%d/+%d" % [String(progress.get("name", challenge_id)), roundi(float(progress.current)), roundi(float(progress.target)), " ✓" if bool(progress.get("completed", false)) else "", int(reward.get("gold", 0)), int(reward.get("essence", 0))])
     var event_labels: Array[String] = []
     var effect_entries: Array[Dictionary] = []
     for event in events.active_events:
@@ -87,12 +90,26 @@ func hud_snapshot() -> Dictionary:
     for synergy in synergies.presentation():
         synergy_labels.append(String(synergy.name))
         effect_entries.append({"kind": "synergy", "name": String(synergy.name), "description": String(synergy.description)})
+    var near_synergies: Array[String] = []
+    for synergy in synergies.catalog.all():
+        if synergies.active.any(func(active_entry: Dictionary): return String(active_entry.id) == String(synergy.id)):
+            continue
+        var missing: Array[String] = []
+        for required_tag in synergy.requires:
+            if not run_tags.has(String(required_tag)):
+                missing.append(String(required_tag))
+        if missing.size() == 1:
+            var hint := "%s — manque %s" % [String(synergy.name), missing[0].replace(":", " : ")]
+            near_synergies.append(hint)
+            effect_entries.append({"kind": "synergy_hint", "name": "Presque : %s" % String(synergy.name), "description": "Condition manquante : %s" % missing[0]})
     return {
         "challenges": challenge_labels,
         "events": event_labels,
         "synergies": synergy_labels,
         "modifiers": events.combined_effects(),
         "effect_entries": effect_entries,
+        "near_synergies": near_synergies,
+        "event_history": events.history.duplicate(),
     }
 
 func finish_run(result: Dictionary) -> Dictionary:
@@ -107,12 +124,23 @@ func finish_run(result: Dictionary) -> Dictionary:
             challenge_rewards.essence += int(reward.essence)
 
     var enriched := result.duplicate(true)
+    if not enriched.has("biome"):
+        for tag in run_tags:
+            if tag.begins_with("biome:"):
+                enriched["biome"] = tag.trim_prefix("biome:")
+                break
     enriched["synergy_ids"] = synergies.discovered.duplicate()
     enriched["challenge_progress"] = completed_ids
     var resources: Dictionary = enriched.get("resources", {}).duplicate(true)
     resources["gold"] = int(resources.get("gold", 0)) + int(challenge_rewards.gold)
     resources["essence"] = int(resources.get("essence", 0)) + int(challenge_rewards.essence)
     enriched["resources"] = resources
+    last_run_result = {
+        "victory": bool(enriched.get("victory", false)),
+        "wave": int(enriched.get("wave", 0)),
+        "captures": int(enriched.get("captures", 0)),
+        "score": int(enriched.get("score", 0)),
+    }
     global_stats.record_run(enriched)
     for tag in run_tags:
         var entry_id := _encyclopedia_id_for_tag(tag)
@@ -158,6 +186,7 @@ func _restore(state: Dictionary) -> void:
     encyclopedia.from_dict(state.get("encyclopedia", {}))
     global_stats.from_dict(state.get("global_stats", {}))
     achievements.from_dict(state.get("achievements", {}))
+    last_run_result = Dictionary(state.get("last_run_result", {})).duplicate(true)
 
 func _persist() -> bool:
     var state := store.load_state()
@@ -167,5 +196,6 @@ func _persist() -> bool:
         "encyclopedia": encyclopedia.to_dict(),
         "global_stats": global_stats.to_dict(),
         "achievements": achievements.to_dict(),
+        "last_run_result": last_run_result.duplicate(true),
     }, true)
     return store.save_state(state)

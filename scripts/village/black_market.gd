@@ -39,6 +39,22 @@ const OFFER_CATALOG := {
     },
 }
 
+const PURCHASE_MODIFIERS := {
+    "wraith_recruit": {"monster_health_multiplier": 0.25},
+    "mimic_room": {"monster_damage_multiplier": 0.15},
+    "void_crown": {"monster_damage_multiplier": 0.25},
+    "bone_foundry": {"trap_damage_multiplier": 0.25},
+    "blood_contract": {"defender_damage_multiplier": 0.30},
+}
+
+const CURSE_MODIFIERS := {
+    "fragile_walls": {"starting_gold_adjustment": -10.0},
+    "greedy_chest": {"adventurer_speed_multiplier": 0.10},
+    "elite_hunters": {"adventurer_health_multiplier": 0.12},
+    "taxed_essence": {"starting_gold_adjustment": -15.0},
+    "monster_upkeep": {"starting_gold_adjustment": -10.0},
+}
+
 var refresh_index: int = 0
 var stock: Array[Dictionary] = []
 var purchased_ids: Array[String] = []
@@ -114,17 +130,43 @@ func combined_modifiers() -> Dictionary:
         "starting_gold_adjustment": 0,
     }
     for purchase_id in purchased_ids:
-        match purchase_id:
-            "wraith_recruit": result.monster_health_multiplier += 0.25
-            "mimic_room": result.monster_damage_multiplier += 0.15
-            "void_crown": result.monster_damage_multiplier += 0.25
-            "bone_foundry": result.trap_damage_multiplier += 0.25
-            "blood_contract": result.defender_damage_multiplier += 0.30
+        _merge_modifiers(result, PURCHASE_MODIFIERS.get(purchase_id, {}))
     for curse in active_curses:
-        match String(curse.get("id", "")):
-            "fragile_walls": result.starting_gold_adjustment -= 10
-            "greedy_chest": result.adventurer_speed_multiplier += 0.10
-            "elite_hunters": result.adventurer_health_multiplier += 0.12
-            "taxed_essence": result.starting_gold_adjustment -= 15
-            "monster_upkeep": result.starting_gold_adjustment -= 10 * int(curse.get("monster_upkeep_bonus", 1))
+        var curse_id := String(curse.get("id", ""))
+        var modifier: Dictionary = CURSE_MODIFIERS.get(curse_id, {}).duplicate()
+        if curse_id == "monster_upkeep":
+            modifier.starting_gold_adjustment *= int(curse.get("monster_upkeep_bonus", 1))
+        _merge_modifiers(result, modifier)
     return result
+
+func active_effect_summaries() -> Array[String]:
+    var lines: Array[String] = []
+    for purchase_id in purchased_ids:
+        if OFFER_CATALOG.has(purchase_id):
+            lines.append("Pacte permanent — %s : %s" % [String(OFFER_CATALOG[purchase_id].name), _format_modifiers(PURCHASE_MODIFIERS.get(purchase_id, {}))])
+    for curse in active_curses:
+        var curse_id := String(curse.get("id", ""))
+        var modifier: Dictionary = CURSE_MODIFIERS.get(curse_id, {}).duplicate()
+        if curse_id == "monster_upkeep":
+            modifier.starting_gold_adjustment *= int(curse.get("monster_upkeep_bonus", 1))
+        lines.append("Malédiction permanente — %s" % _format_modifiers(modifier))
+    return lines
+
+func catalog_is_fully_wired() -> bool:
+    for offer_id in OFFER_CATALOG:
+        if not PURCHASE_MODIFIERS.has(offer_id) or not CURSE_MODIFIERS.has(String(OFFER_CATALOG[offer_id].curse.id)):
+            return false
+    return true
+
+func _merge_modifiers(target: Dictionary, source: Dictionary) -> void:
+    for key in source:
+        target[key] = float(target.get(key, 0.0)) + float(source[key])
+
+func _format_modifiers(modifiers: Dictionary) -> String:
+    var labels := {"trap_damage_multiplier": "dégâts des pièges", "defender_damage_multiplier": "dégâts des défenseurs", "monster_damage_multiplier": "dégâts des monstres", "monster_health_multiplier": "santé des monstres", "adventurer_health_multiplier": "santé des aventuriers", "adventurer_speed_multiplier": "vitesse des aventuriers", "starting_gold_adjustment": "or initial"}
+    var parts: Array[String] = []
+    for key in modifiers:
+        var value := float(modifiers[key])
+        var shown := "%+d" % roundi(value) if key == "starting_gold_adjustment" else "%+d%%" % roundi(value * 100.0)
+        parts.append("%s %s" % [shown, String(labels.get(key, key))])
+    return ", ".join(parts)

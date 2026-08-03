@@ -2,6 +2,7 @@ extends SceneTree
 
 func _init() -> void:
     var market := VillageBlackMarket.new()
+    assert(market.catalog_is_fully_wired())
     var first_stock := market.refresh(42, 3)
     assert(first_stock.size() == 3)
     var first_offer: Dictionary = first_stock[0]
@@ -33,6 +34,7 @@ func _init() -> void:
     assert(is_equal_approx(float(modifiers.defender_damage_multiplier), 0.30))
     assert(is_equal_approx(float(modifiers.adventurer_health_multiplier), 0.12))
     assert(int(modifiers.starting_gold_adjustment) == -10)
+    assert(linked_market.active_effect_summaries().size() == 5)
 
     print("village black market test passed")
     quit()

@@ -27,6 +27,11 @@ func _init() -> void:
     assert(restored.state_of("monster_slime") == EncyclopediaCatalog.DiscoveryState.DISCOVERED)
     assert(int(restored.stats["monster_slime"].uses) == 2)
     assert(catalog.list_by_kind("monster").size() == 4)
+    assert(catalog.list_by_kind("room").size() >= 9)
+    assert(catalog.list_by_kind("adventurer").size() >= 7)
+    assert(restored.pending_notifications == ["monster_slime"])
+    assert(restored.consume_notifications() == ["monster_slime"])
+    assert(restored.pending_notifications.is_empty())
 
     print("encyclopedia test passed")
     quit()

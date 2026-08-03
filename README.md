@@ -8,7 +8,7 @@ La direction produit se trouve dans [docs/VISION.md](docs/VISION.md). Les docume
 
 ## Version actuelle
 
-La branche de développement prépare `v0.6.0-alpha` :
+La branche de développement prépare `v0.7.0-alpha` :
 
 - campagne de cinq vagues et labyrinthe procédural ;
 - construction de murs, pièges, portes et défenseurs ;
@@ -19,6 +19,9 @@ La branche de développement prépare `v0.6.0-alpha` :
 - village cartographié avec tanière, forge, laboratoire, cimetière et marché noir cliquables ;
 - premières silhouettes pixel art pour monstres et aventuriers ;
 - migration automatique des anciennes sauvegardes.
+- combos entre pièges, monstres et terrain, défenses améliorables et pouvoirs tactiques ;
+- tunnels bidirectionnels, escouades d'aventuriers, règles locales de salles et objectifs secondaires ;
+- carte tactique de circulation et tutoriel contextuel sauvegardé.
 
 ## Prérequis
 
@@ -51,6 +54,8 @@ La scène principale est `res://scenes/main.tscn`.
 - `Espace` ou `Entrée` : lancer la vague ou activer l’action principale ;
 - entre deux vagues : choisir une amélioration de run parmi trois propositions ;
 - boutons du résultat : retourner au village ou commencer une nouvelle run.
+- `Q`, `E`, `F` : pouvoirs tactiques ;
+- `H` : afficher ou masquer la carte tactique de la vague précédente.
 
 ## Tests locaux
 
@@ -58,6 +63,7 @@ La scène principale est `res://scenes/main.tscn`.
 C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe --headless --path . --import
 C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe --headless --path . --script tests/smoke_test.gd
 C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe --headless --path . --script tests/v06_full_run_integration_test.gd
+C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe --headless --path . --script tests/v07_feature_runtime_test.gd
 ```
 
 GitHub Actions importe le projet, exécute les tests headless et vérifie les exports de distribution. Une PR ne doit pas être fusionnée si Godot CI échoue.
