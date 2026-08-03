@@ -146,6 +146,7 @@ func _init() -> void:
         game.v06_integration.synergies.catalog.get_entry("mimic_treasure"),
     ]
     game.v06_integration.synergies.active = runtime_synergies
+    assert(game.active_biome.set_active(BiomeCatalog.CRYPT))
     assert(is_equal_approx(game._monster_speed_multiplier(), 0.8 * 1.1))
     assert(is_equal_approx(game._monster_evasion(&"ghost"), 0.2))
     assert(is_equal_approx(game._monster_ambush_multiplier(&"mimic", true), 1.35))

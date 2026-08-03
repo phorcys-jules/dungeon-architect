@@ -7,6 +7,9 @@
 - [x] Environnement, plans et graines testés.
 - [x] Quêtes, accessibilité et défi quotidien sauvegardés.
 - [x] 100 campagnes déterministes restent solvables.
+- [x] Prisonniers, sabotages et patrouilles persistants.
+- [x] Replay compact et ambiance réactive testés sans périphérique audio.
+- [x] 100 défis personnalisés exportés et réimportés avec checksum.
 - [ ] GitHub Actions vertes sur la PR.
 - [ ] Revue et fusion dans `main`.
 - [ ] Créer le tag et la release GitHub `v0.8.0-alpha`.

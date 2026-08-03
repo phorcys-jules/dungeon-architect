@@ -67,6 +67,8 @@ var environment_tick_left := 0.0
 var active_boss := false
 var blueprint_placement_mode := false
 var blueprint_button: Button
+var patrols_visible := false
+var audio_update_left := 0.0
 
 func _ready() -> void:
     village_den = village_den_store.load_den()
@@ -217,6 +219,10 @@ func _prepare_current_wave() -> void:
     tactical_heatmap.finish_wave()
     _configure_room_rules()
     _configure_v08_environment()
+    _configure_v08_patrols()
+    _prepare_v08_sabotage()
+    var faction_id := StringName(v06_integration.v08.active_node.get("faction", "sun_order"))
+    v06_integration.v08.audio.configure(active_biome.active_biome_id, faction_id, {"music": v06_integration.v08.accessibility.audio.music, "muted": false, "reduced_sensory": v06_integration.v08.accessibility.reduced_motion})
     active_boss = int(v06_integration.v08.active_node.get("type", -1)) == RogueliteWorldMap.NodeType.BOSS and waves.current_wave == WaveManager.MAX_WAVES
     if active_boss:
         var boss_id := v06_integration.v08.boss_service.catalog.select_for_seed(v06_integration.v08.world_map.seed)
@@ -260,8 +266,8 @@ func _finish_campaign(victory: bool, message: String) -> void:
     relics_protected_this_run = collectible_route.get_remaining_count()
     super._finish_campaign(victory, message)
     var completed_waves := waves.current_wave if victory else maxi(waves.current_wave - 1, 0)
-    var reward := {"claimed": false, "total": 0, "currency_id": VillageCurrency.ID, "currency_name": VillageCurrency.DISPLAY_NAME} if v06_integration.v08.daily_active else run_end.finish(completed_waves, captures_this_run, relics_protected_this_run, victory)
-    result_summary.text += "\n\nDéfi quotidien : aucune récompense permanente." if v06_integration.v08.daily_active else "\n\n" + run_end.reward_service.calculator.summary(reward)
+    var reward := {"claimed": false, "total": 0, "currency_id": VillageCurrency.ID, "currency_name": VillageCurrency.DISPLAY_NAME} if v06_integration.v08.is_non_persistent_mode() else run_end.finish(completed_waves, captures_this_run, relics_protected_this_run, victory)
+    result_summary.text += "\n\nMode défi : aucune récompense permanente." if v06_integration.v08.is_non_persistent_mode() else "\n\n" + run_end.reward_service.calculator.summary(reward)
     var meta := v06_integration.finish_run({
         "victory": victory,
         "wave": waves.current_wave,
@@ -429,6 +435,7 @@ func _process(delta: float) -> void:
     super._process(delta)
     tactical_powers.tick(delta)
     environment_tick_left = maxf(environment_tick_left - delta, 0.0)
+    audio_update_left = maxf(audio_update_left - delta, 0.0)
     if emergency_lock_time > 0.0:
         emergency_lock_time = maxf(emergency_lock_time - delta, 0.0)
         if emergency_lock_time <= 0.0:
@@ -445,6 +452,12 @@ func _process(delta: float) -> void:
     var cell := _cell_from_world(adventurer_position)
     tactical_heatmap.record(&"traffic", cell)
     adventurer_squad.tick(delta)
+    if audio_update_left <= 0.0:
+        audio_update_left = 0.25
+        var distance := float(cell.distance_to(TREASURE))
+        var danger := 1.0 - clampf(distance / float(GRID_SIZE.x + GRID_SIZE.y), 0.0, 1.0)
+        var boss_ratio := v06_integration.v08.boss_service.encounter.current_health / maxf(float(v06_integration.v08.boss_service.encounter.definition.get("max_health", 1)), 1.0) if active_boss else -1.0
+        v06_integration.v08.audio.update(danger, boss_ratio)
     if environment_tick_left <= 0.0:
         environment_tick_left = 0.5
         var doors: Array[Vector2i] = [DOOR] if door_closed else []
@@ -489,12 +502,21 @@ func _apply_combo_state(state_id: String) -> Dictionary:
     return combo
 
 func _unhandled_input(event: InputEvent) -> void:
-    if event.is_action_pressed(&"capture_blueprint"):
+    if InputMap.has_action(&"capture_blueprint") and event.is_action_pressed(&"capture_blueprint"):
         _capture_run_blueprint()
         return
-    if event.is_action_pressed(&"place_blueprint"):
+    if InputMap.has_action(&"place_blueprint") and event.is_action_pressed(&"place_blueprint"):
         blueprint_placement_mode = true
         status_label.text = "Cliquez sur la case d'ancrage du plan."
+        return
+    if InputMap.has_action(&"toggle_patrols") and event.is_action_pressed(&"toggle_patrols"):
+        patrols_visible = not patrols_visible
+        status_label.text = "Zones de patrouille %s." % ("affichées" if patrols_visible else "masquées")
+        queue_redraw()
+        return
+    if InputMap.has_action(&"replay_next") and event.is_action_pressed(&"replay_next"):
+        var replay_event := v06_integration.v08.replay.next()
+        status_label.text = "REPLAY — %s · %s" % [String(replay_event.get("type", "fin")), String(replay_event.get("actor", ""))]
         return
     if event is InputEventKey and event.pressed and not event.echo:
         match event.keycode:
@@ -514,6 +536,84 @@ func _unhandled_input(event: InputEvent) -> void:
         _place_run_blueprint(_cell_from_world(event.position))
         return
     super._unhandled_input(event)
+
+func _start_invasion() -> void:
+    if game_state != GameState.PREPARATION:
+        return
+    var sabotage := v06_integration.v08.sabotage.resolve(_active_sabotage_counters(), _route_is_valid())
+    if bool(sabotage.get("ok", false)):
+        _apply_v08_sabotage(sabotage)
+        var target: Dictionary = sabotage.get("target", {})
+        v06_integration.v08.replay.record(run_stats.elapsed_time, &"sabotage", String(sabotage.get("action", "")), Vector2i(target.get("cell", Vector2i.ZERO)), sabotage)
+    super._start_invasion()
+
+func _route_is_valid() -> bool:
+    return not astar.get_id_path(ENTRANCE, TREASURE).is_empty()
+
+func _active_sabotage_counters() -> Array[StringName]:
+    var counters: Array[StringName] = []
+    for rule in room_rules.room_rules.values():
+        counters.append(StringName(rule))
+    if not defenders.is_empty():
+        counters.append(&"guardian")
+    var build_runtime: Variant = get("dungeon_build") if has_method("_try_place_free_wall") else null
+    if build_runtime != null and not build_runtime.secret_passages.passages.is_empty():
+        counters.append(&"portal")
+    return counters
+
+func _apply_v08_sabotage(result: Dictionary) -> void:
+    if bool(result.get("blocked", false)):
+        status_label.text = "Sabotage contré."
+        return
+    var target: Dictionary = result.get("target", {})
+    var cell := Vector2i(target.get("cell", Vector2i.ZERO))
+    match String(result.get("effect", "")):
+        "disable_trap":
+            if traps.has(cell):
+                (traps[cell] as SpikeTrap).cooldown_left = 8.0
+        "breach_wall":
+            if walls.has(cell) and cell != DOOR:
+                walls.erase(cell)
+                astar.set_point_solid(cell, false)
+        "lock_door": door_closed = true
+        "reverse_portal": status_label.text = "Un portail a été inversé par les saboteurs."
+        "disable_room_rule": room_rules.room_rules.erase(cell)
+    _recalculate_path()
+
+func _prepare_v08_sabotage() -> void:
+    var targets: Array[Dictionary] = []
+    for cell in traps:
+        targets.append({"id": "trap:%s" % cell, "kind": "trap", "cell": cell, "valid": true})
+    for cell in walls:
+        if cell != DOOR:
+            targets.append({"id": "wall:%s" % cell, "kind": "wall", "cell": cell, "valid": true})
+    if targets.is_empty():
+        targets.append({"id": "door", "kind": "door", "cell": DOOR, "valid": true})
+    var laboratory_level := int(village_progression.state.buildings.get("laboratory", 0))
+    var result := v06_integration.v08.prepare_sabotage(targets, laboratory_level)
+    if bool(result.get("ok", false)):
+        var preview: Dictionary = result.preview
+        status_label.tooltip_text = "SABOTAGE PROBABLE\nAction : %s\nContre : %s\nCertitude : %d%%" % [String(preview.action), String(preview.counter), roundi(float(preview.certainty) * 100.0)]
+
+func _configure_v08_patrols() -> void:
+    var reachable: Array[Vector2i] = []
+    for x in GRID_SIZE.x:
+        for y in GRID_SIZE.y:
+            var cell := Vector2i(x, y)
+            if not walls.has(cell):
+                reachable.append(cell)
+    var definitions := [{"id": "treasure_guard", "type": &"guard", "cells": [TREASURE + Vector2i.LEFT, TREASURE + Vector2i.UP]}, {"id": "central_patrol", "type": &"patrol", "cells": [Vector2i(6, 5), Vector2i(7, 5), Vector2i(8, 5)]}, {"id": "portal_ambush", "type": &"ambush", "cells": [Vector2i(3, 3), Vector2i(11, 7)]}, {"id": "fallback", "type": &"retreat", "cells": [Vector2i(1, 1), Vector2i(1, 8)]}]
+    for definition in definitions:
+        var valid_cells: Array[Vector2i] = []
+        for cell in definition.cells:
+            if reachable.has(cell):
+                valid_cells.append(cell)
+        if not valid_cells.is_empty():
+            v06_integration.v08.patrols.define(definition.id, definition.type, valid_cells, reachable)
+    var zone_ids := ["treasure_guard", "central_patrol", "portal_ambush", "fallback"]
+    var monster_ids := get_monster_ids()
+    for index in monster_ids.size():
+        v06_integration.v08.patrols.assign(monster_ids[index], zone_ids[index % zone_ids.size()])
 
 func _capture_run_blueprint() -> void:
     if game_state != GameState.PREPARATION:
@@ -699,14 +799,18 @@ func _configure_room_rules() -> void:
 
 func _draw() -> void:
     super._draw()
-    if not heatmap_visible:
-        return
-    for x in GRID_SIZE.x:
-        for y in GRID_SIZE.y:
-            var cell := Vector2i(x, y)
-            var value := tactical_heatmap.intensity(&"traffic", cell)
-            if value > 0.0:
-                draw_rect(Rect2(GRID_ORIGIN + Vector2(cell) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE)), Color(0.2 + value * 0.7, 0.25, 0.85 - value * 0.5, 0.18 + value * 0.3), true)
+    if heatmap_visible:
+        for x in GRID_SIZE.x:
+            for y in GRID_SIZE.y:
+                var cell := Vector2i(x, y)
+                var value := tactical_heatmap.intensity(&"traffic", cell)
+                if value > 0.0:
+                    draw_rect(Rect2(GRID_ORIGIN + Vector2(cell) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE)), Color(0.2 + value * 0.7, 0.25, 0.85 - value * 0.5, 0.18 + value * 0.3), true)
+    if patrols_visible:
+        var colors := {&"guard": Color("4cc9f0", 0.22), &"patrol": Color("80ed99", 0.22), &"ambush": Color("f72585", 0.22), &"retreat": Color("ffd166", 0.22)}
+        for zone in v06_integration.v08.patrols.zones.values():
+            for cell in zone.cells:
+                draw_rect(Rect2(GRID_ORIGIN + Vector2(cell) * CELL_SIZE, Vector2(CELL_SIZE, CELL_SIZE)), colors.get(StringName(zone.type), Color.WHITE), true)
 
 func _wave_reward_multiplier() -> float:
     return 1.0 + float(run_choice_modifiers.get("permanent_reward_multiplier", 0.0))

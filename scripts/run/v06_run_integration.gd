@@ -22,6 +22,8 @@ func begin_run(seed_value: int, tags: Array[String]) -> void:
     run_tags = tags.duplicate()
     _restore(store.load_state())
     v08.ensure_started(seed_value)
+    v08.replay.begin(seed_value, GameVersion.VALUE)
+    v08.replay.record(0.0, &"run_start", "dungeon_master", Vector2i.ZERO, {"tags": tags.duplicate()})
     if v08.active_node.is_empty() and not v08.available_routes().is_empty():
         v08.choose_route(String(v08.available_routes()[0].id))
     for campaign_tag in v08.run_tags():
@@ -46,6 +48,7 @@ func begin_run(seed_value: int, tags: Array[String]) -> void:
 func start_wave(wave: int, biome_id: String) -> Dictionary:
     events.tick_stage()
     var event := events.roll(run_seed, wave, biome_id)
+    v08.replay.record(float(wave), &"wave_start", "campaign", Vector2i.ZERO, {"wave": wave, "biome": biome_id, "event": event.get("id", "")})
     return events.announcement(event)
 
 func record_trap_placed() -> void:
@@ -56,6 +59,7 @@ func record_wall_placed() -> void:
 
 func record_capture() -> void:
     challenges.increment("captures")
+    v08.replay.record(float(challenges.metrics.get("captures", 0)), &"capture", "monsters", Vector2i.ZERO)
 
 func adventurer_health_multiplier() -> float:
     return float(events.combined_effects().get("adventurer_health_multiplier", 1.0))
@@ -125,7 +129,7 @@ func finish_run(result: Dictionary) -> Dictionary:
     var completed_ids: Array[String] = []
     for challenge_id in challenges.completed:
         completed_ids.append(challenge_id)
-        if not v08.daily_active:
+        if not v08.is_non_persistent_mode():
             var reward := challenges.claim(challenge_id)
             if bool(reward.get("ok", false)):
                 challenge_rewards.gold += int(reward.gold)
@@ -149,9 +153,10 @@ func finish_run(result: Dictionary) -> Dictionary:
         "captures": int(enriched.get("captures", 0)),
         "score": int(enriched.get("score", 0)),
     }
-    if not v08.daily_active:
+    if not v08.is_non_persistent_mode():
         global_stats.record_run(enriched)
     var campaign_result := v08.finish_node(enriched)
+    v08.replay.record(float(enriched.get("duration_seconds", 0)), &"run_end", "campaign", Vector2i.ZERO, {"victory": enriched.get("victory", false), "score": enriched.get("score", 0)})
     for tag in run_tags:
         var entry_id := _encyclopedia_id_for_tag(tag)
         if not entry_id.is_empty():
@@ -165,7 +170,7 @@ func finish_run(result: Dictionary) -> Dictionary:
     for room_id in enriched.get("room_ids", []):
         encyclopedia.record_use("room_%s" % String(room_id), bool(enriched.get("victory", false)))
     encyclopedia.record_use("biome_%s" % String(enriched.get("biome", "crypt")), bool(enriched.get("victory", false)))
-    if not v08.daily_active:
+    if not v08.is_non_persistent_mode():
         achievements.add_progress("captures", int(enriched.get("captures", 0)))
         if bool(enriched.get("victory", false)) and int(enriched.get("resources_lost", 0)) == 0:
             achievements.add_progress("perfect_runs")

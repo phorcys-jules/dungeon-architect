@@ -20,7 +20,7 @@ const BUILDING_TEXTURES := {
 }
 
 const BUILDING_LAYOUT := {
-    "den": {"label": "TANIÈRE", "subtitle": "Repaire des monstres", "position": Vector2(65, 125), "color": Color("6b4a8f")},
+    "den": {"label": "TANIÈRE", "subtitle": "Repaire des monstres", "position": Vector2(65, 180), "color": Color("6b4a8f")},
     "forge": {"label": "FORGE", "subtitle": "Pièges renforcés", "position": Vector2(370, 72), "color": Color("a95832")},
     "laboratory": {"label": "LABORATOIRE", "subtitle": "Effets prolongés", "position": Vector2(470, 235), "color": Color("467b82")},
     "graveyard": {"label": "CIMETIÈRE", "subtitle": "Retour des monstres", "position": Vector2(65, 390), "color": Color("58606f")},
@@ -754,7 +754,7 @@ func _build_campaign_controls() -> void:
     var panel := PanelContainer.new()
     panel.name = "CampaignV08Panel"
     panel.position = Vector2(12, 12)
-    panel.size = Vector2(330, 138)
+    panel.size = Vector2(330, 170)
     add_child(panel)
     var column := VBoxContainer.new()
     panel.add_child(column)
@@ -774,6 +774,19 @@ func _build_campaign_controls() -> void:
     daily_button.text = "Défi quotidien (sans récompense permanente)"
     daily_button.pressed.connect(_start_daily_challenge)
     column.add_child(daily_button)
+    var extension_row := HBoxContainer.new()
+    column.add_child(extension_row)
+    for decision in ["interrogate", "ransom", "release"]:
+        var prisoner_button := Button.new()
+        prisoner_button.text = {"interrogate": "Interroger", "ransom": "Rançon", "release": "Libérer"}[decision]
+        prisoner_button.add_theme_font_size_override("font_size", 9)
+        prisoner_button.pressed.connect(_decide_first_prisoner.bind(decision))
+        extension_row.add_child(prisoner_button)
+    var custom_button := Button.new()
+    custom_button.text = "Défi perso"
+    custom_button.add_theme_font_size_override("font_size", 9)
+    custom_button.pressed.connect(_start_custom_challenge)
+    extension_row.add_child(custom_button)
     _refresh_campaign_routes()
 
 func _refresh_campaign_routes() -> void:
@@ -793,6 +806,7 @@ func _refresh_campaign_routes() -> void:
         if not quest.is_empty():
             quest_lines.append("%s : %s %d/%d" % [String(resident).replace("_", " ").capitalize(), String(quest.id).replace("_", " "), int(quest.current), int(quest.target)])
     campaign_status.tooltip_text = "QUÊTES DU VILLAGE\n%s" % "\n".join(quest_lines)
+    campaign_status.tooltip_text += "\n\nPrisonniers : %d/%d" % [v08_campaign.prisoners.prisoners.size(), v08_campaign.prisoners.capacity]
 
 func _choose_campaign_route() -> void:
     if campaign_route_selector.item_count == 0:
@@ -813,6 +827,35 @@ func _start_daily_challenge() -> void:
     _persist_village_state()
     _refresh_campaign_routes()
     status_label.text = "Défi du %s : %s. Les récompenses permanentes sont désactivées." % [date, String(challenge.modifier).replace("_", " ")]
+
+func _decide_first_prisoner(decision: String) -> void:
+    var available := v08_campaign.prisoners.prisoners.keys().filter(func(id): return not bool(v08_campaign.prisoners.prisoners[id].resolved))
+    if available.is_empty():
+        status_label.text = "Aucun prisonnier en attente."
+        return
+    var laboratory_level := int(progression_service.state.buildings.get("laboratory", 0))
+    var result := v08_campaign.prisoners.decide(String(available[0]), StringName(decision), laboratory_level)
+    if not bool(result.get("ok", false)):
+        status_label.text = "Cette décision n'est pas disponible."
+        return
+    _persist_village_state()
+    _refresh_campaign_routes()
+    status_label.text = "Prisonnier : %s — %s" % [decision.replace("_", " "), JSON.stringify(result)]
+
+func _start_custom_challenge() -> void:
+    var seed_value: int = absi(int(Time.get_unix_time_from_system()))
+    var mutators: Array[StringName] = [&"scarce_currency", &"volatile_environment", &"fast_adventurers"]
+    var restrictions: Dictionary = {"required": room_deck_selection.selected.duplicate(), "forbidden": []}
+    var result: Dictionary = v08_campaign.custom_challenge.configure(seed_value, room_deck_selection.biome_id, &"free_blades", "royal_huntress", mutators, restrictions)
+    if not bool(result.get("ok", false)):
+        status_label.text = "Défi personnalisé invalide : %s" % String(result.reason)
+        return
+    v08_campaign.start(seed_value)
+    v08_campaign.custom_challenge.configure(seed_value, room_deck_selection.biome_id, &"free_blades", "royal_huntress", mutators, restrictions)
+    DisplayServer.clipboard_set(v08_campaign.custom_challenge.export_code())
+    _persist_village_state()
+    _refresh_campaign_routes()
+    status_label.text = "Défi personnalisé créé (score x%.2f). Code copié." % float(v08_campaign.custom_challenge.configuration.score_multiplier)
 
 func _building_data(building_id: String) -> VillageBuildingData:
     for building: VillageBuildingData in progression_service.catalog.buildings():
