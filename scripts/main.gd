@@ -378,7 +378,7 @@ func _prepare_current_wave() -> void:
     adventurer_attack_flash = 0.0
     active_trap_slows.clear()
     trap_slow_multiplier = 1.0
-    status_label.text = "Préparez les défenses pour %s." % waves.get_label()
+    status_label.text = tr("Préparez les défenses pour %s.") % waves.get_label()
     _refresh_all_ui()
     queue_redraw()
 
@@ -414,7 +414,7 @@ func _place_spike_trap(cell: Vector2i) -> void:
     var definition := _selected_trap_definition()
     var cost := int(definition.cost)
     if not economy.spend(cost):
-        status_label.text = "Or insuffisant pour ce piège."
+        status_label.text = tr("Or insuffisant pour ce piège.")
         return
     var trap: SpikeTrap = SpikeTrapScript.new()
     trap.setup(cell)
@@ -426,7 +426,7 @@ func _place_spike_trap(cell: Vector2i) -> void:
     traps[cell] = trap
     _on_defense_placed(cell, "trap", cost, trap)
     _on_trap_placed()
-    status_label.text = "%s placé pour %d or." % [trap.display_name, cost]
+    status_label.text = tr("%s placé pour %d or.") % [trap.display_name, cost]
     _refresh_build_ui()
     queue_redraw()
 
@@ -447,7 +447,7 @@ func _place_defender(cell: Vector2i) -> void:
     add_child(defender)
     defenders[cell] = defender
     _on_defense_placed(cell, "defender", DEFENDER_COST, defender)
-    status_label.text = "Défenseur placé pour %d or." % DEFENDER_COST
+    status_label.text = tr("Défenseur placé pour %d or.") % DEFENDER_COST
     _refresh_build_ui()
     queue_redraw()
 
@@ -492,12 +492,12 @@ func _toggle_door() -> void:
 
 func _on_gold_changed(current_gold: int) -> void:
     if gold_label:
-        gold_label.text = "Or : %d" % current_gold
+        gold_label.text = tr("Or : %d") % current_gold
     _refresh_build_ui()
 
 func _on_adventurer_health_changed(current_health: int, max_health: int) -> void:
     if health_label:
-        health_label.text = "Aventurier : %d / %d PV" % [current_health, max_health]
+        health_label.text = tr("Aventurier : %d / %d PV") % [current_health, max_health]
     queue_redraw()
 
 func _on_adventurer_died() -> void:
@@ -509,7 +509,7 @@ func _on_adventurer_died() -> void:
         var completed_wave := waves.current_wave
         waves.advance()
         game_state = GameState.WAVE_RESULT
-        result_title.text = "VAGUE %d RÉUSSIE" % completed_wave
+        result_title.text = tr("VAGUE %d RÉUSSIE") % completed_wave
         result_title.modulate = Color("63d471")
         result_summary.text = run_stats.summary() + "\nRécompense : +%d or\nProchaine : %s" % [reward, waves.get_label()]
         result_panel.visible = true
@@ -525,9 +525,9 @@ func _finish_campaign(victory: bool, message: String) -> void:
     path.clear()
     run_stats.finish("VICTOIRE" if victory else "DÉFAITE")
     status_label.text = message
-    result_title.text = "CAMPAGNE GAGNÉE" if victory else "CAMPAGNE PERDUE"
+    result_title.text = tr("CAMPAGNE GAGNÉE") if victory else tr("CAMPAGNE PERDUE")
     result_title.modulate = Color("63d471") if victory else Color("ed6a5a")
-    result_summary.text = run_stats.summary() + "\nVague atteinte : %d / %d\nOr restant : %d" % [waves.current_wave, WaveManager.MAX_WAVES, economy.current_gold]
+    result_summary.text = run_stats.summary() + "\n" + tr("Vague atteinte : %d / %d\nOr restant : %d") % [waves.current_wave, WaveManager.MAX_WAVES, economy.current_gold]
     result_panel.visible = true
     _refresh_all_ui()
     queue_redraw()
@@ -560,21 +560,21 @@ func _refresh_phase_ui() -> void:
         return
     match game_state:
         GameState.PREPARATION:
-            phase_label.text = "Phase : PRÉPARATION"
-            countdown_label.text = "Départ dans %d s" % ceili(preparation_time_left)
-            start_button.text = "Lancer la vague"
+            phase_label.text = tr("Phase : PRÉPARATION")
+            countdown_label.text = tr("Départ dans %d s") % ceili(preparation_time_left)
+            start_button.text = tr("Lancer la vague")
         GameState.INVASION:
-            phase_label.text = "Phase : INVASION"
+            phase_label.text = tr("Phase : INVASION")
             countdown_label.text = ""
-            start_button.text = "Abandonner"
+            start_button.text = tr("Abandonner")
         GameState.WAVE_RESULT:
-            phase_label.text = "Phase : RÉCOMPENSE"
+            phase_label.text = tr("Phase : RÉCOMPENSE")
             countdown_label.text = ""
-            start_button.text = "Préparer la suite"
+            start_button.text = tr("Préparer la suite")
         GameState.CAMPAIGN_FINISHED:
-            phase_label.text = "Phase : TERMINÉE"
+            phase_label.text = tr("Phase : TERMINÉE")
             countdown_label.text = ""
-            start_button.text = "Nouvelle campagne"
+            start_button.text = tr("Nouvelle campagne")
     trap_button.disabled = game_state != GameState.PREPARATION
     defender_button.disabled = game_state != GameState.PREPARATION or not economy.can_afford(DEFENDER_COST)
     door_button.disabled = game_state != GameState.PREPARATION
@@ -587,7 +587,7 @@ func _refresh_build_ui() -> void:
     var mode_name := String(trap_definition.name) if build_mode == BuildMode.SPIKE_TRAP else "Défenseur"
     build_label.text = "Mode : %s (%d or) | Pièges : %d | Défenseurs : %d" % [mode_name, cost, traps.size(), defenders.size()]
     trap_button.text = "%s (%d)" % [String(trap_definition.name), int(trap_definition.cost)]
-    defender_button.text = "Défenseur (%d or)" % DEFENDER_COST
+    defender_button.text = tr("Défenseur (%d or)") % DEFENDER_COST
     _refresh_shortcut_bar()
 
 func _refresh_door_ui() -> void:

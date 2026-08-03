@@ -46,4 +46,5 @@ La v0.8 transforme les runs en campagne tactique persistante. Les choix du villa
 - Les risques d'évasion deviennent des missions de sauvetage annoncées.
 - Le débrief relie ses conseils aux événements enregistrés dans le replay.
 - Les textes structurants disposent de catalogues français et anglais.
+- La langue change immédiatement depuis le village ; les libellés statiques utilisent la traduction native Godot et les textes dynamiques conservent leurs paramètres.
 - Les profils Découverte, Architecte et Impitoyable annoncent toutes leurs règles.

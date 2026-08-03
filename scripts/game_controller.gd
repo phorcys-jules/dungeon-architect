@@ -311,7 +311,7 @@ func _finish_campaign(victory: bool, message: String) -> void:
         result_summary.text += "\nRoutes de campagne disponibles : %d" % Array(campaign_meta.routes).size()
     var debrief: Dictionary = meta.get("debrief", {})
     for finding in debrief.get("findings", []):
-        result_summary.text += "\nConseil : %s" % v06_integration.v08.localization.text(String(finding.text_key))
+        result_summary.text += "\n" + tr("Conseil : %s") % v06_integration.v08.localization.text(String(finding.text_key))
     var experience_gain := maxi(completed_waves * 6 + captures_this_run * 12, 6)
     for archetype in active_monster_archetypes:
         monster_progression.grant_experience(archetype.archetype_id, experience_gain)
@@ -726,7 +726,7 @@ func _build_tactical_power_ui() -> void:
 func _refresh_tactical_power_ui() -> void:
     if tactical_energy_label == null:
         return
-    tactical_energy_label.text = "PUISSANCE %.0f/%d" % [tactical_powers.energy, int(TacticalPowerRuntimeScript.MAX_ENERGY)]
+    tactical_energy_label.text = tr("PUISSANCE %.0f/%d") % [tactical_powers.energy, int(TacticalPowerRuntimeScript.MAX_ENERGY)]
     tactical_energy_label.visible = game_state == GameState.INVASION
     for power_id in tactical_power_buttons:
         var button := tactical_power_buttons[power_id] as Button
@@ -933,7 +933,7 @@ func _refresh_v06_hud() -> void:
     if not objectives_label or not modifiers_label:
         return
     var snapshot := v06_integration.hud_snapshot()
-    objectives_label.text = "OBJECTIFS\n%s" % ("\n".join(snapshot.challenges) if not snapshot.challenges.is_empty() else "Aucun")
+    objectives_label.text = tr("OBJECTIFS\n%s") % ("\n".join(snapshot.challenges) if not snapshot.challenges.is_empty() else tr("Aucun"))
     _refresh_effect_rows(_village_effect_entries() + _choice_effect_entries() + snapshot.effect_entries)
     _refresh_event_history(snapshot.event_history)
 
@@ -947,7 +947,7 @@ func _announce_event(announcement: Dictionary) -> void:
     tween.tween_callback(func(): event_banner.visible = false)
 
 func _refresh_event_history(history: Array) -> void:
-    history_button.text = "HISTORIQUE (%d)" % history.size()
+    history_button.text = tr("HISTORIQUE (%d)") % history.size()
     var lines: Array[String] = []
     for event_id in history:
         var definition := v06_integration.events.catalog.get_event(String(event_id))
