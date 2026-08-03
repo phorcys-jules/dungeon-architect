@@ -135,10 +135,19 @@ func _unhandled_input(event: InputEvent) -> void:
                 _on_primary_button_pressed()
             KEY_D:
                 _toggle_door()
+            KEY_U:
+                _upgrade_inspected_defense("power")
+            KEY_I:
+                _upgrade_inspected_defense("tempo")
+            KEY_X:
+                _recycle_inspected_defense()
         return
     if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
         return
     var cell := _cell_from_world(event.position)
+    if traps.has(cell) or defenders.has(cell) or walls.has(cell):
+        _inspect_defense(cell)
+        return
     if cell == DOOR:
         _toggle_door()
     elif game_state == GameState.PREPARATION:
@@ -415,6 +424,7 @@ func _place_spike_trap(cell: Vector2i) -> void:
     trap.status_applied.connect(_on_trap_status_applied)
     add_child(trap)
     traps[cell] = trap
+    _on_defense_placed(cell, "trap", cost, trap)
     _on_trap_placed()
     status_label.text = "%s placé pour %d or." % [trap.display_name, cost]
     _refresh_build_ui()
@@ -436,12 +446,28 @@ func _place_defender(cell: Vector2i) -> void:
     defender.attacked.connect(func(damage: int): _on_defender_attacked(cell, damage))
     add_child(defender)
     defenders[cell] = defender
+    _on_defense_placed(cell, "defender", DEFENDER_COST, defender)
     status_label.text = "Défenseur placé pour %d or." % DEFENDER_COST
     _refresh_build_ui()
     queue_redraw()
 
 func _is_valid_build_cell(cell: Vector2i) -> bool:
     return _is_inside_grid(cell) and cell != ENTRANCE and cell != TREASURE and cell != DOOR and not walls.has(cell) and not traps.has(cell) and not defenders.has(cell)
+
+func _on_defense_placed(_cell: Vector2i, _kind: String, _cost: int, _object: Node) -> void:
+    pass
+
+func _inspect_defense(_cell: Vector2i) -> void:
+    pass
+
+func _upgrade_inspected_defense(_branch: String) -> void:
+    pass
+
+func _recycle_inspected_defense() -> void:
+    pass
+
+func _remove_evolved_wall(_cell: Vector2i) -> bool:
+    return false
 
 func _trigger_trap_at(cell: Vector2i) -> void:
     if traps.has(cell):

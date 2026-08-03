@@ -32,6 +32,20 @@ func _init() -> void:
     trap_key.pressed = true
     game._unhandled_input(trap_key)
     assert(game.selected_trap_id == &"fire_rune")
+    var inspection_cell := Vector2i(1, 1)
+    while not game._is_valid_build_cell(inspection_cell):
+        inspection_cell.x += 1
+    game._place_spike_trap(inspection_cell)
+    assert(game.traps.has(inspection_cell))
+    game._inspect_defense(inspection_cell)
+    assert(game.defense_inspector.visible)
+    var original_damage := int((game.traps[inspection_cell] as SpikeTrap).damage)
+    game._upgrade_inspected_defense("power")
+    assert(int((game.traps[inspection_cell] as SpikeTrap).damage) > original_damage)
+    var gold_before_recycle: int = game.economy.current_gold
+    game._recycle_inspected_defense()
+    assert(not game.traps.has(inspection_cell))
+    assert(game.economy.current_gold > gold_before_recycle)
     var combat_target: MobileMonster = game.mobile_monsters[0]
     combat_target.world_position = Vector2(game.ENTRANCE) * game.CELL_SIZE
     var previous_monster_health := combat_target.current_health

@@ -5,6 +5,7 @@ const RunEndControllerScript := preload("res://scripts/core/run_end_controller.g
 const AdventurerIntelligenceScript := preload("res://scripts/meta/adventurer_intelligence.gd")
 const RetroSfxPlayerScript := preload("res://scripts/presentation/retro_sfx_player.gd")
 const ComboRuntimeScript := preload("res://scripts/combat/combo_runtime.gd")
+const DefenseEvolutionScript := preload("res://scripts/core/defense_evolution.gd")
 
 var run_end: RunEndController = RunEndControllerScript.new()
 var village_button: Button
@@ -40,6 +41,10 @@ var feedback_settings := GameFeedbackSettings.new()
 var sfx_player: Node
 var combo_runtime = ComboRuntimeScript.new()
 var combo_zone_cell := Vector2i(-1, -1)
+var defense_evolution = DefenseEvolutionScript.new()
+var inspected_defense_cell := Vector2i(-1, -1)
+var defense_inspector: PanelContainer
+var defense_inspector_text: Label
 var pending_run_choice := false
 
 func _ready() -> void:
@@ -105,6 +110,7 @@ func _build_interface() -> void:
     event_banner.add_theme_color_override("font_color", Color("ffe08a"))
     event_banner.visible = false
     add_child(event_banner)
+    _build_defense_inspector()
     for index in 3:
         var choice_button := Button.new()
         choice_button.position = Vector2(32 + index * 160, 326)
@@ -485,6 +491,117 @@ func _refresh_event_history(history: Array) -> void:
 
 func _show_event_history() -> void:
     status_label.text = "HISTORIQUE DES ÉVÉNEMENTS\n%s" % history_button.tooltip_text
+
+func _build_defense_inspector() -> void:
+    defense_inspector = PanelContainer.new()
+    defense_inspector.name = "DefenseInspector"
+    defense_inspector.position = Vector2(768, 104)
+    defense_inspector.size = Vector2(160, 318)
+    defense_inspector.visible = false
+    add_child(defense_inspector)
+    var column := VBoxContainer.new()
+    column.add_theme_constant_override("separation", 6)
+    defense_inspector.add_child(column)
+    var heading := Label.new()
+    heading.text = "DÉFENSE"
+    heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    column.add_child(heading)
+    defense_inspector_text = Label.new()
+    defense_inspector_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    defense_inspector_text.custom_minimum_size = Vector2(150, 155)
+    defense_inspector_text.add_theme_font_size_override("font_size", 10)
+    column.add_child(defense_inspector_text)
+    var power := Button.new()
+    power.text = "[U] Puissance"
+    power.pressed.connect(func(): _upgrade_inspected_defense("power"))
+    column.add_child(power)
+    var tempo := Button.new()
+    tempo.text = "[I] Cadence"
+    tempo.pressed.connect(func(): _upgrade_inspected_defense("tempo"))
+    column.add_child(tempo)
+    var recycle := Button.new()
+    recycle.text = "[X] Recycler"
+    recycle.pressed.connect(_recycle_inspected_defense)
+    column.add_child(recycle)
+    var close := Button.new()
+    close.text = "Fermer"
+    close.pressed.connect(func(): defense_inspector.visible = false)
+    column.add_child(close)
+
+func _on_defense_placed(cell: Vector2i, kind: String, cost: int, object: Node) -> void:
+    var base_stats := {}
+    if kind == "trap":
+        var trap := object as SpikeTrap
+        base_stats = {"damage": trap.damage, "cooldown": trap.cooldown_duration, "range": 1.0}
+    else:
+        if kind == "defender":
+            var defender := object as Defender
+            base_stats = {"damage": defender.damage, "cooldown": defender.cooldown, "range": defender.attack_range_cells}
+        else:
+            base_stats = {"damage": 0, "cooldown": 1.0, "range": 1.0}
+    defense_evolution.register(cell, kind, cost, base_stats)
+
+func _inspect_defense(cell: Vector2i) -> void:
+    if defense_evolution.inspect(cell).is_empty():
+        return
+    inspected_defense_cell = cell
+    defense_inspector.visible = true
+    defense_inspector.move_to_front()
+    _refresh_defense_inspector()
+
+func _refresh_defense_inspector() -> void:
+    var record := defense_evolution.inspect(inspected_defense_cell)
+    if record.is_empty():
+        defense_inspector.visible = false
+        return
+    var stats := defense_evolution.evolved_stats(inspected_defense_cell)
+    var branch := "Aucune" if String(record.branch).is_empty() else String(DefenseEvolutionScript.BRANCHES[record.branch].name)
+    var next_cost := 18 + int(record.level) * 12
+    var refund := floori(float(int(record.base_cost) + int(record.spent)) * DefenseEvolutionScript.REFUND_RATE)
+    defense_inspector_text.text = "%s · case %s\nNiveau %d/%d\nBranche : %s\nDégâts : %d\nPortée : %.1f\nRecharge : %.2f s\nProchaine amélioration : %d or\nRecyclage : %d or" % [String(record.kind).capitalize(), inspected_defense_cell, int(record.level), DefenseEvolutionScript.MAX_LEVEL, branch, int(stats.damage), float(stats.range), float(stats.cooldown), next_cost, refund]
+
+func _upgrade_inspected_defense(branch: String) -> void:
+    if inspected_defense_cell == Vector2i(-1, -1):
+        return
+    var result := defense_evolution.upgrade(inspected_defense_cell, branch, economy.current_gold)
+    if not bool(result.get("ok", false)):
+        status_label.text = "Amélioration refusée : or insuffisant, branche verrouillée ou niveau maximum."
+        return
+    economy.spend(int(result.cost))
+    var stats: Dictionary = result.stats
+    if traps.has(inspected_defense_cell):
+        var trap := traps[inspected_defense_cell] as SpikeTrap
+        trap.damage = int(stats.damage)
+        trap.cooldown_duration = float(stats.cooldown)
+    elif defenders.has(inspected_defense_cell):
+        var defender := defenders[inspected_defense_cell] as Defender
+        defender.damage = int(stats.damage)
+        defender.cooldown = float(stats.cooldown)
+        defender.attack_range_cells = float(stats.range)
+    elif walls.has(inspected_defense_cell):
+        status_label.text = "Mur renforcé : remboursement amélioré au recyclage."
+    status_label.text = "Défense améliorée : branche %s." % branch
+    _refresh_defense_inspector()
+
+func _recycle_inspected_defense() -> void:
+    var result := defense_evolution.recycle(inspected_defense_cell)
+    if not bool(result.get("ok", false)):
+        return
+    if traps.has(inspected_defense_cell):
+        (traps[inspected_defense_cell] as Node).queue_free()
+        traps.erase(inspected_defense_cell)
+    elif defenders.has(inspected_defense_cell):
+        (defenders[inspected_defense_cell] as Node).queue_free()
+        defenders.erase(inspected_defense_cell)
+    elif walls.has(inspected_defense_cell):
+        if not _remove_evolved_wall(inspected_defense_cell):
+            return
+    economy.add_gold(int(result.refund))
+    status_label.text = "Défense recyclée : +%d or (50 %% de l’investissement)." % int(result.refund)
+    inspected_defense_cell = Vector2i(-1, -1)
+    defense_inspector.visible = false
+    _refresh_build_ui()
+    queue_redraw()
 
 func _refresh_effect_rows(entries: Array) -> void:
     for row in effect_rows:

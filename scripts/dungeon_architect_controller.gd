@@ -108,6 +108,7 @@ func _try_place_free_wall(cell: Vector2i) -> void:
         return
     economy.spend(-int(result.gold_delta))
     walls.append(cell)
+    _on_defense_placed(cell, "wall", DungeonBuildRuntime.WALL_COST, self)
     record_v06_wall_placed()
     astar.set_point_solid(cell, true)
     _recalculate_path()
@@ -127,6 +128,15 @@ func _try_remove_free_wall(cell: Vector2i) -> void:
     status_label.text = "Mur retiré : +%d or." % int(result.gold_delta)
     _refresh_build_ui()
     queue_redraw()
+
+func _remove_evolved_wall(cell: Vector2i) -> bool:
+    var result := dungeon_build.try_remove_wall(cell)
+    if not bool(result.ok):
+        return false
+    walls.erase(cell)
+    astar.set_point_solid(cell, false)
+    _recalculate_path()
+    return true
 
 func _synchronize_wall_pathfinding() -> void:
     for x in GRID_SIZE.x:
