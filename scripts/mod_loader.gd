@@ -1,80 +1,78 @@
 class_name ModLoader
 extends RefCounted
 
-# Minimal mod validation: mod is a Dictionary with keys: id, type (trap|monster), data
-func validate_mod_definition(defn: Dictionary) -> bool:
-	if not defn or typeof(defn) != TYPE_DICTIONARY:
-		return false
-	if not defn.has("id") or not defn.has("type") or not defn.has("data"):
-		return false
-	var t := String(defn.get("type"))
-	if t != "trap" and t != "monster":
-		return false
-	# type-specific required fields
-	var d := defn.get("data")
-	if typeof(d) != TYPE_DICTIONARY:
-		return false
-	if t == "trap":
-		if not d.has("name") or not d.has("cost") or not d.has("damage") or not d.has("cooldown"):
-			return false
-		# basic type checks
-		if typeof(d.name) != TYPE_STRING or typeof(d.cost) != TYPE_INT and typeof(d.cost) != TYPE_FLOAT:
-			return false
-		return true
-	else:
-		# monster
-		if not d.has("name") or not d.has("base_speed") or not d.has("hp") or not d.has("attack"):
-			return false
-		if typeof(d.name) != TYPE_STRING:
-			return false
-		if typeof(d.base_speed) != TYPE_FLOAT and typeof(d.base_speed) != TYPE_INT:
-			return false
-		return true
+var _registry: Dictionary = {}
 
-# simple registry kept in-memory for the running session
-var _registry := {}
+func validate_mod_definition(definition: Dictionary) -> bool:
+	if definition.is_empty():
+		return false
+	if not definition.has("id") or not definition.has("type") or not definition.has("data"):
+		return false
+	var mod_type := String(definition.get("type", ""))
+	if mod_type != "trap" and mod_type != "monster":
+		return false
+	var data: Variant = definition.get("data")
+	if typeof(data) != TYPE_DICTIONARY:
+		return false
+	var payload := data as Dictionary
+	if mod_type == "trap":
+		if not payload.has("name") or not payload.has("cost"):
+			return false
+		if not payload.has("damage") or not payload.has("cooldown"):
+			return false
+		if typeof(payload.name) != TYPE_STRING:
+			return false
+		return typeof(payload.cost) == TYPE_INT or typeof(payload.cost) == TYPE_FLOAT
+	if not payload.has("name") or not payload.has("base_speed"):
+		return false
+	if not payload.has("hp") or not payload.has("attack"):
+		return false
+	if typeof(payload.name) != TYPE_STRING:
+		return false
+	return typeof(payload.base_speed) == TYPE_FLOAT or typeof(payload.base_speed) == TYPE_INT
 
 func register_mod(mod: Dictionary) -> void:
-	if not mod or not mod.has("id"):
+	if mod.is_empty() or not mod.has("id"):
 		return
-	_registry[str(mod.id)] = mod
+	_registry[String(mod.id)] = mod
 
 func get_registered_mod(id: String) -> Dictionary:
 	return _registry.get(id, {})
 
 func get_registered_mods() -> Dictionary:
-	return _registry
+	return _registry.duplicate(true)
 
 func clear_registry() -> void:
 	_registry.clear()
 
-func load_mod(defn: Dictionary) -> Dictionary:
-	if not validate_mod_definition(defn):
+func load_mod(definition: Dictionary) -> Dictionary:
+	if not validate_mod_definition(definition):
 		return {}
-	var normalized = {"id":str(defn.id), "type":str(defn.type), "data":defn.data}
+	var normalized := {
+		"id": String(definition.id),
+		"type": String(definition.type),
+		"data": Dictionary(definition.data).duplicate(true),
+	}
 	register_mod(normalized)
 	return normalized
 
-func load_mods_from_dir(path: String) -> Array:
-	var dir := DirAccess.open(path)
-	var loaded := []
-	if dir == null:
+func load_mods_from_dir(path: String) -> Array[Dictionary]:
+	var loaded: Array[Dictionary] = []
+	var directory := DirAccess.open(path)
+	if directory == null:
 		return loaded
-	dir.list_dir_begin()
-	var fname = dir.get_next()
-	while fname != "":
-		if not dir.current_is_dir():
-			if fname.ends_with('.json'):
-				var fpath := path.plus_file(fname)
-				var file := FileAccess.open(fpath, FileAccess.READ)
-				if file:
-					var txt := file.get_as_text()
-					file.close()
-					var ok, data = JSON.parse_string(txt)
-					if ok == OK:
-						var mod = load_mod(data)
-						if mod.size() > 0:
-							loaded.append(mod)
-		fname = dir.get_next()
-	dir.list_dir_end()
+	directory.list_dir_begin()
+	var filename := directory.get_next()
+	while filename != "":
+		if not directory.current_is_dir() and filename.ends_with(".json"):
+			var file := FileAccess.open(path.path_join(filename), FileAccess.READ)
+			if file != null:
+				var parsed: Variant = JSON.parse_string(file.get_as_text())
+				file.close()
+				if typeof(parsed) == TYPE_DICTIONARY:
+					var mod := load_mod(parsed as Dictionary)
+					if not mod.is_empty():
+						loaded.append(mod)
+		filename = directory.get_next()
+	directory.list_dir_end()
 	return loaded
