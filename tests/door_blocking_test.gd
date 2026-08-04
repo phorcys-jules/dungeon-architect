@@ -21,14 +21,14 @@ func _init() -> void:
     astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
     astar.update()
 
-    # Place walls across the middle row except the door so the path must use it.
-    for x in range(1, 14):
-        var cell := Vector2i(x, 5)
+    # Build a vertical wall separating entrance and treasure, leaving one door cell.
+    for y in range(grid_size.y):
+        var cell := Vector2i(door.x, y)
         if cell == door:
             continue
         astar.set_point_solid(cell, true)
 
-    # Open door: the path should include the door cell.
+    # Open door: the only route between both sides must use the door cell.
     astar.set_point_solid(door, false)
     var path_open := astar.get_id_path(entrance, treasure)
     var passes_door := false
@@ -36,18 +36,13 @@ func _init() -> void:
         if Vector2i(point) == door:
             passes_door = true
             break
-    if not _check(passes_door, "path should pass through the door when open"):
+    if not _check(not path_open.is_empty() and passes_door, "path should pass through the door when open"):
         return
 
-    # Closed door: no route should remain through the wall.
+    # Closed door: the wall becomes continuous and no route should remain.
     astar.set_point_solid(door, true)
     var path_closed := astar.get_id_path(entrance, treasure)
-    var passes_closed_door := false
-    for point in path_closed:
-        if Vector2i(point) == door:
-            passes_closed_door = true
-            break
-    if not _check(not passes_closed_door and path_closed.is_empty(), "path should be blocked when door closed"):
+    if not _check(path_closed.is_empty(), "path should be blocked when door closed"):
         return
 
     print("Door blocking test passed")
