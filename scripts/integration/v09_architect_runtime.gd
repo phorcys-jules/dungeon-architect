@@ -1,7 +1,6 @@
 class_name V09ArchitectRuntime
 extends RefCounted
 
-var architect_context := ArchitectContext.new()
 var workshop := WorkshopHub.new()
 var upgrades := WorkshopUpgradeTree.new()
 var contracts := MonsterContractSystem.new()
@@ -20,8 +19,7 @@ func enter_hub() -> Dictionary:
 	var village_state := village.view_model()
 	var resident_state := residents.refresh(
 		int(village_state.reputation),
-		int(village_state.completed_contracts),
-		String(campaign_state.current_act.id)
+		int(village_state.completed_contracts)
 	)
 	return {
 		"workshop": workshop.enter(),
@@ -38,10 +36,13 @@ func generate_contract(seed: int) -> Dictionary:
 	var reputation := int(workshop.resources.get("reputation", 0))
 	active_contract = contracts.generate_contract(seed, reputation)
 	story.set_first_contract(String(active_contract.get("id", "")))
+	var client: Dictionary = active_contract.get("client", {})
+	var context_data := active_contract.duplicate(true)
+	context_data["client_name"] = String(client.get("name", "Client confidentiel"))
 	return {
 		"contract": active_contract.duplicate(true),
 		"briefing": contracts.get_briefing(),
-		"architect_context": architect_context.contract_summary(active_contract),
+		"architect_context": ArchitectContext.contract_summary(context_data),
 		"workshop_effects": upgrades.combined_effects(),
 		"campaign": campaign.view_model(),
 	}
@@ -58,16 +59,10 @@ func complete_contract(metrics: Dictionary) -> Dictionary:
 		"materials": int(metrics.get("materials_salvaged", 0)),
 	}
 	workshop.add_resources(rewards)
-	var village_state := village.record_contract(int(result.get("reputation", 0)))
-	var campaign_state := campaign.record_contract(
-		int(result.get("reputation", 0)),
-		String(active_contract.get("client_id", ""))
-	)
-	residents.refresh(
-		int(village_state.reputation),
-		int(village_state.completed_contracts),
-		String(campaign_state.current_act.id)
-	)
+	var reputation_gain := int(result.get("reputation", 0))
+	var village_state := village.record_contract(reputation_gain)
+	var campaign_state := campaign.record_contract(reputation_gain)
+	residents.refresh(int(village_state.reputation), int(village_state.completed_contracts))
 	last_result = result.duplicate(true)
 	last_result["rewards"] = rewards
 	last_result["village"] = village_state
@@ -77,23 +72,24 @@ func complete_contract(metrics: Dictionary) -> Dictionary:
 
 
 func final_contract_available() -> bool:
-	return campaign.final_act_unlocked() and not final_contract.completed
+	return final_contract.is_available(
+		campaign.reputation,
+		campaign.completed_contracts,
+		workshop.module_levels
+	) and not final_contract.completed
 
 
 func begin_final_contract() -> Dictionary:
 	if not final_contract_available():
 		return {"ok": false, "reason": "locked"}
-	return final_contract.begin(workshop.module_levels, upgrades.combined_effects())
+	var briefing := final_contract.briefing()
+	briefing["ok"] = true
+	return briefing
 
 
 func complete_final_contract(metrics: Dictionary) -> Dictionary:
 	var result := final_contract.evaluate(metrics)
-	if bool(result.get("ok", false)) and bool(result.get("completed", false)):
-		campaign.complete_finale()
-		workshop.add_resources({
-			"payment": int(result.get("payment", 0)),
-			"reputation": int(result.get("reputation", 0)),
-		})
+	if bool(result.get("completed", false)):
 		last_result = result.duplicate(true)
 	return result
 
