@@ -1,0 +1,26 @@
+name: Village Narrative Growth CI
+
+on:
+  pull_request:
+    paths:
+      - "scripts/meta/village_narrative_growth.gd"
+      - "tests/village_narrative_growth_test.gd"
+      - ".github/workflows/village-narrative-growth.yml"
+
+jobs:
+  village-growth:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          curl --fail --location --retry 3 \
+            --output godot.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d godot-bin
+          mv godot-bin/Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+      - name: Import project
+        run: timeout 90s ./godot --headless --path . --import
+      - name: Test village narrative growth
+        run: timeout 45s ./godot --headless --path . --script tests/village_narrative_growth_test.gd
