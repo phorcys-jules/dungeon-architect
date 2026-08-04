@@ -4,16 +4,16 @@ extends RefCounted
 # Produces lightweight spatial debrief data (heatmap + key moments)
 # replay: { positions: [ {pos: Vector2, time: float} ], events: [ {type:String, time:float, data:Dictionary} ] }
 func analyze(replay: Dictionary) -> Dictionary:
-	var positions = replay.get("positions", [])
-	var events = replay.get("events", [])
+	var positions: Array = replay.get("positions", [])
+	var events: Array = replay.get("events", [])
 	# Heatmap: map string "x,y" -> count
-	var heatmap := {}
+	var heatmap: Dictionary = {}
 	for p in positions:
 		var k := "%d,%d" % [int(p.pos.x), int(p.pos.y)]
 		heatmap[k] = heatmap.get(k, 0) + 1
 	# Key moments: first damage, highest damage event, end
-	var first_damage := null
-	var max_damage := null
+	var first_damage: Variant = null
+	var max_damage: Variant = null
 	var max_damage_val := -1
 	for e in events:
 		if e.get("type", "") == "damage":
