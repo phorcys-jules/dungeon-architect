@@ -1,0 +1,24 @@
+name: v0.9 Integration CI
+
+on:
+  pull_request:
+    paths:
+      - "scripts/integration/v09_architect_runtime.gd"
+      - "tests/v09_architect_runtime_test.gd"
+      - ".github/workflows/v09-integration.yml"
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          curl --fail --location --retry 3 --output godot.zip "https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d godot-bin
+          mv godot-bin/Godot_v4.7.1-stable_linux.x86_64 godot
+          chmod +x godot
+      - name: Import project
+        run: timeout 90s ./godot --headless --path . --import
+      - name: Run v0.9 integration test
+        run: timeout 45s ./godot --headless --path . --script tests/v09_architect_runtime_test.gd
