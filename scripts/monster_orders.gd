@@ -7,7 +7,7 @@ extends RefCounted
 func resolve_order(monster_profile: Dictionary, order: String, context: Dictionary) -> Dictionary:
 	var bravery := float(monster_profile.get("bravery", 0.5))
 	var panic := float(monster_profile.get("panic", 0.0))
-	var priority := context.get("priority", 1)
+	var priority: int = int(context.get("priority", 1))
 	# High panic or low bravery tends to ignore risky orders
 	if panic > 0.75 and order != "retreat":
 		return {"accepted": false, "reason": "panicked", "priority": 0}
@@ -22,7 +22,7 @@ func resolve_order(monster_profile: Dictionary, order: String, context: Dictiona
 		return {"accepted": false, "reason": "stubborn", "priority": 0}
 	if order == "intercept":
 		# accept intercept if not busy and priority high
-		if context.get("busy", false):
+		if bool(context.get("busy", false)):
 			return {"accepted": false, "reason": "busy", "priority": 0}
 		if priority >= 2:
 			return {"accepted": true, "reason": "intercepting", "priority": priority}
